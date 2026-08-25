@@ -162,8 +162,10 @@ jobs:
       - name: Sync locked workspace
         run: uv sync --locked --all-packages
 
-      - name: Start real platform dependencies and APIs
-        run: docker compose -f infrastructure/compose/docker-compose.yml up -d --build --wait
+      - name: Start real platform infrastructure
+        run: >
+          docker compose -f infrastructure/compose/docker-compose.yml up -d --wait
+          postgres kafka rabbitmq redis minio mailpit
 
       - name: Run service-owned migrations
         run: |
@@ -176,6 +178,9 @@ jobs:
           uv run --package order-service alembic -c services/order-service/alembic.ini upgrade head
           uv run --package payment-service alembic -c services/payment-service/alembic.ini upgrade head
           uv run --package notification-service alembic -c services/notification-service/alembic.ini upgrade head
+
+      - name: Start migrated APIs and workers
+        run: docker compose -f infrastructure/compose/docker-compose.yml up -d --build --wait
 
       - name: Execute cross-service E2E workflow
         run: RUN_E2E=1 E2E_BASE_URL=http://127.0.0.1 uv run --all-packages pytest tests/e2e/test_phase6_checkout_notification.py -q

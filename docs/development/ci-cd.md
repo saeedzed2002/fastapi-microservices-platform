@@ -16,9 +16,11 @@ third-party distributions, so `pip-audit` excludes them and audits their locked
 external dependencies. The `migration-heads` job requires one Alembic
 head per executable service. Pull requests build each service image
 independently and scan it with Trivy for fixable `HIGH` and `CRITICAL`
-vulnerabilities. The `integration` job starts the real Compose topology, runs
-every service-owned migration, executes checkout-to-invoice-to-email E2E, and
-collects logs on failure.
+vulnerabilities. The `integration` job starts only PostgreSQL and the shared
+brokers first, runs every service-owned migration, then starts APIs and workers
+against the migrated schemas before executing checkout-to-invoice-to-email E2E
+and collecting logs on failure. Application processes must never begin
+background database work against an unmigrated schema.
 
 Only a validated push to `main` can run `publish-ghcr`. That job receives
 `packages: write` and no broader write permission, authenticates with the
