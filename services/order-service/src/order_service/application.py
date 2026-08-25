@@ -116,23 +116,27 @@ async def collect_checkout_snapshot(
     access_token: str,
     address_id: UUID,
     item_quantities: dict[UUID, int],
-) -> tuple[dict[str, str], list[dict[str, object]], str, Decimal]:
+) -> tuple[dict[str, str], str, list[dict[str, object]], str, Decimal]:
     headers = {"Authorization": f"Bearer {access_token}"}
     timeout = httpx.Timeout(5.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
-        variants_response, addresses_response = await asyncio.gather(
+        variants_response, addresses_response, customer_response = await asyncio.gather(
             client.post(
                 f"{catalog_base_url}/api/v1/catalog/checkout/variants",
                 headers=headers,
                 json={"variant_ids": [str(variant_id) for variant_id in item_quantities]},
             ),
             client.get(f"{customer_base_url}/api/v1/customers/me/addresses", headers=headers),
+            client.get(f"{customer_base_url}/api/v1/customers/me", headers=headers),
         )
     if variants_response.status_code != status.HTTP_200_OK:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="checkout variants unavailable"
         )
-    if addresses_response.status_code != status.HTTP_200_OK:
+    if (
+        addresses_response.status_code != status.HTTP_200_OK
+        or customer_response.status_code != status.HTTP_200_OK
+    ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="checkout address unavailable"
         )
@@ -167,6 +171,7 @@ async def collect_checkout_snapshot(
             for key in ("recipient_name", "line1", "line2", "city", "postal_code", "country_code")
             if address.get(key) is not None
         },
+        str(customer_response.json()["email"]),
         snapshots,
         currencies.pop(),
         checkout_total(
@@ -185,6 +190,7 @@ async def create_order(
     customer_id: UUID,
     idempotency_key: str,
     delivery_address: dict[str, str],
+    customer_email: str,
     snapshots: list[dict[str, object]],
     currency: str,
     total_amount: Decimal,
@@ -203,6 +209,7 @@ async def create_order(
         currency=currency,
         total_amount=total_amount,
         delivery_address=delivery_address,
+        customer_email=customer_email,
         payment_method=payment_method,
         idempotency_key=idempotency_key,
     )

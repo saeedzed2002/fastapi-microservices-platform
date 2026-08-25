@@ -2,7 +2,8 @@ from decimal import Decimal
 from uuid import uuid4
 
 from order_service.application import checkout_total, transition_order
-from order_service.models import Order
+from order_service.models import Order, OrderItem
+from order_service.workers.invoice_tasks import render_invoice_pdf
 
 
 def test_checkout_total_is_exact_decimal() -> None:
@@ -38,3 +39,24 @@ def test_late_payment_success_cannot_resurrect_cancelled_order() -> None:
         order, event_type="payment.succeeded.v1", event_id=uuid4(), reason=""
     )
     assert order.status == "CANCELLED"
+
+
+def test_invoice_pdf_is_rendered_from_order_snapshot() -> None:
+    order = Order(
+        tracking_code="ORD-TEST",
+        currency="USD",
+        total_amount=Decimal("10.00"),
+        customer_email="customer@example.test",
+    )
+    item = OrderItem(
+        order_id=uuid4(),
+        variant_id=uuid4(),
+        sku="SKU-TEST",
+        product_name="Test product",
+        unit_amount=Decimal("5.00"),
+        quantity=2,
+    )
+
+    pdf = render_invoice_pdf(order=order, items=[item])
+
+    assert pdf.startswith(b"%PDF")

@@ -14,6 +14,11 @@ failure ends the order in `CANCELLED`. An Inbox guard and the state machine
 prevent duplicate or late facts from repeating effects or resurrecting a
 terminal order.
 
+After `CONFIRMED`, the service consumes its own durable confirmation fact with
+an independent consumer group. It owns the Invoice metadata, deterministic PDF
+object key, task intent, and `invoice.generated.v1` Outbox record. It does not
+own email delivery.
+
 ## API
 
 - `POST /api/v1/orders` with `Idempotency-Key`

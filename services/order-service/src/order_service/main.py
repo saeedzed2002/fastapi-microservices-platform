@@ -19,7 +19,8 @@ from order_service.auth import bearer, current_user
 from order_service.config import get_settings
 from order_service.db import dispose_engine, get_session
 from order_service.schemas import CheckoutRequest, OrderResponse
-from order_service.workers.kafka import consume_saga_events, publish_outbox
+from order_service.workers.kafka import consume_invoice_events, consume_saga_events, publish_outbox
+from order_service.workers.task_dispatcher import run_task_dispatcher
 from platform_auth import AuthClaims
 
 settings = get_settings()
@@ -34,6 +35,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         tasks.append(asyncio.create_task(publish_outbox(settings, stop)))
     if settings.kafka_consumer_enabled:
         tasks.append(asyncio.create_task(consume_saga_events(settings, stop)))
+    if settings.invoice_consumer_enabled:
+        tasks.append(asyncio.create_task(consume_invoice_events(settings, stop)))
+    if settings.task_dispatcher_enabled:
+        tasks.append(asyncio.create_task(run_task_dispatcher(settings, stop)))
     logger.info("service_started")
     yield
     stop.set()
@@ -87,7 +92,7 @@ async def checkout(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="duplicate variant"
             )
         quantities[item.variant_id] = item.quantity
-    address, snapshots, currency, total = await collect_checkout_snapshot(
+    address, customer_email, snapshots, currency, total = await collect_checkout_snapshot(
         catalog_base_url=settings.catalog_base_url,
         customer_base_url=settings.customer_base_url,
         access_token=credentials.credentials,
@@ -101,6 +106,7 @@ async def checkout(
             customer_id=claims.subject,
             idempotency_key=idempotency_key,
             delivery_address=address,
+            customer_email=customer_email,
             snapshots=snapshots,
             currency=currency,
             total_amount=total,

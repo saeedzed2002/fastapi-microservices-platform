@@ -16,7 +16,9 @@ The canonical envelope uses JSON Schema in Phase 0. Before the first business ev
 
 ### Kafka-to-RabbitMQ durable handoff
 
-Before the first critical flow hands work from a database transaction or Kafka consumer to RabbitMQ, define how task intent is recorded and dispatched without loss or uncontrolled duplication. A local task-outbox/dispatcher is the default candidate, but the exact protocol needs an ADR or amendment.
+Resolved by ADR-015 for Invoice and Notification: each service records a local
+task intent, dispatches through a claimed state and RabbitMQ publisher confirm,
+and treats uncertain publication as safe duplicate task execution.
 
 ### Identity and service trust
 
@@ -75,11 +77,14 @@ Confirm whether durable history plus reconnect catch-up is sufficient for the in
 
 ### Media and generated invoice ownership
 
-Media owns user-upload lifecycle and generic media metadata. Order owns generated invoice business metadata and may use its own `ObjectStorage` adapter. Confirm retention, deletion, and access policies for each object class.
+Resolved for generation by ADR-015: Order owns Invoice metadata and bytes under
+its own S3-compatible bucket. Retention, deletion, and customer download policy
+remain open.
 
 ### Customer and Notification preferences
 
-Define one writable owner. The recommended split is Customer for general user preferences and Notification for channel delivery state or an event-fed projection.
+Phase 6 carries a checkout-time email contact snapshot only. User-controlled
+preferences and unsubscribe policy remain open before additional channels ship.
 
 ### Order and Shipping status
 

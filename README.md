@@ -4,12 +4,12 @@ FastAPI Microservices Platform is a backend-only, production-oriented e-commerce
 
 ## Project status
 
-The repository is currently in **Phase 5 — Order & Payment**.
+The repository is currently in **Phase 6 — Invoice & Notification**.
 
-Phase 5 adds the first executable choreography-based checkout Saga. Order stores
-immutable Catalog and Customer snapshots, Inventory owns atomic reservations and
-release compensation, and Payment owns idempotent fake-provider intents. The
-workflow uses transactional Outboxes and durable Inboxes across Kafka.
+Phase 6 adds Order-owned generated Invoices and Notification-owned email
+delivery. The `Kafka -> RabbitMQ/Celery` handoff uses durable task intents,
+publisher confirmation, idempotent workers, S3-compatible storage, and a local
+Mailpit SMTP sink.
 
 ## Architecture at a glance
 
@@ -91,11 +91,13 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Dependency and version policy](docs/development/dependency-policy.md)
 - [Testing strategy](docs/development/testing-strategy.md)
 - [CI/CD strategy](docs/development/ci-cd.md)
+- [Invoice and notification runbook](docs/runbooks/invoice-notification.md)
 - [Phase 0 plan](docs/development/phase-0-plan.md)
 - [Phase 1 plan](docs/development/phase-1-plan.md)
 - [Phase 2 plan](docs/development/phase-2-plan.md)
 - [Phase 4 plan](docs/development/phase-4-plan.md)
 - [Phase 5 plan](docs/development/phase-5-plan.md)
+- [Phase 6 plan](docs/development/phase-6-plan.md)
 
 ## Roadmap
 
@@ -117,8 +119,10 @@ The complete intended layout is documented in [repository structure](docs/archit
 
 ## Local development
 
-Phase 5 adds Order on port `8007` and Payment on port `8008`. See the Phase 5
-plan and use scripts/platform.ps1 for repeatable local tasks.
+Phase 6 adds Notification on port `8009` and the local Mailpit UI on port
+`8025`. `dev-up` first builds API images and then starts Compose; this lets
+the Invoice and Notification workers consume the same built service images.
+Use `scripts/platform.ps1` for repeatable local tasks.
 
     pwsh -File .\scripts\platform.ps1 -Task install
     pwsh -File .\scripts\platform.ps1 -Task test
@@ -131,6 +135,8 @@ plan and use scripts/platform.ps1 for repeatable local tasks.
     pwsh -File .\scripts\platform.ps1 -Task migrate-cart
     pwsh -File .\scripts\platform.ps1 -Task migrate-order
     pwsh -File .\scripts\platform.ps1 -Task migrate-payment
+    pwsh -File .\scripts\platform.ps1 -Task migrate-notification
+    $env:RUN_E2E = "1"; uv run pytest tests/e2e/test_phase6_checkout_notification.py
 
 ## License
 

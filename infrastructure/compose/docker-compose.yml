@@ -87,6 +87,17 @@ services:
       timeout: 10s
       retries: 12
 
+  mailpit:
+    image: axllent/mailpit:v1.30.0
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   reference-service:
     build:
       context: ../..
@@ -255,6 +266,7 @@ services:
     build:
       context: ../..
       dockerfile: services/order-service/Dockerfile
+    image: fastapi-microservices-platform-order-service:latest
     environment:
       ORDER_ENVIRONMENT: local
       ORDER_DATABASE_URL: postgresql+asyncpg://order_service:order-local-only@postgres:5432/order_service
@@ -264,6 +276,10 @@ services:
       ORDER_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       ORDER_KAFKA_PUBLISHER_ENABLED: "true"
       ORDER_KAFKA_CONSUMER_ENABLED: "true"
+      ORDER_INVOICE_CONSUMER_ENABLED: "true"
+      ORDER_TASK_DISPATCHER_ENABLED: "true"
+      ORDER_RABBITMQ_URL: amqp://platform:platform-local-only@rabbitmq:5672//
+      ORDER_S3_ENDPOINT_URL: http://minio:9000
     ports:
       - "8007:8000"
     depends_on:
@@ -274,6 +290,10 @@ services:
       catalog-service:
         condition: service_healthy
       customer-service:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
@@ -303,6 +323,70 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+
+  notification-service:
+    build:
+      context: ../..
+      dockerfile: services/notification-service/Dockerfile
+    image: fastapi-microservices-platform-notification-service:latest
+    environment:
+      NOTIFICATION_ENVIRONMENT: local
+      NOTIFICATION_DATABASE_URL: postgresql+asyncpg://notification_service:notification-local-only@postgres:5432/notification_service
+      NOTIFICATION_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      NOTIFICATION_KAFKA_CONSUMER_ENABLED: "true"
+      NOTIFICATION_RABBITMQ_URL: amqp://platform:platform-local-only@rabbitmq:5672//
+      NOTIFICATION_TASK_DISPATCHER_ENABLED: "true"
+      NOTIFICATION_SMTP_HOST: mailpit
+      NOTIFICATION_SMTP_PORT: "1025"
+    ports:
+      - "8009:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  order-invoice-worker:
+    image: fastapi-microservices-platform-order-service:latest
+    command: ["celery", "-A", "order_service.workers.celery_app:celery_app", "worker", "--loglevel=INFO", "--without-mingle", "--without-gossip", "-Q", "order.invoice"]
+    environment:
+      ORDER_ENVIRONMENT: local
+      ORDER_DATABASE_URL: postgresql+asyncpg://order_service:order-local-only@postgres:5432/order_service
+      ORDER_RABBITMQ_URL: amqp://platform:platform-local-only@rabbitmq:5672//
+      ORDER_S3_ENDPOINT_URL: http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  notification-worker:
+    image: fastapi-microservices-platform-notification-service:latest
+    command: ["celery", "-A", "notification_service.workers.celery_app:celery_app", "worker", "--loglevel=INFO", "--without-mingle", "--without-gossip", "-Q", "notification.email"]
+    environment:
+      NOTIFICATION_ENVIRONMENT: local
+      NOTIFICATION_DATABASE_URL: postgresql+asyncpg://notification_service:notification-local-only@postgres:5432/notification_service
+      NOTIFICATION_RABBITMQ_URL: amqp://platform:platform-local-only@rabbitmq:5672//
+      NOTIFICATION_SMTP_HOST: mailpit
+      NOTIFICATION_SMTP_PORT: "1025"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
 
   media-worker:
     image: fastapi-microservices-platform-media-service:latest

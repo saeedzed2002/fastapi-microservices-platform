@@ -99,11 +99,11 @@
       "name": "order.confirmed.v1",
       "kind": "domain-event",
       "owner": "order-service",
-      "consumers": [],
+      "consumers": ["order-service"],
       "status": "active",
       "topic": "fastapi-platform.order.events.v1",
       "message_key": "order_id",
-      "notes": "Order is terminally confirmed. Phase 6 will add invoice and notification consumers.",
+      "notes": "Order is terminally confirmed. An independent Order consumer group creates the durable invoice-generation handoff.",
       "schema": "events/order.confirmed.v1.schema.json"
     },
     {
@@ -111,11 +111,11 @@
       "kind": "domain-event",
       "owner": "order-service",
       "consumers": ["notification-service"],
-      "status": "reserved",
-      "topic": null,
-      "message_key": null,
-      "notes": "Order owns the event initially; Phase 6 decides order-topic versus dedicated invoice-topic placement.",
-      "schema": null
+      "status": "active",
+      "topic": "fastapi-platform.order.events.v1",
+      "message_key": "order_id",
+      "notes": "Invoice bytes remain Order-owned object storage data; Notification receives only the delivery fact and recipient contact snapshot.",
+      "schema": "events/invoice.generated.v1.schema.json"
     },
     {
       "name": "media.ready.v1",

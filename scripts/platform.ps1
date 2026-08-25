@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("install", "lint", "format-check", "typecheck", "test", "migrate-identity", "migrate-customer", "migrate-catalog", "migrate-media", "migrate-inventory", "migrate-cart", "migrate-order", "migrate-payment", "dev-up", "dev-down", "logs")]
+    [ValidateSet("install", "lint", "format-check", "typecheck", "test", "migrate-identity", "migrate-customer", "migrate-catalog", "migrate-media", "migrate-inventory", "migrate-cart", "migrate-order", "migrate-payment", "migrate-notification", "dev-up", "dev-down", "logs")]
     [string]$Task
 )
 
@@ -30,7 +30,11 @@ try {
         "migrate-cart" { & $uvPath run --package cart-service alembic -c services/cart-service/alembic.ini upgrade head }
         "migrate-order" { & $uvPath run --package order-service alembic -c services/order-service/alembic.ini upgrade head }
         "migrate-payment" { & $uvPath run --package payment-service alembic -c services/payment-service/alembic.ini upgrade head }
-        "dev-up" { docker compose -f $composeFile up -d --build }
+        "migrate-notification" { & $uvPath run --package notification-service alembic -c services/notification-service/alembic.ini upgrade head }
+        "dev-up" {
+            docker compose -f $composeFile build
+            docker compose -f $composeFile up -d
+        }
         "dev-down" { docker compose -f $composeFile down }
         "logs" { docker compose -f $composeFile logs -f }
     }

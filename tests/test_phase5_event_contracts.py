@@ -15,6 +15,7 @@ def test_phase5_emitted_events_are_active_and_have_schemas() -> None:
         "payment.succeeded.v1",
         "payment.failed.v1",
         "order.confirmed.v1",
+        "invoice.generated.v1",
     ):
         contract = contracts[event_name]
         assert contract["status"] == "active"

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["invoice_id", "order_id", "tracking_code", "recipient_email"],
+  "properties": {
+    "invoice_id": {"type": "string", "format": "uuid"},
+    "order_id": {"type": "string", "format": "uuid"},
+    "tracking_code": {"type": "string", "minLength": 1},
+    "recipient_email": {"type": "string", "format": "email"}
+  }
+}

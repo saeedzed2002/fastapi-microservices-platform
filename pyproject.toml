@@ -27,6 +27,7 @@ members = [
   "services/inventory-service",
   "services/order-service",
   "services/payment-service",
+  "services/notification-service",
   "libs/platform-auth",
   "services/customer-service",
   "services/identity-service",
@@ -44,6 +45,7 @@ src = [
   "services/inventory-service/src",
   "services/order-service/src",
   "services/payment-service/src",
+  "services/notification-service/src",
   "services/reference-service/src",
   "services/identity-service/src",
   "services/customer-service/src",
@@ -63,12 +65,16 @@ testpaths = [
   "services/inventory-service/tests",
   "services/order-service/tests",
   "services/payment-service/tests",
+  "services/notification-service/tests",
   "services/reference-service/tests",
   "services/identity-service/tests",
   "services/customer-service/tests",
   "tests",
 ]
 addopts = "-ra --import-mode=importlib"
+markers = [
+  "e2e: requires the local Docker Compose platform and is opt-in",
+]
 
 [tool.mypy]
 python_version = "3.12"
@@ -81,6 +87,7 @@ files = [
   "services/inventory-service/src",
   "services/order-service/src",
   "services/payment-service/src",
+  "services/notification-service/src",
   "services/reference-service/src",
   "services/identity-service/src",
   "services/customer-service/src",

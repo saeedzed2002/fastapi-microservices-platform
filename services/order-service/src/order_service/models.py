@@ -24,6 +24,7 @@ class Order(Base):
     currency: Mapped[str] = mapped_column(String(3))
     total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     delivery_address: Mapped[dict[str, str]] = mapped_column(JSON)
+    customer_email: Mapped[str | None] = mapped_column(String(320))
     payment_method: Mapped[str] = mapped_column(String(32))
     idempotency_key: Mapped[str] = mapped_column(String(128), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
@@ -65,6 +66,39 @@ class InboxMessage(Base):
     event_id: Mapped[UUID] = mapped_column(unique=True)
     event_type: Mapped[str] = mapped_column(String(160))
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class Invoice(Base):
+    __tablename__ = "invoices"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    order_id: Mapped[UUID] = mapped_column(
+        ForeignKey("orders.id", ondelete="RESTRICT"), unique=True, index=True
+    )
+    status: Mapped[str] = mapped_column(String(32), default="PENDING", index=True)
+    object_key: Mapped[str | None] = mapped_column(String(600), unique=True)
+    checksum_sha256: Mapped[str | None] = mapped_column(String(64))
+    size_bytes: Mapped[int | None] = mapped_column(Integer)
+    processing_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    failure_reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
+class TaskIntent(Base):
+    __tablename__ = "task_intents"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    task_name: Mapped[str] = mapped_column(String(160))
+    payload: Mapped[dict[str, str]] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(32), default="PENDING", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class OutboxMessage(Base):
