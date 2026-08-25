@@ -2,7 +2,7 @@
 name = "platform-auth"
 version = "0.1.0"
 description = "Technical JWT verification utilities shared without domain models."
-requires-python = ">=3.12,<3.15"
+requires-python = ">=3.14,<3.15"
 dependencies = ["PyJWT[crypto]>=2.13,<3"]
 
 [build-system]

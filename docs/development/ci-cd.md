@@ -29,7 +29,7 @@ source, revision, and version labels. No `latest` tag is published and the
 workflow summary records the resulting digest.
 
 `pip-audit 2.10.1` and `Trivy Action 0.36.0` were selected from their official
-releases on `2026-08-25`; the former supports Python `3.12` and is locked as a
+releases on `2026-08-25`; the former supports Python `3.14` and is locked as a
 development dependency, while the latter is immutably pinned in the workflow.
 The workflow uses only immutable references to `actions/checkout`,
 `astral-sh/setup-uv`, and `aquasecurity/trivy-action`, the hosted-runner Docker

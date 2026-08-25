@@ -2,7 +2,7 @@
 name = "reference-service"
 version = "0.1.0"
 description = "Dependency-light non-domain service used to validate the platform foundation."
-requires-python = ">=3.12,<3.15"
+requires-python = ">=3.14,<3.15"
 dependencies = [
   "fastapi>=0.141.1,<0.142",
   "pydantic-settings>=2.15,<3",

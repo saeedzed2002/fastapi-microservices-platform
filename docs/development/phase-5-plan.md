@@ -39,7 +39,7 @@ require a later bounded-context worker decision.
 
 The existing aiokafka constraint is retained at >=0.14,<0.15; 0.14.0 was
 rechecked from the official PyPI release on 2026-08-25. It supports Python 3.10
-and newer, has CPython 3.12 wheels, and is compatible with the repository
+and newer, has CPython 3.14 wheels, and is compatible with the repository
 Python baseline and local Apache Kafka 4.2.0 for the producer/consumer API used
 here. Its Apache-2.0 license and upstream documentation were reviewed. The
 exact version is resolved by uv.lock and pinned in service images.

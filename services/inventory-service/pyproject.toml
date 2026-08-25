@@ -2,7 +2,7 @@
 name = "inventory-service"
 version = "0.5.0"
 description = "Inventory bounded context for stock, reservations, and auditable movements."
-requires-python = ">=3.12,<3.15"
+requires-python = ">=3.14,<3.15"
 dependencies = [
   "aiokafka>=0.14,<0.15",
   "alembic>=1.19.1,<2",

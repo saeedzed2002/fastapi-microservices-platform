@@ -270,6 +270,16 @@ if ((Test-CanonicalUuid "not-a-uuid") -or (Test-UtcTimestamp "not-a-dateZ")) {
 
 $workflowPath = Join-Path $repositoryPath ".github/workflows/platform-ci.yml"
 $workflow = Get-Content -LiteralPath $workflowPath -Raw
+$workflowActionPins = [regex]::Matches($workflow, "(?m)^\s*uses:\s*([^\s#]+)")
+if ($workflowActionPins.Count -eq 0) {
+    Add-ValidationError "Platform CI workflow must declare at least one pinned action."
+}
+foreach ($workflowActionPin in $workflowActionPins) {
+    $actionReference = $workflowActionPin.Groups[1].Value
+    if ($actionReference -notmatch "^[^@]+@[0-9a-f]{40}$") {
+        Add-ValidationError "Platform CI action must use a full immutable commit SHA: $actionReference"
+    }
+}
 if ($workflow -notmatch "(?m)^\s*uses:\s*actions/checkout@[0-9a-f]{40}\s*(?:#.*)?$") {
     Add-ValidationError "Platform CI workflow must pin actions/checkout to a full commit SHA."
 }

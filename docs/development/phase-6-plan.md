@@ -23,7 +23,7 @@ retention policy automation, and provider-side idempotency are deferred.
 ## Dependency selection
 
 `ReportLab 5.0.1` was verified on official PyPI on 2026-08-25 as the latest
-production-stable BSD-licensed release with Python 3.12 support. `Celery 5.6.3`
+production-stable BSD-licensed release with Python 3.14 support. `Celery 5.6.3`
 and `Boto3 1.43.79` remain the already locked compatible project choices.
 Mailpit `v1.30.0` was selected from its official release history for local SMTP
 validation; it is not a production mail provider.

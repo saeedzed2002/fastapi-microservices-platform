@@ -25,10 +25,15 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up CPython 3.14.7
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.14.7"
+
       - name: Set up uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.12.1"
+          version: "0.12.5"
           enable-cache: true
 
       - name: Sync locked workspace
@@ -63,10 +68,15 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up CPython 3.14.7
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.14.7"
+
       - name: Set up uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.12.1"
+          version: "0.12.5"
           enable-cache: true
 
       - name: Sync locked workspace
@@ -138,10 +148,15 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up CPython 3.14.7
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.14.7"
+
       - name: Set up uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.12.1"
+          version: "0.12.5"
           enable-cache: true
 
       - name: Sync locked workspace
@@ -190,6 +205,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Set up CPython 3.14.7
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.14.7"
 
       - name: Authenticate to GitHub Container Registry
         env:

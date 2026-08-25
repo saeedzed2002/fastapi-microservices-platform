@@ -2,7 +2,7 @@
 name = "catalog-service"
 version = "0.3.0"
 description = "Catalog bounded context for products, variants, categories, brands, and prices."
-requires-python = ">=3.12,<3.15"
+requires-python = ">=3.14,<3.15"
 dependencies = [
   "alembic>=1.19.1,<2",
   "asyncpg>=0.31,<0.32",

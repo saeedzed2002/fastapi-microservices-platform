@@ -2,7 +2,7 @@
 name = "order-service"
 version = "0.6.0"
 description = "Order bounded context and checkout Saga participant."
-requires-python = ">=3.12,<3.15"
+requires-python = ">=3.14,<3.15"
 dependencies = [
   "aiokafka>=0.14,<0.15",
   "alembic>=1.19.1,<2",

@@ -7,8 +7,9 @@ Phase 1 selects the minimum executable platform profile. Direct package constrai
 | GitHub-hosted runner | 0 | `ubuntu-24.04` managed label; verified `2026-08-25` | Supported runner label, required preinstalled shell, mutable-image update policy |
 | PowerShell | 0 | Runner-provided mutable `pwsh`; minimum `7.4`; standalone `v7.6.5` reviewed `2026-08-25` but not installed | Bundled image inventory, Draft 2020-12 schema behavior, local prerequisite, mutable-image exception |
 | `actions/checkout` | 0 | `v7.0.1` pinned to `3d3c42e5aac5ba805825da76410c181273ba90b1`; verified `2026-08-25` | Official release, immutable commit SHA, runtime compatibility, minimal permissions |
-| Python | 1 | 3.12 local/CI baseline | Stable release, support lifecycle, platform and complete-stack compatibility |
-| `uv` | 1 | 0.12.1 | Stable release, workspace/lock behavior, Python support, reproducible installation |
+| `actions/setup-python` | 1 | `v6.2.0` pinned to `a309ff8b426b58ec0e2a45f0f869d46889d02405`; verified `2026-08-25` | Official release, immutable commit SHA, runner compatibility, explicit interpreter selection |
+| Python | 1 | CPython `3.14.7` local/CI/container baseline | Stable release, support lifecycle, platform and complete-stack compatibility |
+| `uv` | 1 | 0.12.5 | Stable release, workspace/lock behavior, Python support, reproducible installation |
 | Ruff | 1 | 0.14.14 resolved | Python support, rule compatibility, formatter/linter behavior |
 | Type checker | 1 | mypy 1.20.2 resolved | Tool choice, Python/Pydantic/plugin compatibility, strictness policy |
 | pytest | 1 | 9.1.1 resolved | Python support, plugin compatibility, asynchronous test behavior |
@@ -90,12 +91,12 @@ For every later selection, record the exact version or digest, verification date
 
 ## Phase 1 selection evidence
 
-- Python baseline: CPython 3.12 is retained because the local host and selected FastAPI stack support it; the repository constrains the supported range to 3.12 through 3.14 and does not silently download another interpreter.
-- uv: official uv release 0.12.1 was selected after verifying workspace and lock behavior. The installer was obtained from Astral's official release endpoint, and the resulting lock was generated with uv 0.12.1.
-- Application cluster: FastAPI 0.141.1, Pydantic Settings 2.15.0, HTTPX 0.28.1, and Uvicorn 0.52.x were resolved together by uv on Python 3.12. The lock records the exact transitive graph.
+- Python baseline: CPython 3.14.7 is the latest stable production release selected on 2026-08-25. The repository requires 3.14 through 3.14.x, CI selects 3.14.7 explicitly, and every service image uses the official python:3.14.7-slim-bookworm tag. The locked workspace, Ruff, mypy, and 28 unit tests were exercised successfully on the locally installed CPython 3.14.0 interpreter before this baseline was changed.
+- uv: official uv release 0.12.5 was selected after verifying workspace and lock behavior. It includes the managed CPython 3.14.7 distribution required by the pinned project baseline; the installer was obtained from Astral's official release endpoint, and the resulting lock was generated with uv 0.12.5.
+- Application cluster: FastAPI 0.141.1, Pydantic Settings 2.15.0, HTTPX 0.28.1, and Uvicorn 0.52.x were resolved together by uv and validated on CPython 3.14. The lock records the exact transitive graph.
 - Development cluster: pytest, Ruff, and mypy are direct development tools; their exact resolved versions are recorded in uv.lock and validated by the Phase 1 checks.
 - Infrastructure images: PostgreSQL 18.6, Apache Kafka 4.2.0, RabbitMQ 4.3.5-management, Redis 8.10.0, and MinIO RELEASE.2025-07-23T15-54-02Z were selected as explicit local tags. Delivery environments must verify and pin immutable digests before promotion.
-- Official sources reviewed: [uv releases](https://github.com/astral-sh/uv/releases), [FastAPI release notes](https://fastapi.tiangolo.com/release-notes/), [Pydantic Settings on PyPI](https://pypi.org/project/pydantic-settings/), [SQLAlchemy on PyPI](https://pypi.org/project/SQLAlchemy/), [Uvicorn on PyPI](https://pypi.org/project/uvicorn/), [Apache Kafka downloads](https://kafka.apache.org/community/downloads/), [PostgreSQL official image](https://hub.docker.com/_/postgres), [RabbitMQ official image](https://hub.docker.com/_/rabbitmq), [Redis official image](https://hub.docker.com/_/redis), and [MinIO container documentation](https://min.io/docs/minio/container/).
+- Official sources reviewed: [Python releases](https://www.python.org/downloads/), [Python official image](https://hub.docker.com/_/python), [actions/setup-python release](https://github.com/actions/setup-python/releases/tag/v6.2.0), [uv releases](https://github.com/astral-sh/uv/releases), [FastAPI release notes](https://fastapi.tiangolo.com/release-notes/), [Pydantic Settings on PyPI](https://pypi.org/project/pydantic-settings/), [SQLAlchemy on PyPI](https://pypi.org/project/SQLAlchemy/), [Uvicorn on PyPI](https://pypi.org/project/uvicorn/), [Apache Kafka downloads](https://kafka.apache.org/community/downloads/), [PostgreSQL official image](https://hub.docker.com/_/postgres), [RabbitMQ official image](https://hub.docker.com/_/rabbitmq), [Redis official image](https://hub.docker.com/_/redis), and [MinIO container documentation](https://min.io/docs/minio/container/).
 - Compatibility exception: the initial reference service intentionally does not include database, broker, Celery, S3, or OpenTelemetry client packages. Those clusters remain unselected until a service requires them and their official compatibility evidence is reviewed.
 
 ## Phase 2 selection evidence
@@ -128,7 +129,7 @@ source for the workspace.
 
 - Redis Python client: redis-py 8.1.0 was the current stable package release
   when reviewed on 2026-08-25. It supports Python 3.10 and newer, so it is
-  compatible with this repository's Python 3.12 baseline. Cart Service uses
+  compatible with this repository's Python 3.14 baseline. Cart Service uses
   only the documented asynchronous GET, SET, and DEL cache operations.
 - Server compatibility: the local Redis 8.10.0 image remains the selected
   development server. The cart cache behavior is validated against that server
