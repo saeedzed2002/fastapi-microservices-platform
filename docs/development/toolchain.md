@@ -97,3 +97,29 @@ For every later selection, record the exact version or digest, verification date
 - Infrastructure images: PostgreSQL 18.6, Apache Kafka 4.2.0, RabbitMQ 4.3.5-management, Redis 8.10.0, and MinIO RELEASE.2025-07-23T15-54-02Z were selected as explicit local tags. Delivery environments must verify and pin immutable digests before promotion.
 - Official sources reviewed: [uv releases](https://github.com/astral-sh/uv/releases), [FastAPI release notes](https://fastapi.tiangolo.com/release-notes/), [Pydantic Settings on PyPI](https://pypi.org/project/pydantic-settings/), [SQLAlchemy on PyPI](https://pypi.org/project/SQLAlchemy/), [Uvicorn on PyPI](https://pypi.org/project/uvicorn/), [Apache Kafka downloads](https://kafka.apache.org/community/downloads/), [PostgreSQL official image](https://hub.docker.com/_/postgres), [RabbitMQ official image](https://hub.docker.com/_/rabbitmq), [Redis official image](https://hub.docker.com/_/redis), and [MinIO container documentation](https://min.io/docs/minio/container/).
 - Compatibility exception: the initial reference service intentionally does not include database, broker, Celery, S3, or OpenTelemetry client packages. Those clusters remain unselected until a service requires them and their official compatibility evidence is reviewed.
+
+## Phase 2 selection evidence
+
+The Phase 2 services add PostgreSQL access, password hashing, JWT validation, and
+Kafka transport. Stable releases were checked against official package indexes
+on 2026-08-25; preview releases were not selected.
+
+| Package | Selected version | Reason |
+|---|---:|---|
+| SQLAlchemy | 2.0.52 | Stable 2.0 line compatible with the async ORM and Alembic |
+| Alembic | 1.19.1 | Current stable migration tool compatible with SQLAlchemy 2.0 |
+| asyncpg | 0.31.0 | Current stable PostgreSQL async driver |
+| PyJWT | 2.13.0 | Current stable JWT implementation with cryptography extra |
+| argon2-cffi | 25.1.0 | Current stable Argon2id binding |
+| aiokafka | 0.14.0 | Current stable asyncio Kafka client |
+| email-validator | 2.3.0 | Current stable EmailStr validation dependency |
+
+Official sources: [SQLAlchemy](https://pypi.org/project/SQLAlchemy/),
+[Alembic](https://pypi.org/project/alembic/),
+[asyncpg](https://pypi.org/project/asyncpg/),
+[PyJWT](https://pypi.org/project/PyJWT/),
+[argon2-cffi](https://pypi.org/project/argon2-cffi/),
+[aiokafka](https://pypi.org/project/aiokafka/), and
+[email-validator](https://pypi.org/project/email-validator/). The exact
+transitive graph is recorded in uv.lock and is the only reproducible install
+source for the workspace.

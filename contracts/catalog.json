@@ -5,6 +5,17 @@
   "namespace": "fastapi-platform",
   "contracts": [
     {
+      "name": "identity.user_registered.v1",
+      "kind": "domain-event",
+      "owner": "identity-service",
+      "consumers": ["customer-service"],
+      "status": "active",
+      "topic": "fastapi-platform.identity.events.v1",
+      "message_key": "aggregate_id",
+      "notes": "Customer creates its own profile projection from this durable identity fact.",
+      "schema": "events/identity.user_registered.v1.schema.json"
+    },
+    {
       "name": "event-envelope.v1",
       "kind": "event-envelope",
       "owner": "platform",

@@ -1,0 +1,17 @@
+{
+  "event_id": "4e9b9a1c-9e6f-4f8d-a05a-44df2aa51f6a",
+  "event_type": "identity.user_registered.v1",
+  "event_version": 1,
+  "aggregate_type": "user",
+  "aggregate_id": "87b8d8f5-6aa4-469b-990e-1c3e37cf4b0a",
+  "producer": "identity-service",
+  "occurred_at": "2026-08-25T09:00:00Z",
+  "correlation_id": "b1be8c87-61e8-44e2-9131-8cc9bc0ad120",
+  "causation_id": null,
+  "trace_id": "0123456789abcdef0123456789abcdef",
+  "payload": {
+    "user_id": "87b8d8f5-6aa4-469b-990e-1c3e37cf4b0a",
+    "email": "customer@example.com",
+    "roles": ["customer"]
+  }
+}

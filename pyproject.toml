@@ -20,21 +20,27 @@ dev = [
 default-groups = ["dev"]
 
 [tool.uv.workspace]
-members = ["services/reference-service"]
+members = [
+  "libs/platform-auth",
+  "services/customer-service",
+  "services/identity-service",
+  "services/reference-service",
+]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-src = ["services/reference-service/src", "tests"]
+src = ["libs/platform-auth/src", "services/reference-service/src", "services/identity-service/src", "services/customer-service/src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["B008"]
 
 [tool.pytest.ini_options]
-testpaths = ["services/reference-service/tests", "tests"]
-addopts = "-ra"
+testpaths = ["libs/platform-auth/tests", "services/reference-service/tests", "services/identity-service/tests", "services/customer-service/tests", "tests"]
+addopts = "-ra --import-mode=importlib"
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["services/reference-service/src"]
+files = ["libs/platform-auth/src", "services/reference-service/src", "services/identity-service/src", "services/customer-service/src"]

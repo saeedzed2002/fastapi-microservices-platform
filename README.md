@@ -4,9 +4,11 @@ FastAPI Microservices Platform is a backend-only, production-oriented e-commerce
 
 ## Project status
 
-The repository is currently in **Phase 0 — Architecture & Repository Foundation**.
+The repository is currently in **Phase 2 — Identity & Customer**.
 
-Phase 0 defines architecture, ownership, contracts, repository conventions, and decision records. It intentionally contains no runnable business service, dependency lockfile, Docker Compose stack, Kubernetes manifest, or Helm chart. Those artifacts begin only in their designated phases after official version and compatibility verification.
+Phase 2 contains the identity and customer bounded contexts, their migrations,
+versioned event contract, local service images, and focused tests. Later
+business contexts remain intentionally unimplemented.
 
 ## Architecture at a glance
 
@@ -90,6 +92,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [CI/CD strategy](docs/development/ci-cd.md)
 - [Phase 0 plan](docs/development/phase-0-plan.md)
 - [Phase 1 plan](docs/development/phase-1-plan.md)
+- [Phase 2 plan](docs/development/phase-2-plan.md)
 
 ## Roadmap
 
@@ -111,11 +114,14 @@ The complete intended layout is documented in [repository structure](docs/archit
 
 ## Local development
 
-Phase 1 adds the verified and pinned runtime toolchain, Docker Compose infrastructure, a non-domain reference service, tests, and baseline runtime CI. See the Phase 1 plan and use scripts/platform.ps1 for repeatable local tasks.
+Phase 2 adds identity and customer services on top of the Phase 1 runtime.
+See the Phase 2 plan and use scripts/platform.ps1 for repeatable local tasks.
 
     pwsh -File .\scripts\platform.ps1 -Task install
     pwsh -File .\scripts\platform.ps1 -Task test
     pwsh -File .\scripts\platform.ps1 -Task dev-up
+    pwsh -File .\scripts\platform.ps1 -Task migrate-identity
+    pwsh -File .\scripts\platform.ps1 -Task migrate-customer
 
 ## License
 

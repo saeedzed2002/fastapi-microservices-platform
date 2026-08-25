@@ -25,4 +25,7 @@
 
 ## Schema files
 
-Payload schemas will be added when their owning bounded context is designed. Reserved names in `contracts/catalog.json` are not permission to publish an unspecified payload.
+The active identity.user_registered.v1 payload is owned by identity-service and
+consumed by customer-service. Its producer publishes the full envelope and its
+payload is validated against the catalog-linked schema. Reserved names in
+contracts/catalog.json are not permission to publish an unspecified payload.

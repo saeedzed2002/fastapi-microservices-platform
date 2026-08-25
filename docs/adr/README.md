@@ -33,3 +33,4 @@ ADRs record decisions that materially affect service ownership, contracts, durab
 | [ADR-008](ADR-008-s3-compatible-object-storage.md) | Accepted | S3-compatible object storage abstraction |
 | [ADR-009](ADR-009-independent-versioning.md) | Accepted | Independent API, event, and service versioning |
 | [ADR-010](ADR-010-kubernetes-first-runtime.md) | Accepted | Kubernetes-first application runtime model |
+| [ADR-011](ADR-011-identity-token-and-account-lifecycle.md) | Accepted | Identity tokens and account lifecycle |

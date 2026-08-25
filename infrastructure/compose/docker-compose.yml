@@ -113,6 +113,48 @@ services:
       timeout: 5s
       retries: 12
 
+  identity-service:
+    build:
+      context: ../..
+      dockerfile: services/identity-service/Dockerfile
+    environment:
+      IDENTITY_ENVIRONMENT: local
+      IDENTITY_DATABASE_URL: postgresql+asyncpg://identity_service:identity-local-only@postgres:5432/identity_service
+      IDENTITY_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
+      IDENTITY_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      IDENTITY_KAFKA_PUBLISHER_ENABLED: "false"
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  customer-service:
+    build:
+      context: ../..
+      dockerfile: services/customer-service/Dockerfile
+    environment:
+      CUSTOMER_ENVIRONMENT: local
+      CUSTOMER_DATABASE_URL: postgresql+asyncpg://customer_service:customer-local-only@postgres:5432/customer_service
+      CUSTOMER_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
+      CUSTOMER_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      CUSTOMER_KAFKA_CONSUMER_ENABLED: "false"
+    ports:
+      - "8002:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
 volumes:
   postgres-data:
   rabbitmq-data:
