@@ -5,18 +5,20 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from identity_service.config import get_settings
-from identity_service.models import Base
+from media_service.config import get_settings
+from media_service.models import Base
 
 config = context.config
 config.set_main_option("sqlalchemy.url", get_settings().database_url.replace("%", "%%"))
-
 target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
     context.configure(
-        url=get_settings().database_url, target_metadata=target_metadata, literal_binds=True
+        url=config.get_main_option("sqlalchemy.url"),
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
     )
     with context.begin_transaction():
         context.run_migrations()

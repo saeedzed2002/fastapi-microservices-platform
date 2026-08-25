@@ -1,5 +1,4 @@
 import asyncio
-from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import pool
@@ -11,8 +10,6 @@ from customer_service.models import Base
 
 config = context.config
 config.set_main_option("sqlalchemy.url", get_settings().database_url.replace("%", "%%"))
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
 

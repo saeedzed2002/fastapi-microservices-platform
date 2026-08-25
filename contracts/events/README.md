@@ -29,3 +29,7 @@ The active identity.user_registered.v1 payload is owned by identity-service and
 consumed by customer-service. Its producer publishes the full envelope and its
 payload is validated against the catalog-linked schema. Reserved names in
 contracts/catalog.json are not permission to publish an unspecified payload.
+
+media.ready.v1 is owned by media-service. It is active in Phase 3 and has no
+consumer group yet; it remains durable and replayable for later approved
+consumers. Its payload is defined in media.ready.v1.schema.json.

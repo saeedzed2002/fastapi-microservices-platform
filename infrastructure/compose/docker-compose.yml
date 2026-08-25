@@ -155,6 +155,74 @@ services:
       timeout: 5s
       retries: 12
 
+  catalog-service:
+    build:
+      context: ../..
+      dockerfile: services/catalog-service/Dockerfile
+    environment:
+      CATALOG_ENVIRONMENT: local
+      CATALOG_DATABASE_URL: postgresql+asyncpg://catalog_service:catalog-local-only@postgres:5432/catalog_service
+      CATALOG_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
+    ports:
+      - "8003:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  media-service:
+    build:
+      context: ../..
+      dockerfile: services/media-service/Dockerfile
+    environment:
+      MEDIA_ENVIRONMENT: local
+      MEDIA_DATABASE_URL: postgresql+asyncpg://media_service:media-local-only@postgres:5432/media_service
+      MEDIA_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
+      MEDIA_S3_ENDPOINT_URL: http://minio:9000
+      MEDIA_S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
+      MEDIA_RABBITMQ_URL: amqp://platform:platform-local-only@rabbitmq:5672//
+      MEDIA_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MEDIA_TASK_DISPATCHER_ENABLED: "true"
+      MEDIA_KAFKA_PUBLISHER_ENABLED: "true"
+    ports:
+      - "8004:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  media-worker:
+    image: fastapi-microservices-platform-media-service:latest
+    command: ["celery", "-A", "media_service.workers.celery_app:celery_app", "worker", "--loglevel=INFO", "--without-mingle", "--without-gossip"]
+    environment:
+      MEDIA_ENVIRONMENT: local
+      MEDIA_DATABASE_URL: postgresql+asyncpg://media_service:media-local-only@postgres:5432/media_service
+      MEDIA_S3_ENDPOINT_URL: http://minio:9000
+      MEDIA_S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
+      MEDIA_RABBITMQ_URL: amqp://platform:platform-local-only@rabbitmq:5672//
+      MEDIA_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
 volumes:
   postgres-data:
   rabbitmq-data:

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fastapi-microservices-platform.local/contracts/events/media.ready.v1.schema.json",
+  "title": "media.ready.v1 payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["media_asset_id", "purpose", "content_type", "derivative_kinds"],
+  "properties": {
+    "media_asset_id": {"type": "string", "format": "uuid"},
+    "purpose": {"type": "string", "enum": ["avatar", "product_image", "chat_attachment"]},
+    "content_type": {"type": "string"},
+    "derivative_kinds": {
+      "type": "array",
+      "items": {"type": "string"},
+      "minItems": 1
+    }
+  }
+}
