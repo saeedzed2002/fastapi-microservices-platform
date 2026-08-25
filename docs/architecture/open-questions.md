@@ -1,0 +1,89 @@
+# Open Architectural Questions
+
+The baseline architecture is accepted. The following contract and operational decisions remain deliberately open; implementation must not silently invent them.
+
+## Decision required at Phase 1 entry
+
+### Python and `uv` workspace topology
+
+Decide whether one root `uv` workspace lock resolves all services or services maintain controlled independent lockfiles. Finalize this during Phase 1 planning and before creating any `pyproject.toml` or `uv.lock`. The decision must preserve reproducible builds, clear service image contents, affected-service CI, and independent service versioning.
+
+## Decisions required before their first consumer phase
+
+### Event schema representation and compatibility tooling
+
+The canonical envelope uses JSON Schema in Phase 0. Before the first business event payload is proposed, decide whether JSON Schema remains the payload standard and how CI detects backward-incompatible changes. Do not add a schema registry unless an operational requirement justifies it.
+
+### Kafka-to-RabbitMQ durable handoff
+
+Before the first critical flow hands work from a database transaction or Kafka consumer to RabbitMQ, define how task intent is recorded and dispatched without loss or uncontrolled duplication. A local task-outbox/dispatcher is the default candidate, but the exact protocol needs an ADR or amendment.
+
+### Identity and service trust
+
+Define JWT issuer/audience, signing algorithm, key distribution and rotation, downstream validation, service identity, and service-to-service authorization before Phase 2 Identity and Customer implementation.
+
+### Media event consumers
+
+Before Phase 3 activates `media.ready.v1`, define which bounded contexts consume it, whether they need a projection or synchronous readiness query, and how ownership/deletion races are handled.
+
+### Redis degradation policy
+
+Specify fail-open, fail-closed, or durable fallback behavior before each feature first depends on Redis: security state in Phase 2, Cart cache in Phase 4, and Chat fan-out/presence in Phase 7.
+
+## Owner decision not blocking technical Phase 1 work
+
+### License
+
+The repository license is a legal/product decision. No license file is created until the owner selects one.
+
+## Decisions required before Phase 5
+
+### Authoritative checkout composition
+
+Define who revalidates price, discount, tax, currency, cart contents, inventory references, and customer/address data. Cart totals and client payloads cannot be authoritative. Order must snapshot every historical and legal value it accepts.
+
+### Saga timeout and late-event policy
+
+Define reservation and payment deadlines, stuck-Saga reconciliation, `FAILED` semantics, legal transitions, and behavior for payment success after expiry or cancellation. A late captured payment normally requires refund or manual exception handling rather than order resurrection.
+
+### Order-state transition triggers
+
+Map each Saga event or durable observation to the complete order transition table. In particular, define what durably moves an order from `INVENTORY_RESERVED` to `PAYMENT_PENDING`; receiving `inventory.reserved.v1` cannot make both states persistent in one transaction. Define transition history, out-of-order deferral/reconciliation, and the event emitted by each newly reached state.
+
+### Checkout Kafka partition key
+
+Determine whether workflow events use `order_id` as the partition key even when produced by Inventory or Payment aggregates. Consumers must still tolerate stale and out-of-order messages.
+
+### Payment-provider interaction model
+
+The fake provider must model realistic intent, attempt, provider reference, callback/webhook, timeout, and idempotency boundaries without pretending every future provider is synchronous.
+
+## Additional decisions required before dependent features
+
+### Chat realtime delivery guarantee
+
+Confirm whether durable history plus reconnect catch-up is sufficient for the initial release. If eventual live fan-out must survive a commit-to-Redis-publish crash, introduce a durable relay without treating Redis as durable.
+
+### Media and generated invoice ownership
+
+Media owns user-upload lifecycle and generic media metadata. Order owns generated invoice business metadata and may use its own `ObjectStorage` adapter. Confirm retention, deletion, and access policies for each object class.
+
+### Customer and Notification preferences
+
+Define one writable owner. The recommended split is Customer for general user preferences and Notification for channel delivery state or an event-fed projection.
+
+### Order and Shipping status
+
+Shipping should own carrier/fulfilment truth; Order should maintain only a customer-facing projection. Shipping currently has no Phase 0–12 implementation milestone and remains post-roadmap unless explicitly scheduled.
+
+### Topic and event version migration
+
+Event schema version is authoritative in event names. Define when a topic suffix changes, how old/new versions coexist, and whether dual publishing or parallel consumption is required.
+
+### Observability operations
+
+Before production-style deployment, define collector topology, propagation carriers, sampling, retention, cardinality limits, SLOs, alert ownership, and handling of exporter failure.
+
+### Delivery and migration rollback
+
+Define environment promotion, immutable digest handling, migration failure behavior, smoke-test gates, and rollback rules. Database rollback is not assumed to be equivalent to image rollback.

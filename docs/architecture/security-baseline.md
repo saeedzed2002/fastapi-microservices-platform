@@ -1,0 +1,64 @@
+# Security Baseline
+
+Security is enforced at every service boundary and throughout delivery; the edge layer is not the only trust boundary.
+
+## Identity and sessions
+
+- Hash passwords with Argon2id using reviewed, operationally measured parameters.
+- Use short-lived signed JWT access tokens with explicit issuer and audience validation.
+- Rotate refresh tokens and detect reuse at the token-family/session level.
+- Make logout and revocation semantics explicit, including expiry and Redis-outage behavior.
+- Store only hashed refresh-token material where practical.
+- Rotate signing keys through a documented distribution and overlap process.
+
+The signing algorithm, JWKS/key-distribution mechanism, claim set, and service-to-service identity model are Phase 2 design decisions.
+
+## Authorization
+
+- Use RBAC for coarse capabilities.
+- Enforce resource-level ownership and domain policy inside the owning service.
+- Do not trust gateway authorization as sufficient.
+- Do not pass broad internal credentials to clients or unrelated services.
+- Audit sensitive order, payment, inventory-adjustment, and authentication changes.
+
+## Abuse and request controls
+
+- Configure request, header, and body limits at both edge and service layers.
+- Apply Redis-backed rate limits to login, OTP, password reset, public search, uploads, and WebSocket connections.
+- Document fail-open/fail-closed behavior per limit; authentication abuse controls cannot silently disappear.
+- Use narrow CORS allowlists and explicit credential behavior per environment.
+- Apply appropriate security headers and TLS at the edge.
+
+## Upload and object security
+
+- Scope presigned URLs to one authorized object and operation with short expiry.
+- Validate declared and actual type, magic bytes, size, checksum, dimensions, filename/metadata, and decompression risk.
+- Strip EXIF and unnecessary metadata during image processing.
+- Keep buckets private and authorize downloads through service policy.
+- Define quarantine/malware scanning where asset risk justifies it.
+- Reconcile incomplete uploads and orphan objects.
+
+## Secrets and data
+
+- Never commit secrets, credentials, tokens, private keys, or production `.env` files.
+- Inject runtime secrets from approved secret stores.
+- Minimize personal/sensitive data in events and tasks.
+- Redact tokens, passwords, cookies, authorization headers, raw provider data, and sensitive payloads from logs and traces.
+- Define retention and deletion policy for identity, customer, payment, Chat, media, audit, backup, and event data before production.
+
+## Supply chain
+
+- Verify dependencies and images from official sources.
+- Pin reproducibly and avoid unsupported releases or floating image tags.
+- Run dependency and container scans with explicit severity gates, owners, and expiring exceptions.
+- Use minimal CI permissions and immutable action references.
+- Build non-root, minimal runtime images and retain artifact provenance when delivery is implemented.
+
+## Required failure-policy decisions
+
+- Redis loss during revocation, OTP, and rate limiting.
+- Identity signing-key rotation and downstream cache failure.
+- Provider webhook replay and signature failure.
+- Object-storage authorization or scanning failure.
+- CI scanner outage versus enforcement policy.
+- Internal TLS and network trust boundaries for each environment.

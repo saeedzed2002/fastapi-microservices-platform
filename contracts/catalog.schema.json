@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fastapi-platform:contracts:catalog:v1",
+  "title": "FastAPI Platform Contract Catalog v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["catalog_schema", "catalog_version", "project", "namespace", "contracts"],
+  "properties": {
+    "catalog_schema": {
+      "const": "catalog.schema.json"
+    },
+    "catalog_version": {
+      "const": 1
+    },
+    "project": {
+      "const": "FastAPI Microservices Platform"
+    },
+    "namespace": {
+      "const": "fastapi-platform"
+    },
+    "contracts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/contract"
+      }
+    }
+  },
+  "$defs": {
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "owner", "status", "schema"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": ["event-envelope", "api-error-envelope", "domain-event"]
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "consumers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "status": {
+          "enum": ["reserved", "proposed", "active", "deprecated", "retired"]
+        },
+        "topic": {
+          "type": ["string", "null"]
+        },
+        "message_key": {
+          "type": ["string", "null"]
+        },
+        "schema": {
+          "type": ["string", "null"]
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "domain-event"
+              }
+            },
+            "required": ["kind"]
+          },
+          "then": {
+            "required": ["consumers", "topic", "message_key"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "active"
+              }
+            },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "schema": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

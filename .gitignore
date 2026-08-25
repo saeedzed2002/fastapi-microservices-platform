@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.python-version.local
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Dependency and tool caches
+.cache/
+.uv-cache/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDE and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Runtime artifacts
+logs/
+*.log
+tmp/
+.tmp/
+
+# Local infrastructure data
+.data/
+volumes/
+
+# Test artifacts
+.testcontainers.properties.local
+test-results/
+
+# Generated documentation and diagrams
+site/
+docs/_build/

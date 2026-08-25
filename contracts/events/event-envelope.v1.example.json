@@ -1,0 +1,13 @@
+{
+  "event_id": "cbaab3c1-43d8-4f6d-b4ba-88f4dd89e93f",
+  "event_type": "order.created.v1",
+  "event_version": 1,
+  "aggregate_type": "order",
+  "aggregate_id": "ea8bc36b-c212-4526-ab99-89e72bdcc0ee",
+  "producer": "order-service",
+  "occurred_at": "2026-08-25T08:30:00Z",
+  "correlation_id": "126208ee-0102-4e99-a040-9ab71ac01ff8",
+  "causation_id": null,
+  "trace_id": "0123456789abcdef0123456789abcdef",
+  "payload": {}
+}
