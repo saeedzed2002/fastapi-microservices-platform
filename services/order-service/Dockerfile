@@ -1,4 +1,4 @@
-FROM python:3.12.12-slim
+FROM python:3.14.6-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app/src
 WORKDIR /app
 COPY services/order-service/src ./src
