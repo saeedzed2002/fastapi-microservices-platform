@@ -19,7 +19,7 @@ services:
       retries: 12
 
   kafka:
-    image: apache/kafka:4.2.0
+    image: apache/kafka:4.3.1
     ports:
       - "127.0.0.1:29092:29092"
     environment:
