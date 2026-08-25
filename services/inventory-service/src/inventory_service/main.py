@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -23,6 +24,7 @@ from inventory_service.schemas import (
     StockItemResponse,
     StockMovementResponse,
 )
+from inventory_service.workers.kafka import consume_saga_events, publish_outbox
 from platform_auth import AuthClaims
 
 settings = get_settings()
@@ -31,8 +33,19 @@ logger = logging.getLogger(settings.service_name)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    stop = asyncio.Event()
+    tasks: list[asyncio.Task[None]] = []
+    if settings.kafka_publisher_enabled:
+        tasks.append(asyncio.create_task(publish_outbox(settings, stop)))
+    if settings.kafka_consumer_enabled:
+        tasks.append(asyncio.create_task(consume_saga_events(settings, stop)))
     logger.info("service_started")
     yield
+    stop.set()
+    for task in tasks:
+        task.cancel()
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
     await dispose_engine()
     logger.info("service_stopped")
 

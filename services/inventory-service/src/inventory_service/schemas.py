@@ -47,6 +47,7 @@ class StockMovementResponse(BaseModel):
     stock_item_id: UUID
     kind: str
     quantity_delta: int
+    reserved_delta: int
     reason: str
     idempotency_key: str | None
     created_at: datetime

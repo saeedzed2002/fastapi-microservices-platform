@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from catalog_service.models import Product, ProductMedia, ProductVariant
 from catalog_service.schemas import (
+    CheckoutVariantResponse,
     ProductCreate,
     ProductMediaAttach,
     ProductResponse,
@@ -119,3 +120,36 @@ async def list_variants(db: AsyncSession, product_id: UUID) -> list[VariantRespo
         .order_by(ProductVariant.created_at)
     )
     return [VariantResponse.model_validate(variant) for variant in variants]
+
+
+async def checkout_variants(
+    db: AsyncSession, variant_ids: list[UUID]
+) -> list[CheckoutVariantResponse]:
+    rows = await db.execute(
+        select(ProductVariant, Product)
+        .join(Product, Product.id == ProductVariant.product_id)
+        .where(
+            ProductVariant.id.in_(variant_ids),
+            ProductVariant.is_active.is_(True),
+            Product.status == "published",
+        )
+    )
+    snapshots = [
+        CheckoutVariantResponse(
+            variant_id=variant.id,
+            sku=variant.sku,
+            product_name=product.name,
+            unit_amount=variant.price_amount
+            if variant.price_amount is not None
+            else product.price_amount,
+            currency=product.currency,
+            attributes=variant.attributes,
+        )
+        for variant, product in rows.tuples()
+    ]
+    if len({snapshot.variant_id for snapshot in snapshots}) != len(set(variant_ids)):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="one or more variants are unavailable for checkout",
+        )
+    return snapshots

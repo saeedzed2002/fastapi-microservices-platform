@@ -40,23 +40,32 @@ The repository license is a legal/product decision. No license file is created u
 
 ### Authoritative checkout composition
 
-Define who revalidates price, discount, tax, currency, cart contents, inventory references, and customer/address data. Cart totals and client payloads cannot be authoritative. Order must snapshot every historical and legal value it accepts.
+Resolved by ADR-014: Order uses bounded REST snapshot queries before its local
+transaction. Phase 5 does not accept discount, tax, or shipping-price claims
+and snapshots only the authoritative Catalog amount and caller-owned Customer
+address.
 
 ### Saga timeout and late-event policy
 
-Define reservation and payment deadlines, stuck-Saga reconciliation, `FAILED` semantics, legal transitions, and behavior for payment success after expiry or cancellation. A late captured payment normally requires refund or manual exception handling rather than order resurrection.
+Resolved by ADR-014: late terminal payment facts never resurrect an Order.
+Pending expiry remains visible to reconciliation; a real-provider refund
+workflow is deferred.
 
 ### Order-state transition triggers
 
-Map each Saga event or durable observation to the complete order transition table. In particular, define what durably moves an order from `INVENTORY_RESERVED` to `PAYMENT_PENDING`; receiving `inventory.reserved.v1` cannot make both states persistent in one transaction. Define transition history, out-of-order deferral/reconciliation, and the event emitted by each newly reached state.
+Resolved by ADR-014: Payment emits payment.processing.v1, which durably moves
+an Order from INVENTORY_RESERVED to PAYMENT_PENDING.
 
 ### Checkout Kafka partition key
 
-Determine whether workflow events use `order_id` as the partition key even when produced by Inventory or Payment aggregates. Consumers must still tolerate stale and out-of-order messages.
+Resolved by ADR-014: all Phase 5 workflow events use order_id as their Kafka
+key and correlation ID while consumers retain Inbox and state guards.
 
 ### Payment-provider interaction model
 
-The fake provider must model realistic intent, attempt, provider reference, callback/webhook, timeout, and idempotency boundaries without pretending every future provider is synchronous.
+Resolved for Phase 5 by ADR-014: the deterministic fake provider owns an
+intent, attempt, provider reference, and idempotency boundary. Webhooks and
+real-provider unknown outcomes remain explicitly deferred.
 
 ## Additional decisions required before dependent features
 

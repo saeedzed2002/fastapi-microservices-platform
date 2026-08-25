@@ -36,3 +36,4 @@ ADRs record decisions that materially affect service ownership, contracts, durab
 | [ADR-011](ADR-011-identity-token-and-account-lifecycle.md) | Accepted | Identity tokens and account lifecycle |
 | [ADR-012](ADR-012-phase-3-media-reference-boundary.md) | Accepted | Media references remain opaque across service boundaries |
 | [ADR-013](ADR-013-cart-cache-degradation.md) | Accepted | Cart Redis cache degradation policy |
+| [ADR-014](ADR-014-checkout-saga-and-authoritative-snapshots.md) | Accepted | Checkout Saga and authoritative snapshots |

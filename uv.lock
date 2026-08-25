@@ -15,6 +15,8 @@ members = [
     "identity-service",
     "inventory-service",
     "media-service",
+    "order-service",
+    "payment-service",
     "platform-auth",
     "reference-service",
 ]
@@ -755,9 +757,10 @@ wheels = [
 
 [[package]]
 name = "inventory-service"
-version = "0.4.0"
+version = "0.5.0"
 source = { editable = "services/inventory-service" }
 dependencies = [
+    { name = "aiokafka" },
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "fastapi" },
@@ -770,6 +773,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiokafka", specifier = ">=0.14,<0.15" },
     { name = "alembic", specifier = ">=1.19.1,<2" },
     { name = "asyncpg", specifier = ">=0.31,<0.32" },
     { name = "fastapi", specifier = ">=0.141.1,<0.142" },
@@ -1037,6 +1041,37 @@ wheels = [
 ]
 
 [[package]]
+name = "order-service"
+version = "0.5.0"
+source = { editable = "services/order-service" }
+dependencies = [
+    { name = "aiokafka" },
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "platform-auth" },
+    { name = "pydantic-settings" },
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiokafka", specifier = ">=0.14,<0.15" },
+    { name = "alembic", specifier = ">=1.19.1,<2" },
+    { name = "asyncpg", specifier = ">=0.31,<0.32" },
+    { name = "fastapi", specifier = ">=0.141.1,<0.142" },
+    { name = "httpx", specifier = ">=0.28.1,<0.29" },
+    { name = "platform-auth", editable = "libs/platform-auth" },
+    { name = "pydantic-settings", specifier = ">=2.15,<3" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.13,<3" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.52,<2.1" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.3,<0.53" },
+]
+
+[[package]]
 name = "packaging"
 version = "26.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1052,6 +1087,35 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/5a/82/42f767fc1c1143d6fd36efb827202a2d997a375e160a71eb2888a925aac1/pathspec-1.1.1.tar.gz", hash = "sha256:17db5ecd524104a120e173814c90367a96a98d07c45b2e10c2f3919fff91bf5a", size = 135180, upload-time = "2026-04-27T01:46:08.907Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl", hash = "sha256:a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189", size = 57328, upload-time = "2026-04-27T01:46:07.06Z" },
+]
+
+[[package]]
+name = "payment-service"
+version = "0.5.0"
+source = { editable = "services/payment-service" }
+dependencies = [
+    { name = "aiokafka" },
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "fastapi" },
+    { name = "platform-auth" },
+    { name = "pydantic-settings" },
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiokafka", specifier = ">=0.14,<0.15" },
+    { name = "alembic", specifier = ">=1.19.1,<2" },
+    { name = "asyncpg", specifier = ">=0.31,<0.32" },
+    { name = "fastapi", specifier = ">=0.141.1,<0.142" },
+    { name = "platform-auth", editable = "libs/platform-auth" },
+    { name = "pydantic-settings", specifier = ">=2.15,<3" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.13,<3" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.52,<2.1" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.3,<0.53" },
 ]
 
 [[package]]

@@ -6,7 +6,7 @@ WORKDIR /app
 COPY services/inventory-service/src ./src
 COPY libs/platform-auth/src/platform_auth ./src/platform_auth
 RUN pip install --no-cache-dir --disable-pip-version-check \
-    "alembic==1.19.1" "asyncpg==0.31.0" "fastapi==0.141.1" \
+    "aiokafka==0.14.0" "alembic==1.19.1" "asyncpg==0.31.0" "fastapi==0.141.1" \
     "PyJWT[crypto]==2.13.0" "pydantic-settings==2.15.0" \
     "SQLAlchemy[asyncio]==2.0.52" "uvicorn[standard]==0.52.3"
 RUN useradd --create-home --uid 10001 appuser

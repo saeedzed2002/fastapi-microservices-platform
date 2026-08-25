@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+from typing import cast
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -5,7 +7,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from inventory_service.models import StockItem, StockMovement
+from inventory_service.models import (
+    InboxMessage,
+    OutboxMessage,
+    Reservation,
+    StockItem,
+    StockMovement,
+)
 from inventory_service.schemas import (
     StockAdjustmentCreate,
     StockAdjustmentResponse,
@@ -126,3 +134,100 @@ async def list_stock_movements(
         .order_by(StockMovement.created_at, StockMovement.id)
     )
     return [StockMovementResponse.model_validate(movement) for movement in movements]
+
+
+async def process_saga_event(db: AsyncSession, envelope: dict[str, object]) -> bool:
+    event_id = UUID(str(envelope["event_id"]))
+    if await db.scalar(select(InboxMessage).where(InboxMessage.event_id == event_id)):
+        return False
+    event_type = str(envelope["event_type"])
+    payload = cast(dict[str, object], envelope["payload"])
+    order_id = UUID(str(payload["order_id"]))
+    db.add(InboxMessage(event_id=event_id, event_type=event_type))
+    reservation = await db.scalar(
+        select(Reservation).where(Reservation.order_id == order_id).with_for_update()
+    )
+    if event_type == "payment.failed.v1":
+        if reservation is not None and reservation.status == "RESERVED":
+            for item in reservation.items:
+                stock = await db.scalar(
+                    select(StockItem)
+                    .where(StockItem.sku == str(item["sku"]).upper())
+                    .with_for_update()
+                )
+                if stock is not None:
+                    quantity = cast(int, item["quantity"])
+                    stock.reserved -= quantity
+                    stock.version += 1
+                    db.add(
+                        StockMovement(
+                            stock_item_id=stock.id,
+                            kind="release",
+                            quantity_delta=0,
+                            reserved_delta=-quantity,
+                            reason=f"payment failed for order {order_id}",
+                            idempotency_key=f"release:{order_id}:{stock.sku}",
+                        )
+                    )
+            reservation.status = "RELEASED"
+            reservation.released_at = datetime.now(UTC)
+        await db.commit()
+        return True
+    if event_type != "order.created.v1" or reservation is not None:
+        await db.commit()
+        return False
+    items = cast(list[dict[str, object]], payload["items"])
+    stocks: list[StockItem] = []
+    for item in sorted(items, key=lambda row: str(row["sku"])):
+        stock = await db.scalar(
+            select(StockItem).where(StockItem.sku == str(item["sku"]).upper()).with_for_update()
+        )
+        if stock is None or stock.on_hand - stock.reserved < cast(int, item["quantity"]):
+            db.add(Reservation(order_id=order_id, status="FAILED", items=items))
+            db.add(
+                OutboxMessage(
+                    event_type="inventory.reservation_failed.v1",
+                    aggregate_type="reservation",
+                    aggregate_id=order_id,
+                    payload={"order_id": str(order_id)},
+                    correlation_id=order_id,
+                    causation_id=event_id,
+                    trace_id=str(envelope["trace_id"]),
+                )
+            )
+            await db.commit()
+            return True
+        stocks.append(stock)
+    for stock, item in zip(stocks, sorted(items, key=lambda row: str(row["sku"])), strict=True):
+        quantity = cast(int, item["quantity"])
+        stock.reserved += quantity
+        stock.version += 1
+        db.add(
+            StockMovement(
+                stock_item_id=stock.id,
+                kind="reservation",
+                quantity_delta=0,
+                reserved_delta=quantity,
+                reason=f"reserved for order {order_id}",
+                idempotency_key=f"reservation:{order_id}:{stock.sku}",
+            )
+        )
+    db.add(Reservation(order_id=order_id, status="RESERVED", items=items))
+    db.add(
+        OutboxMessage(
+            event_type="inventory.reserved.v1",
+            aggregate_type="reservation",
+            aggregate_id=order_id,
+            payload={
+                "order_id": str(order_id),
+                "currency": payload["currency"],
+                "total_amount": payload["total_amount"],
+                "payment_method": payload["payment_method"],
+            },
+            correlation_id=order_id,
+            causation_id=event_id,
+            trace_id=str(envelope["trace_id"]),
+        )
+    )
+    await db.commit()
+    return True

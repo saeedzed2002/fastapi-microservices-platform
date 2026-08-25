@@ -213,10 +213,15 @@ services:
       INVENTORY_ENVIRONMENT: local
       INVENTORY_DATABASE_URL: postgresql+asyncpg://inventory_service:inventory-local-only@postgres:5432/inventory_service
       INVENTORY_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
+      INVENTORY_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      INVENTORY_KAFKA_PUBLISHER_ENABLED: "true"
+      INVENTORY_KAFKA_CONSUMER_ENABLED: "true"
     ports:
       - "8005:8000"
     depends_on:
       postgres:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
@@ -239,6 +244,59 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  order-service:
+    build:
+      context: ../..
+      dockerfile: services/order-service/Dockerfile
+    environment:
+      ORDER_ENVIRONMENT: local
+      ORDER_DATABASE_URL: postgresql+asyncpg://order_service:order-local-only@postgres:5432/order_service
+      ORDER_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
+      ORDER_CATALOG_BASE_URL: http://catalog-service:8000
+      ORDER_CUSTOMER_BASE_URL: http://customer-service:8000
+      ORDER_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ORDER_KAFKA_PUBLISHER_ENABLED: "true"
+      ORDER_KAFKA_CONSUMER_ENABLED: "true"
+    ports:
+      - "8007:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+      customer-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  payment-service:
+    build:
+      context: ../..
+      dockerfile: services/payment-service/Dockerfile
+    environment:
+      PAYMENT_ENVIRONMENT: local
+      PAYMENT_DATABASE_URL: postgresql+asyncpg://payment_service:payment-local-only@postgres:5432/payment_service
+      PAYMENT_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      PAYMENT_KAFKA_PUBLISHER_ENABLED: "true"
+      PAYMENT_KAFKA_CONSUMER_ENABLED: "true"
+    ports:
+      - "8008:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]

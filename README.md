@@ -4,12 +4,12 @@ FastAPI Microservices Platform is a backend-only, production-oriented e-commerce
 
 ## Project status
 
-The repository is currently in **Phase 4 — Inventory & Cart**.
+The repository is currently in **Phase 5 — Order & Payment**.
 
-Phase 4 contains the identity, customer, catalog, media, inventory, and cart
-bounded contexts. Inventory has auditable, concurrency-safe stock adjustments;
-Cart has PostgreSQL durability with an optional fail-open Redis cache. Checkout
-and its distributed Saga remain intentionally unimplemented.
+Phase 5 adds the first executable choreography-based checkout Saga. Order stores
+immutable Catalog and Customer snapshots, Inventory owns atomic reservations and
+release compensation, and Payment owns idempotent fake-provider intents. The
+workflow uses transactional Outboxes and durable Inboxes across Kafka.
 
 ## Architecture at a glance
 
@@ -95,6 +95,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Phase 1 plan](docs/development/phase-1-plan.md)
 - [Phase 2 plan](docs/development/phase-2-plan.md)
 - [Phase 4 plan](docs/development/phase-4-plan.md)
+- [Phase 5 plan](docs/development/phase-5-plan.md)
 
 ## Roadmap
 
@@ -116,7 +117,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 
 ## Local development
 
-Phase 4 adds Inventory on port 8005 and Cart on port 8006. See the Phase 4
+Phase 5 adds Order on port `8007` and Payment on port `8008`. See the Phase 5
 plan and use scripts/platform.ps1 for repeatable local tasks.
 
     pwsh -File .\scripts\platform.ps1 -Task install
@@ -128,6 +129,8 @@ plan and use scripts/platform.ps1 for repeatable local tasks.
     pwsh -File .\scripts\platform.ps1 -Task migrate-media
     pwsh -File .\scripts\platform.ps1 -Task migrate-inventory
     pwsh -File .\scripts\platform.ps1 -Task migrate-cart
+    pwsh -File .\scripts\platform.ps1 -Task migrate-order
+    pwsh -File .\scripts\platform.ps1 -Task migrate-payment
 
 ## License
 

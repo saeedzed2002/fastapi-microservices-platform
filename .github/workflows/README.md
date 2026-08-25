@@ -4,4 +4,9 @@ Phase 0 contains one project-dependency-free structural workflow. It parses JSON
 
 Phase 1 extends CI after the runtime toolchain is officially verified. It will validate the lockfile, formatting, lint, typing, unit tests, contracts, integration behavior, image builds, and security scans as those capabilities exist.
 
+Phase 5 adds a checkout-Saga workflow. It verifies the locked workspace,
+contracts, Compose model, static checks, tests, and the Inventory, Order, and
+Payment images. Kafka integration scenarios are exercised locally with the
+documented Compose topology until a portable Testcontainers suite is introduced.
+
 Later delivery builds each affected image once, tags and promotes an immutable digest, runs controlled migrations, verifies rollout/readiness, executes smoke tests, and handles rollback explicitly. Uncontrolled deployment commands are not the CD strategy.

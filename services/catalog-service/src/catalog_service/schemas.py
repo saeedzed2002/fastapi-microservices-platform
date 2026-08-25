@@ -59,6 +59,19 @@ class VariantResponse(BaseModel):
     is_active: bool
 
 
+class CheckoutVariantRequest(BaseModel):
+    variant_ids: list[UUID] = Field(min_length=1, max_length=100)
+
+
+class CheckoutVariantResponse(BaseModel):
+    variant_id: UUID
+    sku: str
+    product_name: str
+    unit_amount: Decimal
+    currency: str
+    attributes: dict[str, str]
+
+
 class ProductResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

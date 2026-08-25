@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from catalog_service.application import (
     add_variant,
     attach_media,
+    checkout_variants,
     create_product,
     list_variants,
     load_product_or_404,
@@ -22,6 +23,8 @@ from catalog_service.config import get_settings
 from catalog_service.db import dispose_engine, get_session
 from catalog_service.models import Product
 from catalog_service.schemas import (
+    CheckoutVariantRequest,
+    CheckoutVariantResponse,
     ProductCreate,
     ProductMediaAttach,
     ProductResponse,
@@ -150,6 +153,18 @@ async def list_variants_endpoint(
 ) -> list[VariantResponse]:
     await load_product_or_404(db, product_id)
     return await list_variants(db, product_id)
+
+
+@app.post(
+    "/api/v1/catalog/checkout/variants",
+    response_model=list[CheckoutVariantResponse],
+)
+async def checkout_variants_endpoint(
+    payload: CheckoutVariantRequest,
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> list[CheckoutVariantResponse]:
+    return await checkout_variants(db, payload.variant_ids)
 
 
 @app.get("/metrics", tags=["observability"])

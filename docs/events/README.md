@@ -20,16 +20,22 @@ Examples:
 
 Commands and Celery task names are not domain events.
 
-## Initial reserved events
+## Checkout Saga events
 
 | Event | Owner | Expected consumers | Phase |
 |---|---|---|---|
 | `order.created.v1` | Order | Inventory | 5 |
 | `inventory.reserved.v1` | Inventory | Order, Payment | 5 |
 | `inventory.reservation_failed.v1` | Inventory | Order | 5 |
+| `payment.processing.v1` | Payment | Order | 5 |
 | `payment.succeeded.v1` | Payment | Order | 5 |
 | `payment.failed.v1` | Payment | Order, Inventory | 5 |
-| `order.confirmed.v1` | Order | Order invoice dispatcher | 6 |
+| `order.confirmed.v1` | Order | Future invoice dispatcher | 5 |
+
+## Reserved events
+
+| Event | Owner | Expected consumers | Phase |
+|---|---|---|---|
 | `invoice.generated.v1` | Order | Notification | 6 |
 | `media.ready.v1` | Media | Asset-owning contexts | 3+
 | `product.created.v1` | Catalog | Search | 8 |
