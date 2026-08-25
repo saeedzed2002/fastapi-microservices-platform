@@ -1,0 +1,35 @@
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: docker-compose
+    directory: "/infrastructure/compose"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: docker
+    directories:
+      - "/services/catalog-service"
+      - "/services/cart-service"
+      - "/services/customer-service"
+      - "/services/identity-service"
+      - "/services/inventory-service"
+      - "/services/media-service"
+      - "/services/notification-service"
+      - "/services/order-service"
+      - "/services/payment-service"
+      - "/services/reference-service"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

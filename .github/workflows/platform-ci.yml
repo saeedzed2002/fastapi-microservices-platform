@@ -1,0 +1,220 @@
+name: Platform CI and Delivery
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality, contracts, and dependency audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.1"
+          enable-cache: true
+
+      - name: Sync locked workspace
+        run: uv sync --locked --all-packages
+
+      - name: Validate repository architecture and contracts
+        shell: pwsh
+        run: ./scripts/validate_phase0.ps1
+
+      - name: Validate lock, formatting, linting, typing, and unit tests
+        run: |
+          uv lock --check
+          uv run --all-packages ruff format --check .
+          uv run --all-packages ruff check .
+          uv run --all-packages mypy
+          uv run --all-packages pytest -m "not e2e"
+
+      - name: Audit locked Python dependencies
+        run: uv run pip-audit --skip-editable
+
+      - name: Validate Docker Compose model
+        run: docker compose -f infrastructure/compose/docker-compose.yml config --quiet
+
+  migration-heads:
+    name: Validate service migration heads
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.1"
+          enable-cache: true
+
+      - name: Sync locked workspace
+        run: uv sync --locked --all-packages
+
+      - name: Require one migration head per executable service
+        shell: bash
+        run: |
+          set -euo pipefail
+          for service in identity-service customer-service catalog-service media-service inventory-service cart-service order-service payment-service notification-service; do
+            heads="$(uv run --package "$service" alembic -c "services/$service/alembic.ini" heads)"
+            test "$(printf '%s\n' "$heads" | sed '/^$/d' | wc -l)" -eq 1
+            printf '%s: %s\n' "$service" "$heads"
+          done
+
+  image-build:
+    name: Build ${{ matrix.service }} image
+    if: github.event_name == 'pull_request'
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - reference-service
+          - identity-service
+          - customer-service
+          - catalog-service
+          - media-service
+          - inventory-service
+          - cart-service
+          - order-service
+          - payment-service
+          - notification-service
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build independently deployable image
+        run: |
+          docker build \
+            --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+            --label "org.opencontainers.image.revision=${{ github.sha }}" \
+            --file "services/${{ matrix.service }}/Dockerfile" \
+            --tag "local/${{ matrix.service }}:${{ github.sha }}" \
+            .
+
+      - name: Scan image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: local/${{ matrix.service }}:${{ github.sha }}
+          scan-type: image
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+  integration:
+    name: Checkout, invoice, and notification integration
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.1"
+          enable-cache: true
+
+      - name: Sync locked workspace
+        run: uv sync --locked --all-packages
+
+      - name: Start real platform dependencies and APIs
+        run: docker compose -f infrastructure/compose/docker-compose.yml up -d --build --wait
+
+      - name: Run service-owned migrations
+        run: |
+          uv run --package identity-service alembic -c services/identity-service/alembic.ini upgrade head
+          uv run --package customer-service alembic -c services/customer-service/alembic.ini upgrade head
+          uv run --package catalog-service alembic -c services/catalog-service/alembic.ini upgrade head
+          uv run --package media-service alembic -c services/media-service/alembic.ini upgrade head
+          uv run --package inventory-service alembic -c services/inventory-service/alembic.ini upgrade head
+          uv run --package cart-service alembic -c services/cart-service/alembic.ini upgrade head
+          uv run --package order-service alembic -c services/order-service/alembic.ini upgrade head
+          uv run --package payment-service alembic -c services/payment-service/alembic.ini upgrade head
+          uv run --package notification-service alembic -c services/notification-service/alembic.ini upgrade head
+
+      - name: Execute cross-service E2E workflow
+        run: RUN_E2E=1 E2E_BASE_URL=http://127.0.0.1 uv run --all-packages pytest tests/e2e/test_phase6_checkout_notification.py -q
+
+      - name: Collect Compose logs on failure
+        if: failure()
+        run: docker compose -f infrastructure/compose/docker-compose.yml logs --no-color
+
+      - name: Stop integration platform
+        if: always()
+        run: docker compose -f infrastructure/compose/docker-compose.yml down --volumes --remove-orphans
+
+  publish-ghcr:
+    name: Publish immutable service images to GHCR
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - quality
+      - migration-heads
+      - integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out validated commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Authenticate to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+
+      - name: Build and publish immutable service images
+        shell: bash
+        run: |
+          set -euo pipefail
+          namespace="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/fastapi-microservices-platform"
+          revision="${GITHUB_SHA}"
+          short_revision="${revision:0:12}"
+          for service in reference-service identity-service customer-service catalog-service media-service inventory-service cart-service order-service payment-service notification-service; do
+            version="$(python3 -c "import tomllib; from pathlib import Path; print(tomllib.loads(Path('services/$service/pyproject.toml').read_text())['project']['version'])")"
+            image="$namespace/$service"
+            docker build \
+              --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+              --label "org.opencontainers.image.revision=${revision}" \
+              --label "org.opencontainers.image.version=${version}" \
+              --file "services/$service/Dockerfile" \
+              --tag "$image:sha-${revision}" \
+              --tag "$image:${version}-${short_revision}" \
+              .
+            docker push "$image:sha-${revision}"
+            docker push "$image:${version}-${short_revision}"
+            printf '%s@%s\n' "$image" "$(docker image inspect "$image:sha-${revision}" --format '{{index .RepoDigests 0}}')" >> "$GITHUB_STEP_SUMMARY"
+          done

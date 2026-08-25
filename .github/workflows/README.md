@@ -1,12 +1,28 @@
-# Workflow Roadmap
+# GitHub Actions
 
-Phase 0 contains one project-dependency-free structural workflow. It parses JSON, checks local Markdown links and code fences, validates the contract catalogue and canonical examples against their JSON Schemas, applies additional cross-field invariants, and rejects trailing whitespace. The only external action is the officially verified `actions/checkout` release pinned to its full immutable commit SHA; the job uses explicit read-only permissions and disables persisted credentials.
+`platform-ci.yml` is the only executable workflow for the current platform
+phase. It provides pull-request validation and main-branch image delivery in
+one dependency-ordered graph:
 
-Phase 1 extends CI after the runtime toolchain is officially verified. It will validate the lockfile, formatting, lint, typing, unit tests, contracts, integration behavior, image builds, and security scans as those capabilities exist.
+```text
+quality
+  ├── migration-heads
+  ├── image-build + Trivy scan (pull requests only)
+  └── integration
+        └── publish-ghcr (main only)
+```
 
-Phase 5 adds a checkout-Saga workflow. It verifies the locked workspace,
-contracts, Compose model, static checks, tests, and the Inventory, Order, and
-Payment images. Kafka integration scenarios are exercised locally with the
-documented Compose topology until a portable Testcontainers suite is introduced.
+`image-build` scans every independently deployable image with Trivy and fails
+for fixable `HIGH` or `CRITICAL` vulnerabilities. `publish-ghcr` is delivery,
+not deployment. It publishes immutable OCI images
+only after validation; no workflow deploys to Kubernetes before reviewed
+Kubernetes and Helm resources, environment gates, migration Jobs, readiness
+checks, smoke tests, and rollback behavior exist.
 
-Later delivery builds each affected image once, tags and promotes an immutable digest, runs controlled migrations, verifies rollout/readiness, executes smoke tests, and handles rollback explicitly. Uncontrolled deployment commands are not the CD strategy.
+Action references are immutable commit SHAs. The workflow grants read-only
+permissions by default and grants `packages: write` only to the `GHCR` publish
+job. Pull requests never receive package write permission or repository
+secrets.
+
+See [CI/CD strategy](../../docs/development/ci-cd.md) for required GitHub
+settings, tags, image provenance, and future deployment gates.

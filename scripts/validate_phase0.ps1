@@ -268,19 +268,19 @@ if ((Test-CanonicalUuid "not-a-uuid") -or (Test-UtcTimestamp "not-a-dateZ")) {
     Add-ValidationError "Validator format self-test unexpectedly accepted invalid identifiers or timestamps."
 }
 
-$workflowPath = Join-Path $repositoryPath ".github/workflows/phase0-architecture.yml"
+$workflowPath = Join-Path $repositoryPath ".github/workflows/platform-ci.yml"
 $workflow = Get-Content -LiteralPath $workflowPath -Raw
 if ($workflow -notmatch "(?m)^\s*uses:\s*actions/checkout@[0-9a-f]{40}\s*(?:#.*)?$") {
-    Add-ValidationError "Phase 0 workflow must pin actions/checkout to a full commit SHA."
+    Add-ValidationError "Platform CI workflow must pin actions/checkout to a full commit SHA."
 }
 if ($workflow -notmatch "(?ms)^permissions:\s*\r?\n\s+contents:\s*read\s*$") {
-    Add-ValidationError "Phase 0 workflow must use explicit read-only repository permissions."
+    Add-ValidationError "Platform CI workflow must use explicit read-only repository permissions."
 }
 if ($workflow -notmatch "(?m)^\s*persist-credentials:\s*false\s*$") {
-    Add-ValidationError "Phase 0 workflow must not persist checkout credentials."
+    Add-ValidationError "Platform CI workflow must not persist checkout credentials."
 }
 if ($workflow -notmatch "(?m)^\s*runs-on:\s*ubuntu-24\.04\s*$") {
-    Add-ValidationError "Phase 0 workflow runner must match the verified toolchain record."
+    Add-ValidationError "Platform CI workflow runner must match the verified toolchain record."
 }
 
 if ($validationErrors.Count -gt 0) {
@@ -296,4 +296,4 @@ Write-Host "JSON files parsed: $($jsonFiles.Count)"
 Write-Host "Markdown files and local links checked: $($markdownFiles.Count)"
 Write-Host "ADR structure checked: $($adrFiles.Count)"
 Write-Host "Contract names, statuses, JSON Schemas, event names, and examples checked."
-Write-Host "Phase 0 CI permissions and immutable action pin checked."
+Write-Host "Platform CI permissions and immutable action pins checked."
