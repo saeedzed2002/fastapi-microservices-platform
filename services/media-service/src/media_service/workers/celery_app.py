@@ -18,4 +18,7 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     worker_cancel_long_running_tasks_on_connection_loss=True,
     worker_enable_remote_control=False,
+    task_publish_retry=True,
+    task_publish_retry_policy={"max_retries": 3, "interval_start": 0, "interval_step": 1},
+    broker_transport_options={"confirm_publish": True},
 )

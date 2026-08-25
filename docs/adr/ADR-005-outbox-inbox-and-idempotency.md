@@ -12,7 +12,7 @@ A database commit followed by broker publication has a dual-write failure window
 
 ## Decision
 
-Write critical business state and its outbox record in the same service-owned PostgreSQL transaction. Publish asynchronously and mark the record published only after broker acknowledgement.
+Write critical business state and its outbox record in the same service-owned PostgreSQL transaction. A publisher claims one pending record with `FOR UPDATE SKIP LOCKED` and a durable, expiring lease, commits that claim, publishes outside the database transaction, then marks the record published only after broker acknowledgement. A failed publication releases the lease for retry; a crashed publisher is recovered after lease expiry.
 
 Consumers atomically insert an Inbox record, apply conditional business effects, and write resulting outbox records in one local transaction before committing the Kafka offset.
 
@@ -29,8 +29,8 @@ Inbox event-ID deduplication is supplemented by domain state guards, unique busi
 ### Negative and risks
 
 - Publishers and consumers require additional tables and cleanup policy.
-- Publish-then-crash still creates duplicates by design.
-- Polling, row claiming, ordering, retry, retention, and backlog operations need careful implementation.
+- Publish-then-crash still creates duplicates by design, so consumers remain idempotent even with an idempotent producer.
+- Polling, lease duration, ordering, retry, retention, and backlog operations need careful implementation.
 
 ## Alternatives considered
 
@@ -46,6 +46,7 @@ Outbox and Inbox tables are introduced through service-owned additive migrations
 
 - Kill Kafka after a business commit and verify later publication.
 - Crash a publisher after broker acceptance and verify duplicate-safe consumption.
+- Run multiple publisher replicas and verify a pending record is claimed by only one replica at a time.
 - Deliver payment success twice and verify one confirmation and one downstream event.
 - Alert on outbox age/backlog and Inbox failures.
 

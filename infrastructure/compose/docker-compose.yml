@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: platform-local-only
       POSTGRES_DB: platform
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
@@ -21,7 +21,7 @@ services:
   kafka:
     image: apache/kafka:4.2.0
     ports:
-      - "29092:29092"
+      - "127.0.0.1:29092:29092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -48,8 +48,8 @@ services:
       RABBITMQ_DEFAULT_USER: platform
       RABBITMQ_DEFAULT_PASS: platform-local-only
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
@@ -61,7 +61,7 @@ services:
   redis:
     image: redis:8.10.0
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -77,8 +77,8 @@ services:
       MINIO_ROOT_USER: minio-local
       MINIO_ROOT_PASSWORD: minio-local-only
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - minio-data:/data
     healthcheck:
@@ -90,8 +90,8 @@ services:
   mailpit:
     image: axllent/mailpit:v1.30.0
     ports:
-      - "1025:1025"
-      - "8025:8025"
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
     healthcheck:
       test: ["CMD", "/mailpit", "readyz"]
       interval: 10s
@@ -106,7 +106,7 @@ services:
       PLATFORM_ENVIRONMENT: local
       PLATFORM_LOG_LEVEL: INFO
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -133,14 +133,16 @@ services:
       IDENTITY_DATABASE_URL: postgresql+asyncpg://identity_service:identity-local-only@postgres:5432/identity_service
       IDENTITY_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
       IDENTITY_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      IDENTITY_KAFKA_PUBLISHER_ENABLED: "false"
+      IDENTITY_KAFKA_PUBLISHER_ENABLED: "true"
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"
     depends_on:
       postgres:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -154,14 +156,16 @@ services:
       CUSTOMER_DATABASE_URL: postgresql+asyncpg://customer_service:customer-local-only@postgres:5432/customer_service
       CUSTOMER_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
       CUSTOMER_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      CUSTOMER_KAFKA_CONSUMER_ENABLED: "false"
+      CUSTOMER_KAFKA_CONSUMER_ENABLED: "true"
     ports:
-      - "8002:8000"
+      - "127.0.0.1:8002:8000"
     depends_on:
       postgres:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -175,12 +179,12 @@ services:
       CATALOG_DATABASE_URL: postgresql+asyncpg://catalog_service:catalog-local-only@postgres:5432/catalog_service
       CATALOG_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
     ports:
-      - "8003:8000"
+      - "127.0.0.1:8003:8000"
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -189,6 +193,7 @@ services:
     build:
       context: ../..
       dockerfile: services/media-service/Dockerfile
+    image: fastapi-microservices-platform-media-service:0.6.1-local
     environment:
       MEDIA_ENVIRONMENT: local
       MEDIA_DATABASE_URL: postgresql+asyncpg://media_service:media-local-only@postgres:5432/media_service
@@ -200,7 +205,7 @@ services:
       MEDIA_TASK_DISPATCHER_ENABLED: "true"
       MEDIA_KAFKA_PUBLISHER_ENABLED: "true"
     ports:
-      - "8004:8000"
+      - "127.0.0.1:8004:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -211,7 +216,7 @@ services:
       minio:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -228,14 +233,14 @@ services:
       INVENTORY_KAFKA_PUBLISHER_ENABLED: "true"
       INVENTORY_KAFKA_CONSUMER_ENABLED: "true"
     ports:
-      - "8005:8000"
+      - "127.0.0.1:8005:8000"
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -250,14 +255,14 @@ services:
       CART_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
       CART_REDIS_URL: redis://redis:6379/0
     ports:
-      - "8006:8000"
+      - "127.0.0.1:8006:8000"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -266,7 +271,7 @@ services:
     build:
       context: ../..
       dockerfile: services/order-service/Dockerfile
-    image: fastapi-microservices-platform-order-service:latest
+    image: fastapi-microservices-platform-order-service:0.6.1-local
     environment:
       ORDER_ENVIRONMENT: local
       ORDER_DATABASE_URL: postgresql+asyncpg://order_service:order-local-only@postgres:5432/order_service
@@ -281,7 +286,7 @@ services:
       ORDER_RABBITMQ_URL: amqp://platform:platform-local-only@rabbitmq:5672//
       ORDER_S3_ENDPOINT_URL: http://minio:9000
     ports:
-      - "8007:8000"
+      - "127.0.0.1:8007:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -296,7 +301,7 @@ services:
       minio:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -312,14 +317,14 @@ services:
       PAYMENT_KAFKA_PUBLISHER_ENABLED: "true"
       PAYMENT_KAFKA_CONSUMER_ENABLED: "true"
     ports:
-      - "8008:8000"
+      - "127.0.0.1:8008:8000"
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -328,7 +333,7 @@ services:
     build:
       context: ../..
       dockerfile: services/notification-service/Dockerfile
-    image: fastapi-microservices-platform-notification-service:latest
+    image: fastapi-microservices-platform-notification-service:0.6.1-local
     environment:
       NOTIFICATION_ENVIRONMENT: local
       NOTIFICATION_DATABASE_URL: postgresql+asyncpg://notification_service:notification-local-only@postgres:5432/notification_service
@@ -339,7 +344,7 @@ services:
       NOTIFICATION_SMTP_HOST: mailpit
       NOTIFICATION_SMTP_PORT: "1025"
     ports:
-      - "8009:8000"
+      - "127.0.0.1:8009:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -350,13 +355,14 @@ services:
       mailpit:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
       interval: 10s
       timeout: 5s
       retries: 12
 
   order-invoice-worker:
-    image: fastapi-microservices-platform-order-service:latest
+    image: fastapi-microservices-platform-order-service:0.6.1-local
+    pull_policy: never
     command: ["celery", "-A", "order_service.workers.celery_app:celery_app", "worker", "--loglevel=INFO", "--without-mingle", "--without-gossip", "-Q", "order.invoice"]
     environment:
       ORDER_ENVIRONMENT: local
@@ -372,7 +378,8 @@ services:
         condition: service_healthy
 
   notification-worker:
-    image: fastapi-microservices-platform-notification-service:latest
+    image: fastapi-microservices-platform-notification-service:0.6.1-local
+    pull_policy: never
     command: ["celery", "-A", "notification_service.workers.celery_app:celery_app", "worker", "--loglevel=INFO", "--without-mingle", "--without-gossip", "-Q", "notification.email"]
     environment:
       NOTIFICATION_ENVIRONMENT: local
@@ -389,7 +396,8 @@ services:
         condition: service_healthy
 
   media-worker:
-    image: fastapi-microservices-platform-media-service:latest
+    image: fastapi-microservices-platform-media-service:0.6.1-local
+    pull_policy: never
     command: ["celery", "-A", "media_service.workers.celery_app:celery_app", "worker", "--loglevel=INFO", "--without-mingle", "--without-gossip"]
     environment:
       MEDIA_ENVIRONMENT: local

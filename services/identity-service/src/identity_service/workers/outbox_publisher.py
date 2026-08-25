@@ -3,11 +3,12 @@ import json
 import logging
 import re
 from contextlib import suppress
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
+from uuid import UUID, uuid4
 
 from aiokafka import AIOKafkaProducer  # type: ignore[import-untyped]
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from identity_service.config import Settings
 from identity_service.db import get_session_factory
@@ -37,33 +38,60 @@ def build_event_envelope(message: OutboxMessage, *, producer: str) -> dict[str, 
     }
 
 
-async def _next_pending() -> OutboxMessage | None:
+async def _claim_pending(settings: Settings) -> OutboxMessage | None:
+    claim_expiry = datetime.now(UTC) - timedelta(seconds=settings.outbox_claim_lease_seconds)
     async with get_session_factory()() as db:
-        return cast(
+        message = cast(
             OutboxMessage | None,
             await db.scalar(
                 select(OutboxMessage)
-                .where(OutboxMessage.published_at.is_(None))
+                .where(
+                    OutboxMessage.published_at.is_(None),
+                    or_(
+                        OutboxMessage.publish_claimed_at.is_(None),
+                        OutboxMessage.publish_claimed_at < claim_expiry,
+                    ),
+                )
                 .order_by(OutboxMessage.occurred_at)
+                .with_for_update(skip_locked=True)
                 .limit(1)
             ),
         )
+        if message is None:
+            return None
+        message.publish_claim_token = uuid4()
+        message.publish_claimed_at = datetime.now(UTC)
+        message.attempts += 1
+        await db.commit()
+        return message
 
 
-async def _mark_published(message_id: Any) -> None:
+async def _mark_published(message_id: UUID, claim_token: UUID) -> None:
     async with get_session_factory()() as db:
-        message = await db.get(OutboxMessage, message_id)
-        if message is not None and message.published_at is None:
+        message = await db.get(OutboxMessage, message_id, with_for_update=True)
+        if (
+            message is not None
+            and message.published_at is None
+            and message.publish_claim_token == claim_token
+        ):
             message.published_at = datetime.now(UTC)
+            message.publish_claim_token = None
+            message.publish_claimed_at = None
+            message.last_error = None
             await db.commit()
 
 
-async def _record_failure(message_id: Any, error: str) -> None:
+async def _record_failure(message_id: UUID, claim_token: UUID, error: str) -> None:
     async with get_session_factory()() as db:
-        message = await db.get(OutboxMessage, message_id)
-        if message is not None and message.published_at is None:
-            message.attempts += 1
+        message = await db.get(OutboxMessage, message_id, with_for_update=True)
+        if (
+            message is not None
+            and message.published_at is None
+            and message.publish_claim_token == claim_token
+        ):
             message.last_error = error[:2000]
+            message.publish_claim_token = None
+            message.publish_claimed_at = None
             await db.commit()
 
 
@@ -85,7 +113,7 @@ async def run_outbox_publisher(settings: Settings, stop: asyncio.Event) -> None:
                     )
                     await producer.start()
 
-                message = await _next_pending()
+                message = await _claim_pending(settings)
                 if message is None:
                     await _wait_or_stop(stop, settings.outbox_poll_interval_seconds)
                     continue
@@ -99,14 +127,17 @@ async def run_outbox_publisher(settings: Settings, stop: asyncio.Event) -> None:
                     value=json.dumps(envelope, separators=(",", ":")).encode("utf-8"),
                     headers=headers,
                 )
-                await _mark_published(message.id)
+                if message.publish_claim_token is None:
+                    raise RuntimeError("claimed outbox message has no claim token")
+                await _mark_published(message.id, message.publish_claim_token)
                 message = None
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
                 if message is not None:
                     with suppress(Exception):
-                        await _record_failure(message.id, str(exc))
+                        if message.publish_claim_token is not None:
+                            await _record_failure(message.id, message.publish_claim_token, str(exc))
                 logger.exception("outbox_publish_failed")
                 if producer is not None:
                     with suppress(Exception):

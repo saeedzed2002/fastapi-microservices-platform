@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -82,22 +83,35 @@ async def complete_upload(db: AsyncSession, *, asset: MediaAsset, storage: Objec
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="media asset is not completable"
         )
+    asset_id = asset.id
+    expected_content_type = asset.content_type
+    expected_size_bytes = asset.size_bytes
+    object_key = asset.original_object_key
+    await db.rollback()
     try:
-        object_head = storage.head(object_key=asset.original_object_key)
+        object_head = await asyncio.to_thread(storage.head, object_key=object_key)
     except ClientError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="uploaded object was not found"
         ) from exc
-    if object_head.content_type != asset.content_type or object_head.size_bytes != asset.size_bytes:
+    if (
+        object_head.content_type != expected_content_type
+        or object_head.size_bytes != expected_size_bytes
+    ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="uploaded object does not match authorization",
         )
-    asset.status = "uploaded"
+    reloaded_asset = await db.get(MediaAsset, asset_id, with_for_update=True)
+    if reloaded_asset is None or reloaded_asset.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="media asset is not completable"
+        )
+    reloaded_asset.status = "uploaded"
     db.add(
         MediaTaskIntent(
             task_name="media.process_asset.v1",
-            payload={"media_asset_id": str(asset.id)},
+            payload={"media_asset_id": str(reloaded_asset.id)},
         )
     )
     await db.commit()

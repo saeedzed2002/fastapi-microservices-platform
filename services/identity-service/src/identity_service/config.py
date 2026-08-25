@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     kafka_topic: str = "fastapi-platform.identity.events.v1"
     kafka_publisher_enabled: bool = False
     outbox_poll_interval_seconds: float = 1.0
+    outbox_claim_lease_seconds: float = Field(default=60.0, ge=1.0, le=900.0)
     log_level: str = "INFO"
 
     model_config = SettingsConfigDict(env_prefix="IDENTITY_", extra="ignore")

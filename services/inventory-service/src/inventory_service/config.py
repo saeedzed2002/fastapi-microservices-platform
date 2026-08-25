@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     kafka_publisher_enabled: bool = False
     kafka_consumer_enabled: bool = False
     outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1)
+    outbox_claim_lease_seconds: float = Field(default=60.0, ge=1.0, le=900.0)
 
     model_config = SettingsConfigDict(env_prefix="INVENTORY_", extra="ignore")
 

@@ -1,7 +1,7 @@
 import asyncio
 from contextlib import suppress
 from datetime import UTC, datetime
-from typing import cast
+from uuid import UUID
 
 from sqlalchemy import select
 
@@ -16,40 +16,37 @@ async def _wait(stop: asyncio.Event, seconds: float) -> None:
         await asyncio.wait_for(stop.wait(), timeout=seconds)
 
 
-async def _next_intent() -> MediaTaskIntent | None:
+async def _claim_intent() -> MediaTaskIntent | None:
     async with get_session_factory()() as db:
-        return cast(
-            MediaTaskIntent | None,
-            await db.scalar(
-                select(MediaTaskIntent)
-                .where(MediaTaskIntent.status == "pending")
-                .order_by(MediaTaskIntent.created_at)
-                .limit(1)
-            ),
+        intent = await db.scalar(
+            select(MediaTaskIntent)
+            .where(MediaTaskIntent.status == "pending")
+            .order_by(MediaTaskIntent.created_at)
+            .with_for_update(skip_locked=True)
+            .limit(1)
         )
+        if intent is None:
+            return None
+        intent.status = "dispatching"
+        intent.attempts += 1
+        await db.commit()
+        return intent
 
 
-async def _mark_dispatched(intent_id: object) -> None:
+async def _mark(intent_id: UUID, *, status: str, error: str | None = None) -> None:
     async with get_session_factory()() as db:
         intent = await db.get(MediaTaskIntent, intent_id)
-        if intent is not None and intent.status == "pending":
-            intent.status = "dispatched"
-            intent.dispatched_at = datetime.now(UTC)
-            await db.commit()
-
-
-async def _record_failure(intent_id: object, error: str) -> None:
-    async with get_session_factory()() as db:
-        intent = await db.get(MediaTaskIntent, intent_id)
-        if intent is not None and intent.status == "pending":
-            intent.attempts += 1
-            intent.last_error = error[:2000]
-            await db.commit()
+        if intent is None or intent.status != "dispatching":
+            return
+        intent.status = status
+        intent.last_error = error[:2000] if error else None
+        intent.dispatched_at = datetime.now(UTC) if status == "dispatched" else None
+        await db.commit()
 
 
 async def run_task_dispatcher(settings: Settings, stop: asyncio.Event) -> None:
     while not stop.is_set():
-        intent = await _next_intent()
+        intent = await _claim_intent()
         if intent is None:
             await _wait(stop, settings.task_dispatcher_poll_interval_seconds)
             continue
@@ -58,10 +55,11 @@ async def run_task_dispatcher(settings: Settings, stop: asyncio.Event) -> None:
                 celery_app.send_task,
                 "media_service.process_asset",
                 kwargs={"media_asset_id": intent.payload["media_asset_id"]},
+                queue="media.processing",
             )
-            await _mark_dispatched(intent.id)
+            await _mark(intent.id, status="dispatched")
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            await _record_failure(intent.id, str(exc))
+            await _mark(intent.id, status="pending", error=str(exc))
             await _wait(stop, settings.task_dispatcher_poll_interval_seconds)

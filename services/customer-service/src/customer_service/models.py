@@ -13,6 +13,15 @@ class Base(DeclarativeBase):
     pass
 
 
+class InboxMessage(Base):
+    __tablename__ = "inbox_messages"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    event_id: Mapped[UUID] = mapped_column(unique=True)
+    event_type: Mapped[str] = mapped_column(String(160))
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
 class Customer(Base):
     __tablename__ = "customers"
 

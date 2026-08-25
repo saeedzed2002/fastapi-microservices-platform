@@ -5,7 +5,7 @@ from typing import Any
 
 from aiokafka import AIOKafkaConsumer  # type: ignore[import-untyped]
 
-from customer_service.application import provision_customer
+from customer_service.application import provision_identity_customer
 from customer_service.config import Settings
 from customer_service.db import get_session_factory
 
@@ -16,14 +16,17 @@ async def handle_identity_event(payload: dict[str, Any]) -> None:
     if payload.get("event_type") != "identity.user_registered.v1":
         return
     event_payload = payload.get("payload", {})
+    event_id = payload.get("event_id")
     user_id = event_payload.get("user_id")
     email = event_payload.get("email")
-    if not isinstance(user_id, str) or not isinstance(email, str):
+    if not isinstance(event_id, str) or not isinstance(user_id, str) or not isinstance(email, str):
         raise ValueError("identity.user_registered.v1 has invalid payload")
     from uuid import UUID
 
     async with get_session_factory()() as db:
-        await provision_customer(db, user_id=UUID(user_id), email=email)
+        await provision_identity_customer(
+            db, event_id=UUID(event_id), user_id=UUID(user_id), email=email
+        )
         await db.commit()
 
 
