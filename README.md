@@ -89,6 +89,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Testing strategy](docs/development/testing-strategy.md)
 - [CI/CD strategy](docs/development/ci-cd.md)
 - [Phase 0 plan](docs/development/phase-0-plan.md)
+- [Phase 1 plan](docs/development/phase-1-plan.md)
 
 ## Roadmap
 
@@ -110,7 +111,11 @@ The complete intended layout is documented in [repository structure](docs/archit
 
 ## Local development
 
-There is no runnable local stack in Phase 0. Phase 1 will add verified and pinned runtime toolchain configuration, Docker Compose infrastructure, a non-domain reference service, shared technical packages, tests, and baseline runtime CI. Until then, setup commands would be misleading and are intentionally omitted.
+Phase 1 adds the verified and pinned runtime toolchain, Docker Compose infrastructure, a non-domain reference service, tests, and baseline runtime CI. See the Phase 1 plan and use scripts/platform.ps1 for repeatable local tasks.
+
+    pwsh -File .\scripts\platform.ps1 -Task install
+    pwsh -File .\scripts\platform.ps1 -Task test
+    pwsh -File .\scripts\platform.ps1 -Task dev-up
 
 ## License
 

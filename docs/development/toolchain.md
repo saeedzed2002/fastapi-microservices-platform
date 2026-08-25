@@ -1,36 +1,36 @@
 # Toolchain Record
 
-Phase 0 selects only the components needed to run its structural CI gate. Runtime, application, broker, database, and deployment versions remain deliberately unselected until their target phase. Each component has an independent evidence record because compatibility and security cannot be established for a grouped technology label.
+Phase 1 selects the minimum executable platform profile. Direct package constraints remain in the root and service manifests; uv.lock is the reproducible resolution. Image tags are explicit local-development selections and must be replaced or supplemented with immutable digests before delivery.
 
 | Component | Target phase | Selection status | Evidence required before adoption |
 |---|---:|---|---|
 | GitHub-hosted runner | 0 | `ubuntu-24.04` managed label; verified `2026-08-25` | Supported runner label, required preinstalled shell, mutable-image update policy |
 | PowerShell | 0 | Runner-provided mutable `pwsh`; minimum `7.4`; standalone `v7.6.5` reviewed `2026-08-25` but not installed | Bundled image inventory, Draft 2020-12 schema behavior, local prerequisite, mutable-image exception |
 | `actions/checkout` | 0 | `v7.0.1` pinned to `3d3c42e5aac5ba805825da76410c181273ba90b1`; verified `2026-08-25` | Official release, immutable commit SHA, runtime compatibility, minimal permissions |
-| Python | 1 | Not selected | Stable release, support lifecycle, platform and complete-stack compatibility |
-| `uv` | 1 | Not selected | Stable release, workspace/lock behavior, Python support, reproducible installation |
-| Ruff | 1 | Not selected | Python support, rule compatibility, formatter/linter behavior |
-| Type checker | 1 | Not selected | Tool choice, Python/Pydantic/plugin compatibility, strictness policy |
-| pytest | 1 | Not selected | Python support, plugin compatibility, asynchronous test behavior |
+| Python | 1 | 3.12 local/CI baseline | Stable release, support lifecycle, platform and complete-stack compatibility |
+| `uv` | 1 | 0.12.1 | Stable release, workspace/lock behavior, Python support, reproducible installation |
+| Ruff | 1 | 0.14.14 resolved | Python support, rule compatibility, formatter/linter behavior |
+| Type checker | 1 | mypy 1.20.2 resolved | Tool choice, Python/Pydantic/plugin compatibility, strictness policy |
+| pytest | 1 | 9.1.1 resolved | Python support, plugin compatibility, asynchronous test behavior |
 | pre-commit framework | 1 | Not selected | Stable release, hook revisions, reproducible local/CI behavior |
-| FastAPI | 1 | Not selected | Python, Starlette, Pydantic and OpenAPI compatibility |
+| FastAPI | 1 | 0.141.1 | Python, Starlette, Pydantic and OpenAPI compatibility |
 | Starlette | 1 | Not selected | FastAPI-supported range and security advisories |
 | Pydantic | 1 | Not selected | FastAPI, settings, serialization and schema compatibility |
-| Pydantic Settings | 1 | Not selected | Pydantic and configuration-source compatibility |
-| Uvicorn | 1 | Not selected | Python/ASGI compatibility and production worker model |
-| HTTPX | 1 | Not selected | Python, ASGI test client, timeout and transport compatibility |
+| Pydantic Settings | 1 | 2.15.0 | Pydantic and configuration-source compatibility |
+| Uvicorn | 1 | 0.52.4 resolved | Python/ASGI compatibility and production worker model |
+| HTTPX | 1 | 0.28.1 | Python, ASGI test client, timeout and transport compatibility |
 | SQLAlchemy | 1 | Not selected | Python, PostgreSQL driver and Alembic compatibility |
 | Alembic | 1 | Not selected | SQLAlchemy compatibility and migration behavior |
 | PostgreSQL driver | 1 | Not selected | Driver choice, SQLAlchemy support, async behavior and packaging |
-| PostgreSQL server/image | 1 | Not selected | Supported stable release, upgrade path, extensions, architecture and digest |
-| Kafka broker/image | 1 | Not selected | Stable distribution, protocol baseline, KRaft/operations, architecture and digest |
+| PostgreSQL server/image | 1 | postgres:18.6 local | Supported stable release, upgrade path, extensions, architecture and digest |
+| Kafka broker/image | 1 | apache/kafka:4.2.0 local | Stable distribution, protocol baseline, KRaft/operations, architecture and digest |
 | Kafka Python client | 1 | Not selected | Python support, broker protocol, idempotent producer and tracing integration |
-| RabbitMQ server/image | 1 | Not selected | Supported stable release, Celery compatibility, quorum/DLX features and digest |
+| RabbitMQ server/image | 1 | rabbitmq:4.3.5-management local | Supported stable release, Celery compatibility, quorum/DLX features and digest |
 | Celery | 1 | Not selected | Python/RabbitMQ compatibility, acknowledgement, retry and shutdown semantics |
-| Redis server/image | 1 | Not selected | Supported stable release, persistence/degradation policy and digest |
+| Redis server/image | 1 | redis:8.10.0 local | Supported stable release, persistence/degradation policy and digest |
 | Redis Python client | 1 | Not selected | Python/server compatibility, async and cluster behavior |
 | S3 Python client | 1 | Not selected | Signing, checksum, multipart and presigned-request behavior |
-| MinIO image | 1 | Not selected | Stable production release, S3 compatibility, architecture and digest |
+| MinIO image | 1 | quay.io/minio/minio:RELEASE.2025-07-23T15-54-02Z local | Stable production release, S3 compatibility, architecture and digest |
 | OpenTelemetry API/SDK | 1 | Not selected | Python support and semantic-convention compatibility |
 | OpenTelemetry instrumentation/exporters | 1 | Not selected | FastAPI, HTTPX, SQLAlchemy, Kafka, Celery and OTLP compatibility |
 | OpenTelemetry Collector image | 1 | Not selected | Stable distribution, component set, configuration compatibility and digest |
@@ -87,3 +87,13 @@ Phase 0 selects only the components needed to run its structural CI gate. Runtim
 - Next review: before Phase 1 CI expansion or `2026-09-25`, whichever occurs first.
 
 For every later selection, record the exact version or digest, verification date, release date, official source, compatibility evidence, security and license review, pinning method, exceptions, and next review date. Never populate this register from model memory, tutorials, prior repositories, or cached assumptions.
+
+## Phase 1 selection evidence
+
+- Python baseline: CPython 3.12 is retained because the local host and selected FastAPI stack support it; the repository constrains the supported range to 3.12 through 3.14 and does not silently download another interpreter.
+- uv: official uv release 0.12.1 was selected after verifying workspace and lock behavior. The installer was obtained from Astral's official release endpoint, and the resulting lock was generated with uv 0.12.1.
+- Application cluster: FastAPI 0.141.1, Pydantic Settings 2.15.0, HTTPX 0.28.1, and Uvicorn 0.52.x were resolved together by uv on Python 3.12. The lock records the exact transitive graph.
+- Development cluster: pytest, Ruff, and mypy are direct development tools; their exact resolved versions are recorded in uv.lock and validated by the Phase 1 checks.
+- Infrastructure images: PostgreSQL 18.6, Apache Kafka 4.2.0, RabbitMQ 4.3.5-management, Redis 8.10.0, and MinIO RELEASE.2025-07-23T15-54-02Z were selected as explicit local tags. Delivery environments must verify and pin immutable digests before promotion.
+- Official sources reviewed: [uv releases](https://github.com/astral-sh/uv/releases), [FastAPI release notes](https://fastapi.tiangolo.com/release-notes/), [Pydantic Settings on PyPI](https://pypi.org/project/pydantic-settings/), [SQLAlchemy on PyPI](https://pypi.org/project/SQLAlchemy/), [Uvicorn on PyPI](https://pypi.org/project/uvicorn/), [Apache Kafka downloads](https://kafka.apache.org/community/downloads/), [PostgreSQL official image](https://hub.docker.com/_/postgres), [RabbitMQ official image](https://hub.docker.com/_/rabbitmq), [Redis official image](https://hub.docker.com/_/redis), and [MinIO container documentation](https://min.io/docs/minio/container/).
+- Compatibility exception: the initial reference service intentionally does not include database, broker, Celery, S3, or OpenTelemetry client packages. Those clusters remain unselected until a service requires them and their official compatibility evidence is reviewed.
