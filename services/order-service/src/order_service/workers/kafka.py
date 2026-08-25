@@ -14,6 +14,7 @@ from order_service.config import Settings
 from order_service.db import get_session_factory
 from order_service.invoice_application import accept_invoice_request
 from order_service.models import OutboxMessage
+from platform_messaging import KafkaDlqPolicy, process_record_with_dead_letter
 
 logger = logging.getLogger(__name__)
 
@@ -131,18 +132,35 @@ async def consume_saga_events(settings: Settings, stop: asyncio.Event) -> None:
         enable_auto_commit=False,
         auto_offset_reset="earliest",
     )
+    producer = AIOKafkaProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers, enable_idempotence=True
+    )
     await consumer.start()
+    await producer.start()
     try:
         async for message in consumer:
-            try:
+
+            async def handle(current_message: Any = message) -> None:
                 async with get_session_factory()() as db:
-                    await process_saga_result(db, json.loads(message.value))
-                await consumer.commit()
-            except Exception:
-                logger.exception("order_saga_consume_failed")
+                    await process_saga_result(db, json.loads(current_message.value))
+
+            await process_record_with_dead_letter(
+                consumer=consumer,
+                producer=producer,
+                record=message,
+                policy=KafkaDlqPolicy(
+                    consumer_name="order-service.saga",
+                    dead_letter_topic=settings.kafka_dead_letter_topic,
+                    max_attempts=settings.kafka_consumer_max_attempts,
+                    retry_backoff_seconds=settings.kafka_consumer_retry_backoff_seconds,
+                ),
+                handler=handle,
+                stop=stop,
+            )
             if stop.is_set():
                 break
     finally:
+        await producer.stop()
         await consumer.stop()
 
 
@@ -154,18 +172,35 @@ async def consume_invoice_events(settings: Settings, stop: asyncio.Event) -> Non
         enable_auto_commit=False,
         auto_offset_reset="earliest",
     )
+    producer = AIOKafkaProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers, enable_idempotence=True
+    )
     await consumer.start()
+    await producer.start()
     try:
         async for message in consumer:
-            try:
-                envelope = json.loads(message.value)
+
+            async def handle(current_message: Any = message) -> None:
+                envelope = json.loads(current_message.value)
                 if envelope.get("event_type") == "order.confirmed.v1":
                     async with get_session_factory()() as db:
                         await accept_invoice_request(db, envelope)
-                await consumer.commit()
-            except Exception:
-                logger.exception("order_invoice_consume_failed")
+
+            await process_record_with_dead_letter(
+                consumer=consumer,
+                producer=producer,
+                record=message,
+                policy=KafkaDlqPolicy(
+                    consumer_name="order-service.invoice-dispatcher",
+                    dead_letter_topic=settings.kafka_dead_letter_topic,
+                    max_attempts=settings.kafka_consumer_max_attempts,
+                    retry_backoff_seconds=settings.kafka_consumer_retry_backoff_seconds,
+                ),
+                handler=handle,
+                stop=stop,
+            )
             if stop.is_set():
                 break
     finally:
+        await producer.stop()
         await consumer.stop()

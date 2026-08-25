@@ -102,6 +102,7 @@ foreach ($jsonFile in $jsonFiles) {
 
 Test-JsonSchemaDocument -DocumentPath (Join-Path $repositoryPath "contracts/catalog.json") -SchemaPath (Join-Path $repositoryPath "contracts/catalog.schema.json") -Label "contract catalog"
 Test-JsonSchemaDocument -DocumentPath (Join-Path $repositoryPath "contracts/events/event-envelope.v1.example.json") -SchemaPath (Join-Path $repositoryPath "contracts/events/event-envelope.v1.schema.json") -Label "event-envelope example"
+Test-JsonSchemaDocument -DocumentPath (Join-Path $repositoryPath "contracts/events/kafka.dead_letter.v1.example.json") -SchemaPath (Join-Path $repositoryPath "contracts/events/kafka.dead_letter.v1.schema.json") -Label "Kafka dead-letter example"
 Test-JsonSchemaDocument -DocumentPath (Join-Path $repositoryPath "contracts/openapi/error-response.v1.example.json") -SchemaPath (Join-Path $repositoryPath "contracts/openapi/error-response.v1.schema.json") -Label "error-response example"
 
 foreach ($markdownFile in $markdownFiles) {
@@ -160,7 +161,7 @@ foreach ($adrFile in $adrFiles) {
 
 $catalogPath = Join-Path $repositoryPath "contracts/catalog.json"
 $catalog = Get-Content -LiteralPath $catalogPath -Raw | ConvertFrom-Json -Depth 100
-$allowedKinds = @("event-envelope", "api-error-envelope", "domain-event")
+$allowedKinds = @("event-envelope", "api-error-envelope", "domain-event", "dead-letter-envelope")
 $allowedStatuses = @("reserved", "proposed", "active", "deprecated", "retired")
 
 if ($catalog.catalog_schema -ne "catalog.schema.json") {
@@ -210,6 +211,17 @@ foreach ($contract in $catalog.contracts) {
         }
         if ($contract.status -eq "reserved" -and $null -ne $contract.schema) {
             Add-ValidationError "Reserved event must not expose an active payload schema: $($contract.name)"
+        }
+    }
+    if ($contract.kind -eq "dead-letter-envelope") {
+        if ($contract.name -notmatch "^kafka\.dead_letter\.v[1-9][0-9]*$") {
+            Add-ValidationError "Invalid versioned dead-letter contract name: $($contract.name)"
+        }
+        if ($contract.topic -ne "fastapi-platform.dead-letter.v1") {
+            Add-ValidationError "Dead-letter contract must use the platform dead-letter topic."
+        }
+        if ($contract.message_key -ne "source.topic:source.partition:source.offset") {
+            Add-ValidationError "Dead-letter contract must key records by immutable source coordinates."
         }
     }
 }

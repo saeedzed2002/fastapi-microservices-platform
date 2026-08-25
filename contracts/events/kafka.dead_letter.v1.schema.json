@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fastapi-platform:contracts:events:kafka-dead-letter:v1",
+  "title": "FastAPI Platform Kafka Dead Letter Record v1",
+  "description": "Technical envelope written only after a Kafka consumer exhausts bounded processing retries.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "dead_letter_version",
+    "dead_lettered_at",
+    "consumer",
+    "source",
+    "event_context",
+    "failure_history"
+  ],
+  "properties": {
+    "dead_letter_version": {
+      "const": 1
+    },
+    "dead_lettered_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "consumer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic",
+        "partition",
+        "offset",
+        "timestamp_ms",
+        "key_base64",
+        "value_base64",
+        "headers"
+      ],
+      "properties": {
+        "topic": {
+          "type": "string",
+          "pattern": "^fastapi-platform\\."
+        },
+        "partition": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timestamp_ms": {
+          "type": "integer",
+          "minimum": -1
+        },
+        "key_base64": {
+          "type": ["string", "null"],
+          "contentEncoding": "base64"
+        },
+        "value_base64": {
+          "type": ["string", "null"],
+          "contentEncoding": "base64"
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "value_base64"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "value_base64": {
+                "type": ["string", "null"],
+                "contentEncoding": "base64"
+              }
+            }
+          }
+        }
+      }
+    },
+    "event_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_id", "event_type", "correlation_id", "causation_id", "trace_id"],
+      "properties": {
+        "event_id": {"type": ["string", "null"]},
+        "event_type": {"type": ["string", "null"]},
+        "correlation_id": {"type": ["string", "null"]},
+        "causation_id": {"type": ["string", "null"]},
+        "trace_id": {"type": ["string", "null"]}
+      }
+    },
+    "failure_history": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["attempt", "occurred_at", "exception_type", "reason"],
+        "properties": {
+          "attempt": {"type": "integer", "minimum": 1},
+          "occurred_at": {"type": "string", "format": "date-time", "pattern": "Z$"},
+          "exception_type": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "maxLength": 2000}
+        }
+      }
+    }
+  }
+}

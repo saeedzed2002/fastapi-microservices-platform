@@ -14,6 +14,8 @@ than the agreed operational threshold, or the Outbox backlog rises.
    `payment-service`.
 4. Inspect the matching `order_id` in only the owning databases, including each
    Inbox record and Inventory reservation.
+5. Inspect `fastapi-platform.dead-letter.v1` for the matching source event. Do
+   not commit past a poisoned record or replay it before repairing the cause.
 
 ## Recovery
 
@@ -22,6 +24,10 @@ The Outbox publisher retries unpublished records; consumers write their Inbox
 and business effect before committing the Kafka offset. Do not manually replay a
 payment or release stock unless the durable records prove normal recovery cannot
 complete.
+
+If a checkout event has entered the DLQ, follow the [Kafka DLQ runbook](kafka-dlq.md)
+before replay. Replay must pass through the normal Inbox and state-machine
+guards.
 
 ## Verification
 

@@ -23,6 +23,16 @@
       "schema": "events/event-envelope.v1.schema.json"
     },
     {
+      "name": "kafka.dead_letter.v1",
+      "kind": "dead-letter-envelope",
+      "owner": "platform",
+      "status": "active",
+      "topic": "fastapi-platform.dead-letter.v1",
+      "message_key": "source.topic:source.partition:source.offset",
+      "notes": "Technical Kafka processing failures only. The original record is preserved as base64 bytes together with source coordinates and local retry history.",
+      "schema": "events/kafka.dead_letter.v1.schema.json"
+    },
+    {
       "name": "error-response.v1",
       "kind": "api-error-envelope",
       "owner": "platform",

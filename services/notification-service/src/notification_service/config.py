@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     )
     kafka_bootstrap_servers: str = "localhost:29092"
     kafka_invoice_topic: str = "fastapi-platform.order.events.v1"
+    kafka_dead_letter_topic: str = "fastapi-platform.dead-letter.v1"
+    kafka_consumer_max_attempts: int = Field(default=3, ge=1, le=20)
+    kafka_consumer_retry_backoff_seconds: float = Field(default=0.25, ge=0.05, le=60.0)
     kafka_consumer_enabled: bool = False
     rabbitmq_url: str = "amqp://platform:platform-local-only@localhost:5672//"
     task_dispatcher_enabled: bool = False

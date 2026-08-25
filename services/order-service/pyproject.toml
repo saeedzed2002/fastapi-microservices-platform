@@ -12,6 +12,7 @@ dependencies = [
   "fastapi>=0.141.1,<0.142",
   "httpx>=0.28.1,<0.29",
   "platform-auth",
+  "platform-messaging",
   "pydantic-settings>=2.15,<3",
   "PyJWT[crypto]>=2.13,<3",
   "reportlab>=5.0,<6",
@@ -28,3 +29,4 @@ package = true
 
 [tool.uv.sources]
 platform-auth = { workspace = true }
+platform-messaging = { workspace = true }

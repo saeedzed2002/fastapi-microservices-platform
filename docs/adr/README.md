@@ -23,6 +23,7 @@ ADRs record decisions that materially affect service ownership, contracts, durab
 
 | ADR | Status | Decision |
 |---|---|---|
+| [ADR-016](ADR-016-kafka-consumer-dead-letter-policy.md) | Accepted | Kafka consumer dead-letter policy |
 | [ADR-015](ADR-015-invoice-delivery-handoff.md) | Accepted | Durable invoice and notification handoff |
 | [ADR-001](ADR-001-monorepo-and-repository-layout.md) | Accepted | Monorepo and repository layout |
 | [ADR-002](ADR-002-service-boundaries-and-database-ownership.md) | Accepted | Bounded contexts and database ownership |

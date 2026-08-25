@@ -19,6 +19,8 @@ An Order is `CONFIRMED`, but its Order-owned Invoice remains `PENDING`,
    `notification.email` queues.
 4. Do not query Customer data or edit another service's records to recover the
    workflow.
+5. Inspect `fastapi-platform.dead-letter.v1` for a failed Order invoice-dispatch
+   or Notification invoice-consumer record.
 
 ## Recovery
 
@@ -33,6 +35,9 @@ recoverable by task redelivery.
 Do not mark an Invoice as `GENERATED` or an email as `SENT` manually. If SMTP
 acceptance is ambiguous, verify provider delivery first: SMTP has no universal
 idempotency guarantee, so a recovery retry can create a duplicate email.
+
+For a Kafka poison record, repair the cause and use the [Kafka DLQ runbook](kafka-dlq.md)
+instead of manually committing the source offset.
 
 ## Verification
 

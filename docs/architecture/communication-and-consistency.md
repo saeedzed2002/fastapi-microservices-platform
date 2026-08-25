@@ -75,6 +75,21 @@ Kafka and RabbitMQ DLQs preserve:
 
 DLQs require ownership, alerting, inspection, repair, and replay runbooks. Replay always passes through normal idempotency controls.
 
+For Kafka, the acknowledgement sequence is mandatory:
+
+```text
+process one source record
+  -> bounded retries with exponential backoff
+  -> publish kafka.dead_letter.v1 after final failure
+  -> Kafka acknowledges DLQ publication
+  -> commit exactly that source topic/partition/offset
+```
+
+The consumer must not handle a later record from that partition, or commit the
+source offset, while DLQ publication is unavailable. A duplicate DLQ record is
+possible after an ambiguous broker acknowledgement and is deduplicated by the
+immutable source topic, partition, and offset.
+
 ## RabbitMQ task delivery
 
 Task queues are owned by bounded context and workload. Every task defines acknowledgement timing, retryable exceptions, exponential backoff, jitter, maximum attempts, time limits, idempotency, and poison-task behavior.

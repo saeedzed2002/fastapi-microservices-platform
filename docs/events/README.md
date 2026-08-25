@@ -1,6 +1,6 @@
 # Event Catalogue and Policy
 
-The machine-readable registry is [`contracts/catalog.json`](../../contracts/catalog.json). The canonical envelope is [`event-envelope.v1.schema.json`](../../contracts/events/event-envelope.v1.schema.json).
+The machine-readable registry is [`contracts/catalog.json`](../../contracts/catalog.json). The canonical domain-event envelope is [`event-envelope.v1.schema.json`](../../contracts/events/event-envelope.v1.schema.json). Technical Kafka delivery failures use the separate [`kafka.dead_letter.v1.schema.json`](../../contracts/events/kafka.dead_letter.v1.schema.json) contract.
 
 ## Naming
 
@@ -65,3 +65,8 @@ Each active event documents:
 - produced/consumed metrics;
 - compatibility and retirement policy;
 - related ADR and runbook.
+
+`kafka.dead_letter.v1` is not a domain fact. It records a consumer failure after
+bounded retries, preserves raw source bytes and headers, and is keyed by source
+`topic:partition:offset`. Its owner is platform engineering; recovery follows
+the [Kafka DLQ runbook](../runbooks/kafka-dlq.md).

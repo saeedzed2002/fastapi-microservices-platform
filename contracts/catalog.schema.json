@@ -36,7 +36,7 @@
           "minLength": 1
         },
         "kind": {
-          "enum": ["event-envelope", "api-error-envelope", "domain-event"]
+          "enum": ["event-envelope", "api-error-envelope", "domain-event", "dead-letter-envelope"]
         },
         "owner": {
           "type": "string",
@@ -79,6 +79,19 @@
           },
           "then": {
             "required": ["consumers", "topic", "message_key"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "dead-letter-envelope"
+              }
+            },
+            "required": ["kind"]
+          },
+          "then": {
+            "required": ["topic", "message_key"]
           }
         },
         {

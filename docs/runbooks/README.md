@@ -16,3 +16,5 @@ Required initial runbook topics include:
 - A migration or rollout failed.
 
 Phase 0 reserves these operational obligations; runnable commands and thresholds are added only after the corresponding implementation exists.
+
+Implemented: [Kafka dead-letter inspection and replay](kafka-dlq.md).

@@ -1,0 +1,48 @@
+{
+  "dead_letter_version": 1,
+  "dead_lettered_at": "2026-08-26T09:00:03Z",
+  "consumer": {
+    "name": "order-service.saga"
+  },
+  "source": {
+    "topic": "fastapi-platform.inventory.events.v1",
+    "partition": 1,
+    "offset": 42,
+    "timestamp_ms": 1787734800000,
+    "key_base64": "YWU4YmMzNmItYzIxMi00NTI2LWFiOTktODllNzJiZGNjMGVl",
+    "value_base64": "eyJldmVudF90eXBlIjoiaW52ZW50b3J5LnJlc2VydmVkLnYxIn0=",
+    "headers": [
+      {
+        "name": "traceparent",
+        "value_base64": "MDAtMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWYtMDEyMzQ1Njc4OWFiY2RlZi0wMQ=="
+      }
+    ]
+  },
+  "event_context": {
+    "event_id": "cbaab3c1-43d8-4f6d-b4ba-88f4dd89e93f",
+    "event_type": "inventory.reserved.v1",
+    "correlation_id": "126208ee-0102-4e99-a040-9ab71ac01ff8",
+    "causation_id": "fcaab3c1-43d8-4f6d-b4ba-88f4dd89e93f",
+    "trace_id": "0123456789abcdef0123456789abcdef"
+  },
+  "failure_history": [
+    {
+      "attempt": 1,
+      "occurred_at": "2026-08-26T09:00:01Z",
+      "exception_type": "ValueError",
+      "reason": "invalid state transition"
+    },
+    {
+      "attempt": 2,
+      "occurred_at": "2026-08-26T09:00:02Z",
+      "exception_type": "ValueError",
+      "reason": "invalid state transition"
+    },
+    {
+      "attempt": 3,
+      "occurred_at": "2026-08-26T09:00:03Z",
+      "exception_type": "ValueError",
+      "reason": "invalid state transition"
+    }
+  ]
+}

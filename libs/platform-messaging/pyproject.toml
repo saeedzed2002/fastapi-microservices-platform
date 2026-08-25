@@ -1,0 +1,15 @@
+[project]
+name = "platform-messaging"
+version = "0.1.0"
+description = "Technical Kafka delivery and dead-letter utilities shared without domain models."
+requires-python = ">=3.14,<3.15"
+dependencies = [
+  "aiokafka>=0.14,<0.15",
+]
+
+[build-system]
+requires = ["uv_build>=0.8.0,<0.9"]
+build-backend = "uv_build"
+
+[tool.uv]
+package = true

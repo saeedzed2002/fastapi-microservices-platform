@@ -71,7 +71,10 @@ services:
       retries: 12
 
   minio:
-    image: quay.io/minio/minio:RELEASE.2025-07-23T15-54-02Z
+    build:
+      context: ../minio
+      dockerfile: Dockerfile
+    image: fastapi-microservices-platform-minio:RELEASE.2025-10-15T17-29-55Z-local
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minio-local
@@ -82,7 +85,7 @@ services:
     volumes:
       - minio-data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:9000/minio/health/live"]
       interval: 10s
       timeout: 10s
       retries: 12
