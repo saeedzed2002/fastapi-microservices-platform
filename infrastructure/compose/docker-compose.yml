@@ -205,6 +205,47 @@ services:
       timeout: 5s
       retries: 12
 
+  inventory-service:
+    build:
+      context: ../..
+      dockerfile: services/inventory-service/Dockerfile
+    environment:
+      INVENTORY_ENVIRONMENT: local
+      INVENTORY_DATABASE_URL: postgresql+asyncpg://inventory_service:inventory-local-only@postgres:5432/inventory_service
+      INVENTORY_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
+    ports:
+      - "8005:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  cart-service:
+    build:
+      context: ../..
+      dockerfile: services/cart-service/Dockerfile
+    environment:
+      CART_ENVIRONMENT: local
+      CART_DATABASE_URL: postgresql+asyncpg://cart_service:cart-local-only@postgres:5432/cart_service
+      CART_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
+      CART_REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8006:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   media-worker:
     image: fastapi-microservices-platform-media-service:latest
     command: ["celery", "-A", "media_service.workers.celery_app:celery_app", "worker", "--loglevel=INFO", "--without-mingle", "--without-gossip"]

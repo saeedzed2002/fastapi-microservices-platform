@@ -28,7 +28,7 @@ Phase 1 selects the minimum executable platform profile. Direct package constrai
 | RabbitMQ server/image | 1 | rabbitmq:4.3.5-management local | Supported stable release, Celery compatibility, quorum/DLX features and digest |
 | Celery | 1 | Not selected | Python/RabbitMQ compatibility, acknowledgement, retry and shutdown semantics |
 | Redis server/image | 1 | redis:8.10.0 local | Supported stable release, persistence/degradation policy and digest |
-| Redis Python client | 1 | Not selected | Python/server compatibility, async and cluster behavior |
+| Redis Python client | 4 | 8.1.0 | Python/server compatibility, async cache commands and failure behavior |
 | S3 Python client | 1 | Not selected | Signing, checksum, multipart and presigned-request behavior |
 | MinIO image | 1 | quay.io/minio/minio:RELEASE.2025-07-23T15-54-02Z local | Stable production release, S3 compatibility, architecture and digest |
 | OpenTelemetry API/SDK | 1 | Not selected | Python support and semantic-convention compatibility |
@@ -123,3 +123,24 @@ Official sources: [SQLAlchemy](https://pypi.org/project/SQLAlchemy/),
 [email-validator](https://pypi.org/project/email-validator/). The exact
 transitive graph is recorded in uv.lock and is the only reproducible install
 source for the workspace.
+
+## Phase 4 selection evidence
+
+- Redis Python client: redis-py 8.1.0 was the current stable package release
+  when reviewed on 2026-08-25. It supports Python 3.10 and newer, so it is
+  compatible with this repository's Python 3.12 baseline. Cart Service uses
+  only the documented asynchronous GET, SET, and DEL cache operations.
+- Server compatibility: the local Redis 8.10.0 image remains the selected
+  development server. The cart cache behavior is validated against that server
+  at runtime. The package documentation's server-support statement does not
+  justify claiming blanket compatibility for every Redis 8.10 feature; this
+  service intentionally relies only on the stable basic cache command set.
+- Security and lifecycle: the client is a BSD-licensed dependency selected from
+  its official PyPI release. Cache failure is non-critical by ADR-013 because
+  PostgreSQL remains the sole durable cart source. The exact release is locked
+  in uv.lock and pinned in the Cart image.
+- Official sources: [redis-py on PyPI](https://pypi.org/project/redis/),
+  [redis-py documentation](https://redis.readthedocs.io/en/stable/), and
+  [Redis 8.10 release notes](https://redis.io/docs/latest/develop/whats-new/8-10/).
+- Owner: platform engineering. Next review: before Phase 5 or 2026-09-25,
+  whichever occurs first.

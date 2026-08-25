@@ -1,0 +1,25 @@
+[project]
+name = "inventory-service"
+version = "0.4.0"
+description = "Inventory bounded context for stock and auditable movements."
+requires-python = ">=3.12,<3.15"
+dependencies = [
+  "alembic>=1.19.1,<2",
+  "asyncpg>=0.31,<0.32",
+  "fastapi>=0.141.1,<0.142",
+  "platform-auth",
+  "pydantic-settings>=2.15,<3",
+  "PyJWT[crypto]>=2.13,<3",
+  "SQLAlchemy[asyncio]>=2.0.52,<2.1",
+  "uvicorn[standard]>=0.52.3,<0.53",
+]
+
+[build-system]
+requires = ["uv_build>=0.8.0,<0.9"]
+build-backend = "uv_build"
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+platform-auth = { workspace = true }

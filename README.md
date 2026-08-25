@@ -4,11 +4,12 @@ FastAPI Microservices Platform is a backend-only, production-oriented e-commerce
 
 ## Project status
 
-The repository is currently in **Phase 2 — Identity & Customer**.
+The repository is currently in **Phase 4 — Inventory & Cart**.
 
-Phase 2 contains the identity and customer bounded contexts, their migrations,
-versioned event contract, local service images, and focused tests. Later
-business contexts remain intentionally unimplemented.
+Phase 4 contains the identity, customer, catalog, media, inventory, and cart
+bounded contexts. Inventory has auditable, concurrency-safe stock adjustments;
+Cart has PostgreSQL durability with an optional fail-open Redis cache. Checkout
+and its distributed Saga remain intentionally unimplemented.
 
 ## Architecture at a glance
 
@@ -93,6 +94,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Phase 0 plan](docs/development/phase-0-plan.md)
 - [Phase 1 plan](docs/development/phase-1-plan.md)
 - [Phase 2 plan](docs/development/phase-2-plan.md)
+- [Phase 4 plan](docs/development/phase-4-plan.md)
 
 ## Roadmap
 
@@ -114,14 +116,18 @@ The complete intended layout is documented in [repository structure](docs/archit
 
 ## Local development
 
-Phase 2 adds identity and customer services on top of the Phase 1 runtime.
-See the Phase 2 plan and use scripts/platform.ps1 for repeatable local tasks.
+Phase 4 adds Inventory on port 8005 and Cart on port 8006. See the Phase 4
+plan and use scripts/platform.ps1 for repeatable local tasks.
 
     pwsh -File .\scripts\platform.ps1 -Task install
     pwsh -File .\scripts\platform.ps1 -Task test
     pwsh -File .\scripts\platform.ps1 -Task dev-up
     pwsh -File .\scripts\platform.ps1 -Task migrate-identity
     pwsh -File .\scripts\platform.ps1 -Task migrate-customer
+    pwsh -File .\scripts\platform.ps1 -Task migrate-catalog
+    pwsh -File .\scripts\platform.ps1 -Task migrate-media
+    pwsh -File .\scripts\platform.ps1 -Task migrate-inventory
+    pwsh -File .\scripts\platform.ps1 -Task migrate-cart
 
 ## License
 

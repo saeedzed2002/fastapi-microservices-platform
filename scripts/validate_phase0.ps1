@@ -83,7 +83,7 @@ function Test-UtcTimestamp {
 }
 
 $repositoryFiles = @(Get-ChildItem -LiteralPath $repositoryPath -Recurse -File -Force | Where-Object {
-    $_.FullName -notmatch '[\\/]\.git[\\/]'
+    $_.FullName -notmatch '[\\/]\.(git|venv)[\\/]'
 })
 $jsonFiles = @($repositoryFiles | Where-Object { $_.Extension -eq ".json" })
 $markdownFiles = @($repositoryFiles | Where-Object { $_.Extension -eq ".md" })

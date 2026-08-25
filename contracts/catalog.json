@@ -111,10 +111,10 @@
       "kind": "domain-event",
       "owner": "media-service",
       "consumers": [],
-      "status": "reserved",
+      "status": "active",
       "topic": "fastapi-platform.media.events.v1",
       "message_key": "aggregate_id",
-      "schema": null
+      "schema": "events/media.ready.v1.schema.json"
     },
     {
       "name": "product.created.v1",

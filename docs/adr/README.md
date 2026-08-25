@@ -34,3 +34,5 @@ ADRs record decisions that materially affect service ownership, contracts, durab
 | [ADR-009](ADR-009-independent-versioning.md) | Accepted | Independent API, event, and service versioning |
 | [ADR-010](ADR-010-kubernetes-first-runtime.md) | Accepted | Kubernetes-first application runtime model |
 | [ADR-011](ADR-011-identity-token-and-account-lifecycle.md) | Accepted | Identity tokens and account lifecycle |
+| [ADR-012](ADR-012-phase-3-media-reference-boundary.md) | Accepted | Media references remain opaque across service boundaries |
+| [ADR-013](ADR-013-cart-cache-degradation.md) | Accepted | Cart Redis cache degradation policy |

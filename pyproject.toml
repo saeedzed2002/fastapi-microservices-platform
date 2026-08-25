@@ -22,7 +22,9 @@ default-groups = ["dev"]
 [tool.uv.workspace]
 members = [
   "services/catalog-service",
+  "services/cart-service",
   "services/media-service",
+  "services/inventory-service",
   "libs/platform-auth",
   "services/customer-service",
   "services/identity-service",
@@ -35,7 +37,9 @@ line-length = 100
 src = [
   "libs/platform-auth/src",
   "services/catalog-service/src",
+  "services/cart-service/src",
   "services/media-service/src",
+  "services/inventory-service/src",
   "services/reference-service/src",
   "services/identity-service/src",
   "services/customer-service/src",
@@ -50,7 +54,9 @@ ignore = ["B008"]
 testpaths = [
   "libs/platform-auth/tests",
   "services/catalog-service/tests",
+  "services/cart-service/tests",
   "services/media-service/tests",
+  "services/inventory-service/tests",
   "services/reference-service/tests",
   "services/identity-service/tests",
   "services/customer-service/tests",
@@ -64,7 +70,9 @@ strict = true
 files = [
   "libs/platform-auth/src",
   "services/catalog-service/src",
+  "services/cart-service/src",
   "services/media-service/src",
+  "services/inventory-service/src",
   "services/reference-service/src",
   "services/identity-service/src",
   "services/customer-service/src",
