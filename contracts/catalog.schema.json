@@ -36,7 +36,13 @@
           "minLength": 1
         },
         "kind": {
-          "enum": ["event-envelope", "api-error-envelope", "domain-event", "dead-letter-envelope"]
+          "enum": [
+            "event-envelope",
+            "api-error-envelope",
+            "domain-event",
+            "dead-letter-envelope",
+            "realtime-client-protocol"
+          ]
         },
         "owner": {
           "type": "string",

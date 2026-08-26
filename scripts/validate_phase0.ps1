@@ -104,6 +104,7 @@ Test-JsonSchemaDocument -DocumentPath (Join-Path $repositoryPath "contracts/cata
 Test-JsonSchemaDocument -DocumentPath (Join-Path $repositoryPath "contracts/events/event-envelope.v1.example.json") -SchemaPath (Join-Path $repositoryPath "contracts/events/event-envelope.v1.schema.json") -Label "event-envelope example"
 Test-JsonSchemaDocument -DocumentPath (Join-Path $repositoryPath "contracts/events/kafka.dead_letter.v1.example.json") -SchemaPath (Join-Path $repositoryPath "contracts/events/kafka.dead_letter.v1.schema.json") -Label "Kafka dead-letter example"
 Test-JsonSchemaDocument -DocumentPath (Join-Path $repositoryPath "contracts/openapi/error-response.v1.example.json") -SchemaPath (Join-Path $repositoryPath "contracts/openapi/error-response.v1.schema.json") -Label "error-response example"
+Test-JsonSchemaDocument -DocumentPath (Join-Path $repositoryPath "contracts/realtime/chat.v1.example.json") -SchemaPath (Join-Path $repositoryPath "contracts/realtime/chat.v1.schema.json") -Label "chat realtime example"
 
 foreach ($markdownFile in $markdownFiles) {
     $markdown = Get-Content -LiteralPath $markdownFile.FullName -Raw
@@ -161,7 +162,7 @@ foreach ($adrFile in $adrFiles) {
 
 $catalogPath = Join-Path $repositoryPath "contracts/catalog.json"
 $catalog = Get-Content -LiteralPath $catalogPath -Raw | ConvertFrom-Json -Depth 100
-$allowedKinds = @("event-envelope", "api-error-envelope", "domain-event", "dead-letter-envelope")
+$allowedKinds = @("event-envelope", "api-error-envelope", "domain-event", "dead-letter-envelope", "realtime-client-protocol")
 $allowedStatuses = @("reserved", "proposed", "active", "deprecated", "retired")
 
 if ($catalog.catalog_schema -ne "catalog.schema.json") {

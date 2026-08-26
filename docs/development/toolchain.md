@@ -161,3 +161,38 @@ source for the workspace.
   migration is required for this narrow validator use.
 - Owner: platform engineering. Next review: before Phase 7 or 2026-09-25,
   whichever occurs first.
+
+## Phase 7 selection evidence
+
+- `redis-py` `8.1.0` was re-reviewed on `2026-08-26` before Chat used its
+  asynchronous `PubSub` and sorted-set APIs. Its official package metadata
+  identifies `8.1.0` as the current stable `MIT` release with `Python` `3.10+`
+  support, compatible with this repository's `Python` `3.14` baseline. The
+  documented protocol requires a distinct Pub/Sub connection; Chat creates that
+  connection separately from its publisher/rate-limit client. The local
+  `Redis` `8.10.0` server remains the selected compatible development runtime.
+- `HTTPX` `0.28.1` was already locked for platform test clients and is now a
+  runtime dependency of Chat's bounded Media adapter. It remains the latest
+  stable non-prerelease in the reviewed release history, supports asynchronous
+  clients and `Python` `3.8+`, and has `BSD-3-Clause` licensing. Chat owns one
+  bounded-timeout `AsyncClient` for its lifecycle and never makes the Media
+  network call while a Chat database transaction is open.
+- No new broker, runtime, or unbounded dependency was introduced. Exact
+  transitive resolutions remain in `uv.lock`. The changed Chat and Media images
+  copy the official `uv` `0.12.5` binary from digest
+  `sha256:e85be844203885286c60ffad8a858d48afb6c5a5c237ca0e67f12e74b8f174b1`
+  and run `uv sync --locked --no-dev --no-editable --package`; this prevents
+  an image build from independently resolving package ranges. Their official
+  `Python` `3.14.7-slim-bookworm` base is pinned to index digest
+  `sha256:416f0db2a2b561945630cef9877a7ea0581b27449eb9fd9df42f03e1b74b5b63`.
+  The repository `.dockerignore` excludes the host virtual environment because
+  it is platform-specific. The internal HMAC access proof uses the standard
+  library and a rotatable external secret, not a new dependency.
+- Official sources: [redis-py `8.1.0` on PyPI](https://pypi.org/project/redis/8.1.0/),
+  [redis-py asynchronous documentation](https://redis.readthedocs.io/en/stable/examples/asyncio_examples.html),
+  [Redis sorted sets](https://redis.io/docs/latest/develop/data-types/sorted-sets/),
+  [HTTPX `0.28.1` on PyPI](https://pypi.org/project/httpx/0.28.1/), and
+  [HTTPX asynchronous documentation](https://www.python-httpx.org/async/), and
+  [uv Docker integration](https://docs.astral.sh/uv/guides/integration/docker/).
+- Owner: platform engineering. Next review: before `Phase 8` or `2026-09-25`,
+  whichever occurs first.

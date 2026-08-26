@@ -124,13 +124,14 @@ Inventory failure cancels the order before payment. Payment failure cancels the 
 ```text
 authenticated WebSocket message
    -> validate membership
+   -> validate sender-owned ready Media attachments when present
    -> commit Message in Chat PostgreSQL
    -> acknowledge sender
-   -> publish notification through Redis
-   -> fan out from each Chat pod to local connections
+   -> fan out to local participant connections
+   -> publish notification through Redis for other Chat pods
 ```
 
-Redis failure may interrupt realtime delivery but cannot lose committed chat messages. Clients recover from durable history using stable cursors or message IDs.
+Redis failure may interrupt cross-pod realtime delivery but cannot lose committed chat messages. Clients recover from durable history using stable cursors or message IDs. Redis-backed connection limiting is fail-closed; Pub/Sub and presence are not. A Chat-authorized participant receives a Media-generated short-lived attachment URL only after Chat membership validation and Media verification of a short-lived service proof.
 
 ## Runtime model
 

@@ -48,3 +48,17 @@ class MediaAssetResponse(BaseModel):
     created_at: datetime
     ready_at: datetime | None
     derivatives: list[DerivativeResponse] = Field(default_factory=list)
+
+
+class InternalChatAttachmentDownloadRequest(BaseModel):
+    subject_id: UUID
+    conversation_id: UUID
+    message_id: UUID
+    expires_at: int = Field(gt=0)
+
+
+class InternalChatAttachmentDownloadResponse(BaseModel):
+    asset_id: UUID
+    content_type: str
+    size_bytes: int = Field(gt=0)
+    download_url: str

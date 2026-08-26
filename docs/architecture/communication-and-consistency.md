@@ -98,9 +98,11 @@ A Kafka consumer or database transaction cannot directly publish a task and assu
 
 ## Chat consistency
 
-Chat commits a Message to PostgreSQL before sender acknowledgement and Redis publication. Redis loss therefore degrades live delivery, not durability. Clients use stable IDs/cursors to retrieve missed messages and deduplicate frames after reconnect.
+Chat commits a Message to PostgreSQL before sender acknowledgement and Redis publication. It fans out locally before its cross-pod publication; an origin instance ignores its own Redis notification. Redis loss therefore degrades live delivery, not durability. Clients use stable IDs/cursors to retrieve missed messages and deduplicate frames after reconnect.
 
 If requirements later demand guaranteed eventual fan-out after a commit-to-publish crash, Chat adds a durable relay. Redis Pub/Sub itself remains ephemeral.
+
+WebSocket connection limiting is security-sensitive and therefore fail-closed when Redis is unavailable. Pub/Sub, presence, and an already authenticated Message send are not rate-limit truth and remain independent from Redis durability. Presence returns `unknown` during Redis failure rather than a false offline result. Chat-to-Media attachment URL authorization uses a short-lived service proof after Chat validates membership; Media validates only its own asset lifecycle and never reads Chat data.
 
 ## Failure model
 

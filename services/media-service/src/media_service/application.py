@@ -155,3 +155,31 @@ async def asset_response(
             for derivative in derivatives
         ],
     )
+
+
+async def chat_attachment_download_url(
+    db: AsyncSession, *, asset_id: UUID, storage: ObjectStorage, settings: Settings
+) -> tuple[str, str, int]:
+    asset = await db.scalar(
+        select(MediaAsset).where(MediaAsset.id == asset_id, MediaAsset.deleted_at.is_(None))
+    )
+    if asset is None or asset.purpose != "chat_attachment" or asset.status != "ready":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="media asset not found")
+    derivative = await db.scalar(
+        select(MediaDerivative).where(
+            MediaDerivative.media_asset_id == asset.id,
+            MediaDerivative.kind == "thumbnail",
+        )
+    )
+    if derivative is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="media asset is not available"
+        )
+    return (
+        storage.create_download_url(
+            object_key=derivative.object_key,
+            expires_in=settings.upload_url_ttl_seconds,
+        ),
+        derivative.content_type,
+        derivative.size_bytes,
+    )

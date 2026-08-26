@@ -46,6 +46,7 @@ Minimum operational coverage includes:
 - Celery count, duration, retry, and failure;
 - Redis latency and error rate;
 - WebSocket connections, messages, disconnects, and errors;
+- Chat sender acknowledgement latency, Redis fan-out publication/subscriber failures, presence-unknown responses, connection-rate-limit rejections, and Media attachment authorization failures;
 - checkout duration, reservation failure, payment failure, and stuck Saga count;
 - DLQ volume and replay outcomes.
 

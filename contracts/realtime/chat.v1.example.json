@@ -1,0 +1,10 @@
+{
+  "type": "chat.message.v1",
+  "conversation_id": "d2719aa6-63d8-44f9-a4b5-8664785b0b0e",
+  "message_id": "e8302b5f-167d-4f16-ae3a-8a71f60f5288",
+  "client_message_id": "2dd981eb-9776-45df-bad4-80a54e7e3190",
+  "sender_id": "be899bfa-05f8-48f2-87d6-50f83a7467c5",
+  "content": "Your invoice is ready.",
+  "attachments": [],
+  "created_at": "2026-08-26T12:00:00Z"
+}

@@ -6,6 +6,7 @@ This directory is the canonical, language-neutral source of truth for cross-serv
 
 - `events/` contains the standard Kafka envelope and, in later phases, versioned event payload schemas.
 - `openapi/` contains shared API schema fragments and exported per-service OpenAPI contracts once services exist.
+- `realtime/` contains versioned bidirectional client-frame protocols for persistent realtime APIs.
 - `catalog.json` indexes active and reserved contracts, owners, consumers, delivery expectations, and schema locations.
 - `catalog.schema.json` defines the machine-readable structure enforced by the Phase 0 validation workflow.
 

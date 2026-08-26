@@ -86,7 +86,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for service in identity-service customer-service catalog-service media-service inventory-service cart-service order-service payment-service notification-service; do
+          for service in identity-service customer-service catalog-service media-service inventory-service cart-service order-service payment-service notification-service chat-service; do
             heads="$(uv run --package "$service" alembic -c "services/$service/alembic.ini" heads)"
             test "$(printf '%s\n' "$heads" | sed '/^$/d' | wc -l)" -eq 1
             printf '%s: %s\n' "$service" "$heads"
@@ -112,6 +112,7 @@ jobs:
           - order-service
           - payment-service
           - notification-service
+          - chat-service
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -138,7 +139,7 @@ jobs:
           severity: HIGH,CRITICAL
 
   integration:
-    name: Checkout, invoice, and notification integration
+    name: Checkout, invoice, notification, and chat integration
     needs: quality
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -178,12 +179,13 @@ jobs:
           uv run --package order-service alembic -c services/order-service/alembic.ini upgrade head
           uv run --package payment-service alembic -c services/payment-service/alembic.ini upgrade head
           uv run --package notification-service alembic -c services/notification-service/alembic.ini upgrade head
+          uv run --package chat-service alembic -c services/chat-service/alembic.ini upgrade head
 
       - name: Start migrated APIs and workers
         run: docker compose -f infrastructure/compose/docker-compose.yml up -d --build --wait
 
       - name: Execute cross-service E2E workflow
-        run: RUN_E2E=1 E2E_BASE_URL=http://127.0.0.1 uv run --all-packages pytest tests/e2e/test_phase6_checkout_notification.py -q
+        run: RUN_E2E=1 E2E_BASE_URL=http://127.0.0.1 uv run --all-packages pytest tests/e2e/test_phase6_checkout_notification.py tests/e2e/test_phase7_realtime_chat.py -q
 
       - name: Collect Compose logs on failure
         if: failure()
@@ -228,7 +230,7 @@ jobs:
           namespace="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/fastapi-microservices-platform"
           revision="${GITHUB_SHA}"
           short_revision="${revision:0:12}"
-          for service in reference-service identity-service customer-service catalog-service media-service inventory-service cart-service order-service payment-service notification-service; do
+          for service in reference-service identity-service customer-service catalog-service media-service inventory-service cart-service order-service payment-service notification-service chat-service; do
             version="$(python3 -c "import tomllib; from pathlib import Path; print(tomllib.loads(Path('services/$service/pyproject.toml').read_text())['project']['version'])")"
             image="$namespace/$service"
             docker build \

@@ -40,6 +40,14 @@
       "schema": "openapi/error-response.v1.schema.json"
     },
     {
+      "name": "chat.v1",
+      "kind": "realtime-client-protocol",
+      "owner": "chat-service",
+      "status": "active",
+      "notes": "Bidirectional WebSocket client protocol. Sender acknowledgements follow the local Chat PostgreSQL commit; messages may be duplicated across reconnect or Redis fan-out and are deduplicated by message_id.",
+      "schema": "realtime/chat.v1.schema.json"
+    },
+    {
       "name": "order.created.v1",
       "kind": "domain-event",
       "owner": "order-service",

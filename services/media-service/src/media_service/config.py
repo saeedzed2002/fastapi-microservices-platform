@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     service_name: str = "media-service"
-    service_version: str = "0.3.0"
+    service_version: str = "0.4.0"
     environment: str = "local"
     database_url: str = (
         "postgresql+asyncpg://media_service:media-local-only@localhost:5432/media_service"
@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     s3_bucket: str = "fastapi-platform-media"
     s3_region: str = "us-east-1"
     upload_url_ttl_seconds: int = Field(default=300, ge=60, le=3600)
+    chat_access_secret: str = Field(
+        default="local-development-chat-media-access-secret-change-me-32-bytes", min_length=32
+    )
+    chat_access_previous_secret: str | None = None
+    chat_access_proof_max_ttl_seconds: int = Field(default=60, ge=1, le=300)
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
     rabbitmq_url: str = "amqp://platform:platform-local-only@localhost:5672//"
     task_dispatcher_enabled: bool = False

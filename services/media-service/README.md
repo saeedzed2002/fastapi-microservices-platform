@@ -1,5 +1,14 @@
 # Media Service
 
+Media owns object bytes, upload processing, asset lifecycle, and signed download
+URLs. A ready `chat_attachment` remains Media-owned even when Chat stores a
+durable reference. Chat first validates the sender through the ordinary
+owner-authorized API. For a recipient read, Chat authorizes conversation
+membership and calls `POST /api/internal/v1/media/chat-attachments/{asset_id}/download-url`
+with a short-lived HMAC proof. The endpoint verifies the proof, the ready asset,
+and its thumbnail derivative before it creates a short-lived URL. It never
+queries Chat data or accepts a client-issued proof.
+
 Media owns upload authorization, object metadata, completion verification, image-processing lifecycle, derivatives, and storage cleanup orchestration. Binary bytes are stored in S3-compatible object storage, not PostgreSQL.
 
 ## Upload lifecycle

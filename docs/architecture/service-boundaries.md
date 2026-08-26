@@ -82,7 +82,7 @@ Owns conversations, participants, messages, durable attachment associations, cha
 
 Does not own identity credentials, binary attachment storage, or durable presence.
 
-It serves HTTP/WebSocket clients, commits messages to PostgreSQL before acknowledgement/fan-out, uses Redis for cross-pod delivery and presence, and references authorized Media assets.
+It serves HTTP/WebSocket clients, commits messages to PostgreSQL before acknowledgement/fan-out, uses Redis for cross-pod delivery and presence, and references authorized Media assets. When a participant needs an attachment URL, Chat validates its own membership and requests a short-lived Media URL through a signed internal REST proof; Media continues to own bytes, lifecycle, and URL generation without querying Chat data.
 
 ## Later services
 

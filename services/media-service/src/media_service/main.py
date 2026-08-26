@@ -4,20 +4,28 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Header
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from media_service.application import (
     asset_response,
     authorize_upload,
+    chat_attachment_download_url,
     complete_upload,
     load_owned_asset_or_404,
 )
 from media_service.auth import current_user
+from media_service.chat_access import verify_chat_access_proof
 from media_service.config import get_settings
 from media_service.db import dispose_engine, get_session
-from media_service.schemas import MediaAssetResponse, UploadAuthorization, UploadRequest
+from media_service.schemas import (
+    InternalChatAttachmentDownloadRequest,
+    InternalChatAttachmentDownloadResponse,
+    MediaAssetResponse,
+    UploadAuthorization,
+    UploadRequest,
+)
 from media_service.storage import S3ObjectStorage
 from media_service.workers.outbox_publisher import run_outbox_publisher
 from media_service.workers.task_dispatcher import run_task_dispatcher
@@ -95,6 +103,36 @@ async def get_asset(
 ) -> MediaAssetResponse:
     asset = await load_owned_asset_or_404(db, asset_id=asset_id, owner_subject_id=claims.subject)
     return await asset_response(db, asset=asset, storage=storage, settings=settings)
+
+
+@app.post(
+    "/api/internal/v1/media/chat-attachments/{asset_id}/download-url",
+    response_model=InternalChatAttachmentDownloadResponse,
+)
+async def create_chat_attachment_download_url(
+    asset_id: UUID,
+    payload: InternalChatAttachmentDownloadRequest,
+    chat_access_proof: str = Header(alias="X-Chat-Access-Proof"),
+    db: AsyncSession = Depends(get_session),
+) -> InternalChatAttachmentDownloadResponse:
+    verify_chat_access_proof(
+        settings=settings,
+        provided_proof=chat_access_proof,
+        subject_id=payload.subject_id,
+        conversation_id=payload.conversation_id,
+        message_id=payload.message_id,
+        asset_id=asset_id,
+        expires_at=payload.expires_at,
+    )
+    download_url, content_type, size_bytes = await chat_attachment_download_url(
+        db, asset_id=asset_id, storage=storage, settings=settings
+    )
+    return InternalChatAttachmentDownloadResponse(
+        asset_id=asset_id,
+        content_type=content_type,
+        size_bytes=size_bytes,
+        download_url=download_url,
+    )
 
 
 @app.get("/metrics", tags=["observability"])

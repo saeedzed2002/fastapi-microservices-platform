@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fastapi-platform:contracts:realtime:chat:v1",
+  "title": "FastAPI Platform Chat WebSocket Protocol v1",
+  "description": "Versioned client and server frames for the Chat Service WebSocket endpoint.",
+  "oneOf": [
+    { "$ref": "#/$defs/authenticate" },
+    { "$ref": "#/$defs/authenticated" },
+    { "$ref": "#/$defs/sendMessage" },
+    { "$ref": "#/$defs/messageAcknowledgement" },
+    { "$ref": "#/$defs/message" },
+    { "$ref": "#/$defs/heartbeat" },
+    { "$ref": "#/$defs/heartbeatAcknowledgement" },
+    { "$ref": "#/$defs/presence" },
+    { "$ref": "#/$defs/error" }
+  ],
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_id", "content_type", "size_bytes"],
+      "properties": {
+        "asset_id": { "$ref": "#/$defs/uuid" },
+        "content_type": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "size_bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "authenticate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "request_id", "access_token"],
+      "properties": {
+        "type": { "const": "chat.authenticate.v1" },
+        "request_id": { "$ref": "#/$defs/uuid" },
+        "access_token": { "type": "string", "minLength": 1, "maxLength": 8192 }
+      }
+    },
+    "authenticated": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "request_id", "subject_id"],
+      "properties": {
+        "type": { "const": "chat.authenticated.v1" },
+        "request_id": { "$ref": "#/$defs/uuid" },
+        "subject_id": { "$ref": "#/$defs/uuid" }
+      }
+    },
+    "sendMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "request_id", "client_message_id", "conversation_id", "attachment_ids"],
+      "properties": {
+        "type": { "const": "chat.send_message.v1" },
+        "request_id": { "$ref": "#/$defs/uuid" },
+        "client_message_id": { "$ref": "#/$defs/uuid" },
+        "conversation_id": { "$ref": "#/$defs/uuid" },
+        "content": { "type": "string", "minLength": 1, "maxLength": 4000, "pattern": ".*\\S.*" },
+        "attachment_ids": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/uuid" }
+        }
+      },
+      "anyOf": [
+        { "required": ["content"] },
+        { "properties": { "attachment_ids": { "minItems": 1 } } }
+      ]
+    },
+    "messageAcknowledgement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "request_id", "conversation_id", "message_id", "created_at", "duplicate"],
+      "properties": {
+        "type": { "const": "chat.message_ack.v1" },
+        "request_id": { "$ref": "#/$defs/uuid" },
+        "conversation_id": { "$ref": "#/$defs/uuid" },
+        "message_id": { "$ref": "#/$defs/uuid" },
+        "created_at": { "$ref": "#/$defs/timestamp" },
+        "duplicate": { "type": "boolean" }
+      }
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "conversation_id", "message_id", "client_message_id", "sender_id", "content", "attachments", "created_at"],
+      "properties": {
+        "type": { "const": "chat.message.v1" },
+        "conversation_id": { "$ref": "#/$defs/uuid" },
+        "message_id": { "$ref": "#/$defs/uuid" },
+        "client_message_id": { "$ref": "#/$defs/uuid" },
+        "sender_id": { "$ref": "#/$defs/uuid" },
+        "content": { "type": ["string", "null"], "maxLength": 4000 },
+        "attachments": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/attachment" } },
+        "created_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "heartbeat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "request_id"],
+      "properties": {
+        "type": { "const": "chat.heartbeat.v1" },
+        "request_id": { "$ref": "#/$defs/uuid" }
+      }
+    },
+    "heartbeatAcknowledgement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "request_id"],
+      "properties": {
+        "type": { "const": "chat.heartbeat_ack.v1" },
+        "request_id": { "$ref": "#/$defs/uuid" }
+      }
+    },
+    "presence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "subject_id", "online"],
+      "properties": {
+        "type": { "const": "chat.presence.v1" },
+        "subject_id": { "$ref": "#/$defs/uuid" },
+        "online": { "type": "boolean" }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "code", "message"],
+      "properties": {
+        "type": { "const": "chat.error.v1" },
+        "request_id": { "$ref": "#/$defs/uuid" },
+        "code": { "type": "string", "pattern": "^[a-z_]{1,64}$" },
+        "message": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    }
+  }
+}

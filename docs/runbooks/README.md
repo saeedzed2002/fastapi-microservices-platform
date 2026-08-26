@@ -17,4 +17,7 @@ Required initial runbook topics include:
 
 Phase 0 reserves these operational obligations; runnable commands and thresholds are added only after the corresponding implementation exists.
 
-Implemented: [Kafka dead-letter inspection and replay](kafka-dlq.md).
+Implemented: [Kafka dead-letter inspection and replay](kafka-dlq.md),
+[checkout and invoice recovery](checkout-saga.md),
+[invoice and notification recovery](invoice-notification.md), and
+[Chat realtime delivery and attachment access](chat-realtime.md).
