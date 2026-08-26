@@ -31,7 +31,7 @@ Phase 1 selects the minimum executable platform profile. Direct package constrai
 | Redis server/image | 1 | redis:8.10.0 local | Supported stable release, persistence/degradation policy and digest |
 | Redis Python client | 4 | 8.1.0 | Python/server compatibility, async cache commands and failure behavior |
 | S3 Python client | 1 | Not selected | Signing, checksum, multipart and presigned-request behavior |
-| MinIO image | 1 | locally built from `minio/minio` `RELEASE.2025-10-15T17-29-55Z` | Latest upstream security release; MinIO no longer publishes a matching official container image, so Compose builds the signed release from source with its required `Go` `1.24.8` toolchain. Builder and runtime base images are pinned by digest in `infrastructure/minio/Dockerfile`. |
+| MinIO image | 1 | locally built from `minio/minio` `RELEASE.2025-10-15T17-29-55Z` at `9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a` | Latest upstream security release; MinIO no longer publishes a matching official container image, so Compose builds the official release source with its required `Go` `1.24.8` toolchain. The Dockerfile verifies that the checked-out tag resolves to the recorded commit; builder and runtime base images are digest-pinned and the runtime is non-root. |
 | OpenTelemetry API/SDK | 1 | Not selected | Python support and semantic-convention compatibility |
 | OpenTelemetry instrumentation/exporters | 1 | Not selected | FastAPI, HTTPX, SQLAlchemy, Kafka, Celery and OTLP compatibility |
 | OpenTelemetry Collector image | 1 | Not selected | Stable distribution, component set, configuration compatibility and digest |
@@ -95,7 +95,7 @@ For every later selection, record the exact version or digest, verification date
 - uv: official uv release 0.12.5 was selected after verifying workspace and lock behavior. It includes the managed CPython 3.14.7 distribution required by the pinned project baseline; the installer was obtained from Astral's official release endpoint, and the resulting lock was generated with uv 0.12.5.
 - Application cluster: FastAPI 0.141.1, Pydantic Settings 2.15.0, HTTPX 0.28.1, and Uvicorn 0.52.x were resolved together by uv and validated on CPython 3.14. The lock records the exact transitive graph.
 - Development cluster: pytest, Ruff, and mypy are direct development tools; their exact resolved versions are recorded in uv.lock and validated by the Phase 1 checks.
-- Infrastructure images: PostgreSQL 18.6, Apache Kafka 4.2.0, RabbitMQ 4.3.5-management, and Redis 8.10.0 are explicit local tags. MinIO is built locally from signed upstream security release RELEASE.2025-10-15T17-29-55Z because the official publisher stopped releasing matching container images; its release requires a source-built container and Go 1.24.8. Its builder and runtime bases are pinned by digest; delivery environments must publish and promote the resulting MinIO image by immutable digest.
+- Infrastructure images: PostgreSQL 18.6, Apache Kafka 4.2.0, RabbitMQ 4.3.5-management, and Redis 8.10.0 are explicit local tags. MinIO is built locally from official upstream release RELEASE.2025-10-15T17-29-55Z at commit 9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a because the official publisher stopped releasing matching container images; its release requires a source-built container and Go 1.24.8. The Dockerfile verifies the tag-to-commit resolution, pins both base-image digests, and runs the resulting image without root privileges; delivery environments must publish and promote the resulting MinIO image by immutable digest.
 - Official sources reviewed: [Python releases](https://www.python.org/downloads/), [Python official image](https://hub.docker.com/_/python), [actions/setup-python release](https://github.com/actions/setup-python/releases/tag/v6.2.0), [uv releases](https://github.com/astral-sh/uv/releases), [FastAPI release notes](https://fastapi.tiangolo.com/release-notes/), [Pydantic Settings on PyPI](https://pypi.org/project/pydantic-settings/), [SQLAlchemy on PyPI](https://pypi.org/project/SQLAlchemy/), [Uvicorn on PyPI](https://pypi.org/project/uvicorn/), [Apache Kafka downloads](https://kafka.apache.org/community/downloads/), [PostgreSQL official image](https://hub.docker.com/_/postgres), [RabbitMQ official image](https://hub.docker.com/_/rabbitmq), [Redis official image](https://hub.docker.com/_/redis), [MinIO security release](https://github.com/minio/minio/releases/tag/RELEASE.2025-10-15T17-29-55Z), and [MinIO official Docker Hub tags](https://hub.docker.com/r/minio/minio/tags).
 - Compatibility exception: the initial reference service intentionally does not include database, broker, Celery, S3, or OpenTelemetry client packages. Those clusters remain unselected until a service requires them and their official compatibility evidence is reviewed.
 
@@ -144,4 +144,20 @@ source for the workspace.
   [redis-py documentation](https://redis.readthedocs.io/en/stable/), and
   [Redis 8.10 release notes](https://redis.io/docs/latest/develop/whats-new/8-10/).
 - Owner: platform engineering. Next review: before Phase 5 or 2026-09-25,
+  whichever occurs first.
+
+## Phase 6 selection evidence
+
+- jsonschema: 4.26.0 was the latest stable production release on 2026-08-26.
+  It supports Python 3.10 through 3.14, implements Draft 2020-12, and is
+  MIT-licensed. It is a development-only contract-test dependency used to
+  validate the DLQ record emitted by platform-messaging against the canonical
+  JSON Schema; it is not included in service runtime dependencies. The direct
+  constraint permits the compatible 4.x line and uv.lock records the exact
+  resolved graph.
+- Official sources: [jsonschema on PyPI](https://pypi.org/project/jsonschema/)
+  and [its release history](https://github.com/python-jsonschema/jsonschema/releases).
+  Version 4.26.0's release notes report an import-time optimization only; no
+  migration is required for this narrow validator use.
+- Owner: platform engineering. Next review: before Phase 7 or 2026-09-25,
   whichever occurs first.

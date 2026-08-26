@@ -2,7 +2,10 @@ import asyncio
 import base64
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+
+from jsonschema import Draft202012Validator
 
 from platform_messaging.kafka_dlq import KafkaDlqPolicy, process_record_with_dead_letter
 
@@ -113,6 +116,16 @@ async def _test_poison_record_is_dead_lettered_before_source_offset_commit() -> 
     assert base64.b64decode(dead_letter["source"]["value_base64"]) == FakeRecord().value
     assert dead_letter["event_context"]["event_type"] == "order.created.v1"
     assert [item["attempt"] for item in dead_letter["failure_history"]] == [1, 2, 3]
+    schema_path = (
+        Path(__file__).resolve().parents[3]
+        / "contracts"
+        / "events"
+        / "kafka.dead_letter.v1.schema.json"
+    )
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    Draft202012Validator(schema, format_checker=Draft202012Validator.FORMAT_CHECKER).validate(
+        dead_letter
+    )
 
 
 def test_unavailable_dlq_leaves_source_offset_uncommitted() -> None:
