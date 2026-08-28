@@ -24,6 +24,7 @@ class PaymentIntent(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     method: Mapped[str] = mapped_column(String(32))
     provider_reference: Mapped[str] = mapped_column(String(128), unique=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
@@ -35,8 +36,12 @@ class PaymentAttempt(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     intent_id: Mapped[UUID] = mapped_column(index=True)
+    provider: Mapped[str] = mapped_column(String(32))
     status: Mapped[str] = mapped_column(String(32))
     provider_reference: Mapped[str] = mapped_column(String(128))
+    authority: Mapped[str | None] = mapped_column(String(64), unique=True)
+    reference_id: Mapped[str | None] = mapped_column(String(64))
+    failure_code: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 

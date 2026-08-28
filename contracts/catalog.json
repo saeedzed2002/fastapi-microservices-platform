@@ -59,6 +59,14 @@
       "schema": "openapi/order-query.v1.openapi.json"
     },
     {
+      "name": "payment.zarinpal.v1",
+      "kind": "service-openapi",
+      "owner": "payment-service",
+      "status": "active",
+      "notes": "Customer payment-start API and verified Zarinpal browser-return callback. Existing payment Saga events remain unchanged.",
+      "schema": "openapi/payment-zarinpal.v1.openapi.json"
+    },
+    {
       "name": "event-envelope.v1",
       "kind": "event-envelope",
       "owner": "platform",

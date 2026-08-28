@@ -1,6 +1,6 @@
 # OpenAPI Contracts
 
-This directory contains the shared API error envelope and reviewed versioned OpenAPI documents grouped by service. `chat-support.v1.openapi.json` is the canonical contract for Chat's customer-support queue operations. `identity-auth.v1.openapi.json` is the canonical public contract for staff password and customer OTP authentication; `identity-admin.v1.openapi.json`, `customer-profile.v1.openapi.json`, and `order-query.v1.openapi.json` define staff lifecycle, customer contact profile, and read-only order queries. Internal service endpoints are excluded.
+This directory contains the shared API error envelope and reviewed versioned OpenAPI documents grouped by service. `chat-support.v1.openapi.json` is the canonical contract for Chat's customer-support queue operations. `identity-auth.v1.openapi.json` is the canonical public contract for staff password and customer OTP authentication; `identity-admin.v1.openapi.json`, `customer-profile.v1.openapi.json`, and `order-query.v1.openapi.json` define staff lifecycle, customer contact profile, and read-only order queries. `payment-zarinpal.v1.openapi.json` defines Payment's customer payment-start API and verified browser-return callback. Internal service endpoints are excluded.
 
 The generated FastAPI OpenAPI document is not accepted as an unreviewed implementation artifact. Contract changes are reviewed for compatibility and exported schemas are validated in CI.
 

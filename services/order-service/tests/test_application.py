@@ -12,6 +12,7 @@ from order_service.application import (
     encode_order_cursor,
     required_customer_email,
     transition_order,
+    validate_checkout_payment,
 )
 from order_service.models import Order, OrderItem
 from order_service.workers.invoice_tasks import render_invoice_pdf
@@ -91,3 +92,18 @@ def test_checkout_requires_a_real_customer_contact_email() -> None:
 
     with pytest.raises(HTTPException, match="checkout email unavailable"):
         required_customer_email({"email": None})
+
+
+def test_zarinpal_checkout_requires_a_whole_irt_amount() -> None:
+    validate_checkout_payment(
+        payment_method="zarinpal", currency="IRT", total_amount=Decimal("150000")
+    )
+
+    with pytest.raises(HTTPException, match="zarinpal requires IRT currency"):
+        validate_checkout_payment(
+            payment_method="zarinpal", currency="USD", total_amount=Decimal("150000")
+        )
+    with pytest.raises(HTTPException, match="zarinpal amount must be a positive whole IRT value"):
+        validate_checkout_payment(
+            payment_method="zarinpal", currency="IRT", total_amount=Decimal("150000.50")
+        )

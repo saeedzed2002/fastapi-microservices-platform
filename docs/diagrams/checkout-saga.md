@@ -25,7 +25,14 @@ sequenceDiagram
         Order->>ODB: inbox + persist reservation result + guarded state transition
         Note over Order,ODB: Phase 5 defines the durable trigger for PAYMENT_PENDING
         Kafka->>Payment: inventory.reserved.v1
-        Payment->>PDB: inbox + payment attempt + outbox
+        Payment->>PDB: inbox + AWAITING_CUSTOMER + payment.processing.v1 outbox
+        Client->>Payment: authenticated payment start
+        Payment->>Order: authenticated ownership and PAYMENT_PENDING REST check
+        Payment->>PDB: commit REQUESTING attempt
+        Payment->>Payment: Zarinpal request outside transaction
+        Payment->>PDB: authority + PENDING_CUSTOMER
+        Client->>Payment: Zarinpal browser return
+        Payment->>Payment: verify persisted authority with Zarinpal
 
         alt payment succeeds
             PDB-->>Kafka: payment.succeeded.v1
@@ -50,4 +57,9 @@ sequenceDiagram
 
 Kafka ordering is only partition-local. There is no ordering guarantee between inventory and payment topics or between different aggregate keys. The Order consumer must therefore combine Inbox deduplication, conditional state transitions, and a Phase 5-defined retry/reconciliation policy so that an out-of-order payment event cannot force an illegal transition.
 
-The diagram does not define final payloads, timeouts, late payment, unknown provider outcomes, refund semantics, or every compensation event. Those are Phase 5 design decisions and must be fixed before checkout implementation.
+ADR-022 fixes the Zarinpal start, verification, expiry, unknown-request, and
+late-success policies. The provider request happens after a durable
+`REQUESTING` marker and outside the Payment transaction. Expiry writes
+`payment.failed.v1` through the normal Payment outbox, and a late verified
+success is recorded for manual refund without resurrecting the Order. Refund
+execution remains outside the current scope.

@@ -198,6 +198,32 @@ source for the workspace.
 - Owner: platform engineering. Next review: before `Phase 8` or `2026-09-25`,
   whichever occurs first.
 
+## Zarinpal payment adapter selection evidence
+
+- Payment uses the documented Zarinpal `v4` request and verification endpoints
+  with a small owner-local adapter. The documented `StartPay` URL is built only
+  from an authority returned by the request endpoint. No third-party Zarinpal
+  Python SDK was selected because no reviewed, production-supported Python
+  package was required for this narrow protocol.
+- `HTTPX` `0.28.1` was already locked in the workspace and is now declared as a
+  direct Payment runtime dependency. The reviewed release is the current
+  stable non-prerelease line for this repository's `Python` `3.14` baseline;
+  only its documented asynchronous client and explicit timeout support are
+  used. The exact release is pinned in the Payment image and resolved in
+  `uv.lock`.
+- The adapter makes provider calls outside database transactions, uses bounded
+  timeouts, and never logs provider request/response bodies, merchant IDs, or
+  browser tokens. A persisted authority plus provider-side verification is
+  required before Payment emits success; a browser return parameter alone is
+  insufficient.
+- Official sources reviewed on `2026-08-29`: [Zarinpal REST sample](https://github.com/ZarinPal-Lab/Zarinpal-RestAPI-Sample-php/blob/master/Request.php),
+  [Zarinpal official GitHub organization](https://github.com/ZarinPal),
+  [HTTPX `0.28.1` on PyPI](https://pypi.org/project/httpx/0.28.1/), and
+  [HTTPX asynchronous documentation](https://www.python-httpx.org/async/).
+  Owner: platform engineering. Next review: before production merchant
+  activation, a provider API migration, or `2026-09-25`, whichever occurs
+  first.
+
 ## Customer OTP selection evidence
 
 - The customer OTP implementation introduces no new provider SDK, broker, or

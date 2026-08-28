@@ -142,7 +142,9 @@ async def consume_reservation_events(settings: Settings, stop: asyncio.Event) ->
                 payload = json.loads(current_message.value)
                 if payload.get("event_type") == "inventory.reserved.v1":
                     async with get_session_factory()() as db:
-                        await process_reservation_event(db, payload)
+                        await process_reservation_event(
+                            db, payload, reservation_minutes=settings.reservation_minutes
+                        )
 
             await process_record_with_dead_letter(
                 consumer=consumer,

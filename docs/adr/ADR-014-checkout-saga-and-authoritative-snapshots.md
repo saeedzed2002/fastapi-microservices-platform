@@ -89,7 +89,8 @@ payload named with .v1; breaking changes require a new event version. Kafka
 topics remain bounded-context topics, while their key is order_id for this
 workflow. The fake payment method is a Phase 5-only test contract and must be
 replaced by a provider adapter/callback protocol without changing historical
-order snapshots.
+order snapshots. ADR-022 adds the Zarinpal provider path and expiry policy
+while preserving those fake methods for deterministic tests.
 
 ## Validation
 
@@ -106,5 +107,5 @@ order snapshots.
 
 - Contracts: contracts/catalog.json and contracts/events/
 - Diagrams: docs/diagrams/checkout-saga.md
-- Runbooks: docs/runbooks/README.md
+- Runbooks: docs/runbooks/README.md and docs/runbooks/zarinpal-payment.md
 - Issues: none

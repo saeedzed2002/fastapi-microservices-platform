@@ -71,7 +71,11 @@ Owns payment intents, attempts, provider references, payment status, callbacks/w
 
 Does not own order state, stock, product data, or customer profiles.
 
-It reacts to the payment stage of the Saga, calls provider adapters, accepts authenticated provider callbacks, and emits payment facts through its outbox.
+It reacts to the payment stage of the Saga, calls provider adapters, accepts
+verified provider callbacks, and emits payment facts through its outbox. A
+browser-return callback may be public, but Payment accepts only a locally
+issued authority and verifies it with the provider before it becomes a durable
+payment fact.
 
 ### Notification Service
 

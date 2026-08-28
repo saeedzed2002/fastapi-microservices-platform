@@ -14,7 +14,7 @@ class CheckoutItem(BaseModel):
 class CheckoutRequest(BaseModel):
     address_id: UUID
     items: list[CheckoutItem] = Field(min_length=1, max_length=100)
-    payment_method: str = Field(pattern=r"^test_(success|failure)$")
+    payment_method: Literal["test_success", "test_failure", "zarinpal"]
 
 
 class OrderItemResponse(BaseModel):

@@ -50,6 +50,21 @@ def tracking_code() -> str:
     return f"ORD-{uuid4().hex[:16].upper()}"
 
 
+def validate_checkout_payment(*, payment_method: str, currency: str, total_amount: Decimal) -> None:
+    if payment_method != "zarinpal":
+        return
+    if currency.upper() != "IRT":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="zarinpal requires IRT currency",
+        )
+    if total_amount <= 0 or total_amount != total_amount.to_integral_value():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="zarinpal amount must be a positive whole IRT value",
+        )
+
+
 async def order_response(db: AsyncSession, order: Order) -> OrderResponse:
     items = await db.scalars(
         select(OrderItem).where(OrderItem.order_id == order.id).order_by(OrderItem.id)

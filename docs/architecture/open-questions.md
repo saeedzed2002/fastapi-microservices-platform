@@ -49,9 +49,10 @@ address.
 
 ### Saga timeout and late-event policy
 
-Resolved by ADR-014: late terminal payment facts never resurrect an Order.
-Pending expiry remains visible to reconciliation; a real-provider refund
-workflow is deferred.
+Resolved by ADR-014 and ADR-022: an expired Zarinpal intent emits the normal
+payment-failure fact, and a late verified charge never resurrects an Order.
+The charge remains visible for manual reconciliation; automatic refund
+execution is deferred.
 
 ### Order-state transition triggers
 
@@ -65,9 +66,10 @@ key and correlation ID while consumers retain Inbox and state guards.
 
 ### Payment-provider interaction model
 
-Resolved for Phase 5 by ADR-014: the deterministic fake provider owns an
-intent, attempt, provider reference, and idempotency boundary. Webhooks and
-real-provider unknown outcomes remain explicitly deferred.
+Resolved by ADR-022: Payment owns a Zarinpal `v4` adapter, persisted authority,
+verified browser-return callback, expiry, and unknown-request recovery state.
+The deterministic fake provider remains only for repeatable tests. Automatic
+refund execution remains explicitly deferred.
 
 ## Additional decisions required before dependent features
 

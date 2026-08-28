@@ -18,6 +18,7 @@ from order_service.application import (
     load_order_or_404,
     load_owned_order_or_404,
     order_response,
+    validate_checkout_payment,
 )
 from order_service.auth import bearer, require_administrator, require_customer
 from order_service.config import get_settings
@@ -159,6 +160,9 @@ async def checkout(
         access_token=credentials.credentials,
         address_id=payload.address_id,
         item_quantities=quantities,
+    )
+    validate_checkout_payment(
+        payment_method=payload.payment_method, currency=currency, total_amount=total
     )
     return await order_response(
         db,

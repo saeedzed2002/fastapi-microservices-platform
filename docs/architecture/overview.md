@@ -117,7 +117,13 @@ Order confirmation or cancellation
    -> invoice and notification work after confirmation
 ```
 
-Inventory failure cancels the order before payment. Payment failure cancels the order and releases the reservation. Duplicate events must not repeat reservation, payment, release, confirmation, invoice, or notification effects.
+Inventory failure cancels the order before payment. For Zarinpal, Payment first
+persists a customer-payment window, then requests the provider outside its
+database transaction, and verifies a locally issued authority before success.
+Payment expiry emits the normal failure fact; a verified late charge never
+resurrects the Order and is reconciled manually. Duplicate events must not
+repeat reservation, payment, release, confirmation, invoice, or notification
+effects.
 
 ## Realtime chat flow
 

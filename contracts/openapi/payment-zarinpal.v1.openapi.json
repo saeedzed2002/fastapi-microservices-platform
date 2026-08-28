@@ -1,0 +1,72 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Payment Zarinpal API",
+    "version": "v1",
+    "description": "Customer payment start and Zarinpal browser-return verification. Payment owns provider state; Order ownership is checked through Order's authenticated API."
+  },
+  "paths": {
+    "/api/v1/payments/orders/{order_id}/zarinpal": {
+      "post": {
+        "summary": "Create or resume a Zarinpal payment redirect for the caller's payment-pending order",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/OrderId"}],
+        "responses": {
+          "200": {"description": "Provider redirect is ready", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/StartPayment"}}}},
+          "401": {"description": "Authentication required or invalid"},
+          "403": {"description": "Customer role required"},
+          "409": {"description": "Order is not payable, payment is in progress, expired, or uses an unsupported currency"},
+          "502": {"description": "Provider rejected the request"},
+          "503": {"description": "Order lookup or provider is unavailable"}
+        }
+      }
+    },
+    "/api/v1/payments/zarinpal/callback": {
+      "get": {
+        "summary": "Verify a Zarinpal browser return against a persisted authority",
+        "parameters": [
+          {"name": "Authority", "in": "query", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 64}},
+          {"name": "Status", "in": "query", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 32}}
+        ],
+        "responses": {
+          "200": {"description": "Verified or safely recorded browser-return outcome", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CallbackResult"}}}},
+          "404": {"description": "Authority was not issued by this Payment service"},
+          "409": {"description": "Payment cannot be verified in its current state"},
+          "502": {"description": "Provider rejected verification"},
+          "503": {"description": "Provider verification is unavailable"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+    },
+    "parameters": {
+      "OrderId": {"name": "order_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
+    },
+    "schemas": {
+      "StartPayment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["order_id", "authority", "redirect_url", "expires_at"],
+        "properties": {
+          "order_id": {"type": "string", "format": "uuid"},
+          "authority": {"type": "string"},
+          "redirect_url": {"type": "string", "format": "uri"},
+          "expires_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "CallbackResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["order_id", "payment_status", "provider_reference"],
+        "properties": {
+          "order_id": {"type": "string", "format": "uuid"},
+          "payment_status": {"enum": ["succeeded", "cancelled", "failed", "expired"]},
+          "provider_reference": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}

@@ -14,3 +14,29 @@ def test_liveness() -> None:
     response = asyncio.run(request())
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_zarinpal_routes_are_present_in_payment_openapi() -> None:
+    openapi = app.openapi()
+
+    start = openapi["paths"]["/api/v1/payments/orders/{order_id}/zarinpal"]["post"]
+    callback = openapi["paths"]["/api/v1/payments/zarinpal/callback"]["get"]
+
+    assert start["responses"]["200"]["description"] == "Successful Response"
+    assert set(start["responses"]) == {"200", "401", "403", "409", "422", "502", "503"}
+    assert start["security"] == [{"HTTPBearer": []}]
+    assert set(callback["responses"]) == {"200", "404", "409", "422", "502", "503"}
+    assert callback["parameters"] == [
+        {
+            "name": "Authority",
+            "in": "query",
+            "required": True,
+            "schema": {"type": "string", "minLength": 1, "maxLength": 64, "title": "Authority"},
+        },
+        {
+            "name": "Status",
+            "in": "query",
+            "required": True,
+            "schema": {"type": "string", "minLength": 1, "maxLength": 32, "title": "Status"},
+        },
+    ]

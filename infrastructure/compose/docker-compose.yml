@@ -271,7 +271,7 @@ services:
     build:
       context: ../..
       dockerfile: services/order-service/Dockerfile
-    image: fastapi-microservices-platform-order-service:0.7.0-local
+    image: fastapi-microservices-platform-order-service:0.8.0-local
     environment:
       ORDER_ENVIRONMENT: local
       ORDER_DATABASE_URL: postgresql+asyncpg://order_service:order-local-only@postgres:5432/order_service
@@ -308,16 +308,27 @@ services:
     build:
       context: ../..
       dockerfile: services/payment-service/Dockerfile
+    image: fastapi-microservices-platform-payment-service:0.6.0-local
     environment:
       PAYMENT_ENVIRONMENT: local
       PAYMENT_DATABASE_URL: postgresql+asyncpg://payment_service:payment-local-only@postgres:5432/payment_service
+      PAYMENT_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
+      PAYMENT_ORDER_BASE_URL: http://order-service:8000
       PAYMENT_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       PAYMENT_KAFKA_PUBLISHER_ENABLED: "true"
       PAYMENT_KAFKA_CONSUMER_ENABLED: "true"
+      PAYMENT_ZARINPAL_MERCHANT_ID: ${ZARINPAL_MERCHANT_ID:-}
+      PAYMENT_ZARINPAL_SANDBOX: ${ZARINPAL_SANDBOX:-true}
+      PAYMENT_ZARINPAL_CALLBACK_URL: ${ZARINPAL_CALLBACK_URL:-https://localhost/api/v1/payments/zarinpal/callback}
+      PAYMENT_ZARINPAL_REQUEST_TIMEOUT_SECONDS: ${ZARINPAL_REQUEST_TIMEOUT_SECONDS:-10}
+      PAYMENT_RESERVATION_MINUTES: ${PAYMENT_RESERVATION_MINUTES:-15}
+      PAYMENT_EXPIRY_WORKER_ENABLED: "true"
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      order-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
@@ -415,6 +426,8 @@ services:
         condition: service_healthy
       order-service:
         condition: service_healthy
+      payment-service:
+        condition: service_healthy
       chat-service:
         condition: service_healthy
     healthcheck:
@@ -424,7 +437,7 @@ services:
       retries: 12
 
   order-invoice-worker:
-    image: fastapi-microservices-platform-order-service:0.7.0-local
+    image: fastapi-microservices-platform-order-service:0.8.0-local
     pull_policy: never
     command: ["celery", "-A", "order_service.workers.celery_app:celery_app", "worker", "--loglevel=INFO", "--without-mingle", "--without-gossip", "-Q", "order.invoice"]
     environment:

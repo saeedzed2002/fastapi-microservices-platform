@@ -1172,7 +1172,7 @@ requires-dist = [
 
 [[package]]
 name = "order-service"
-version = "0.7.0"
+version = "0.8.0"
 source = { editable = "services/order-service" }
 dependencies = [
     { name = "aiokafka" },
@@ -1238,13 +1238,14 @@ wheels = [
 
 [[package]]
 name = "payment-service"
-version = "0.5.0"
+version = "0.6.0"
 source = { editable = "services/payment-service" }
 dependencies = [
     { name = "aiokafka" },
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "platform-auth" },
     { name = "platform-messaging" },
     { name = "pydantic-settings" },
@@ -1259,6 +1260,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.19.1,<2" },
     { name = "asyncpg", specifier = ">=0.31,<0.32" },
     { name = "fastapi", specifier = ">=0.141.1,<0.142" },
+    { name = "httpx", specifier = ">=0.28.1,<0.29" },
     { name = "platform-auth", editable = "libs/platform-auth" },
     { name = "platform-messaging", editable = "libs/platform-messaging" },
     { name = "pydantic-settings", specifier = ">=2.15,<3" },
