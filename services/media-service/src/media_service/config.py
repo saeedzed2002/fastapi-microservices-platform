@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     rabbitmq_url: str = "amqp://platform:platform-local-only@localhost:5672//"
     task_dispatcher_enabled: bool = False
     task_dispatcher_poll_interval_seconds: float = Field(default=1.0, ge=0.1)
+    task_dispatcher_publish_timeout_seconds: float = Field(default=10.0, ge=0.1, le=60.0)
     kafka_bootstrap_servers: str = "localhost:29092"
     kafka_topic: str = "fastapi-platform.media.events.v1"
     kafka_publisher_enabled: bool = False

@@ -19,7 +19,8 @@ Media owns upload authorization, object metadata, completion verification, image
 4. The client calls complete; Media verifies object size and content type.
 5. In one database transaction Media marks the asset uploaded and records a durable MediaTaskIntent.
 6. The dispatcher submits idempotent processing work to the Media Celery queue.
-7. The worker creates a thumbnail, marks the asset ready, and writes media.ready.v1 to the transactional outbox.
+7. A publish attempt is bounded to 10 seconds; a timeout returns the durable intent to pending. A later retry may deliver a duplicate task, which the worker accepts idempotently.
+8. The worker creates a thumbnail, marks the asset ready, and writes media.ready.v1 to the transactional outbox.
 
 The Phase 3 active event has no consumer yet. It is intentionally durable and replayable for the later Chat and edge/read-projection integrations. Catalog stores opaque asset identifiers and never consumes a Media database.
 

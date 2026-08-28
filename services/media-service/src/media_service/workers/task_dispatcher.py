@@ -33,6 +33,18 @@ async def _claim_intent() -> MediaTaskIntent | None:
         return intent
 
 
+async def _dispatch_asset(*, media_asset_id: str, timeout_seconds: float) -> None:
+    await asyncio.wait_for(
+        asyncio.to_thread(
+            celery_app.send_task,
+            "media_service.process_asset",
+            kwargs={"media_asset_id": media_asset_id},
+            queue="media.processing",
+        ),
+        timeout=timeout_seconds,
+    )
+
+
 async def _mark(intent_id: UUID, *, status: str, error: str | None = None) -> None:
     async with get_session_factory()() as db:
         intent = await db.get(MediaTaskIntent, intent_id)
@@ -51,15 +63,16 @@ async def run_task_dispatcher(settings: Settings, stop: asyncio.Event) -> None:
             await _wait(stop, settings.task_dispatcher_poll_interval_seconds)
             continue
         try:
-            await asyncio.to_thread(
-                celery_app.send_task,
-                "media_service.process_asset",
-                kwargs={"media_asset_id": intent.payload["media_asset_id"]},
-                queue="media.processing",
+            await _dispatch_asset(
+                media_asset_id=intent.payload["media_asset_id"],
+                timeout_seconds=settings.task_dispatcher_publish_timeout_seconds,
             )
             await _mark(intent.id, status="dispatched")
         except asyncio.CancelledError:
             raise
+        except TimeoutError:
+            await _mark(intent.id, status="pending", error="Celery publish timed out")
+            await _wait(stop, settings.task_dispatcher_poll_interval_seconds)
         except Exception as exc:
             await _mark(intent.id, status="pending", error=str(exc))
             await _wait(stop, settings.task_dispatcher_poll_interval_seconds)
