@@ -122,9 +122,11 @@ The complete intended layout is documented in [repository structure](docs/archit
 
 The local edge gateway is the only public API entry point: use
 `https://localhost/api/v1/...` and `wss://localhost/api/v1/chat/ws`.
+Local Swagger interfaces are available at `https://localhost/docs/` only;
+they are not a production ingress feature.
 Generate its ignored self-signed certificate once before `dev-up` with
 `pwsh -NoProfile -File .\\scripts\\new_local_edge_certificate.ps1`. The HTTP
-listener `8080` redirects to TLS. API services no longer publish host ports;
+listener `http://localhost` redirects to TLS. API services no longer publish host ports;
 MinIO `9000` and the Mailpit UI `8025` remain direct local development endpoints.
 `dev-up` first builds API images and then starts Compose; this lets
 the Invoice and Notification workers consume the same built service images.

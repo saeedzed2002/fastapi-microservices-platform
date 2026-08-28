@@ -37,9 +37,23 @@ The HTTPS request returns `200`. The HTTP request returns `308` with the
 canonical HTTPS location. `-k` is local-only because the certificate is
 self-signed.
 
+## Local Swagger
+
+Open `https://localhost/docs/` and select the service to inspect. Each
+`/docs/<service>` page has its own proxied OpenAPI document at
+`/docs/<service>/openapi.json`, so the Swagger UI sends requests to the
+existing local API routes and does not expose a service host port.
+
+This is a Docker Compose development convenience only. It is not a public API
+contract and must not be copied into a Kubernetes ingress or production edge
+configuration. The stock FastAPI Swagger page loads its UI assets from its
+configured `jsDelivr` CDN, so a browser needs access to that CDN to render the
+interactive interface.
+
 ## Routing checks
 
 - Open `https://localhost` to verify the edge root response.
+- Open `https://localhost/docs/` to inspect local service Swagger interfaces.
 - Call public APIs through `https://localhost/api/v1/...`.
 - Connect Chat through `wss://localhost/api/v1/chat/ws`.
 - A request to `/api/internal/` must return `404`.

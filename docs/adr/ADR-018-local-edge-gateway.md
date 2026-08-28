@@ -41,6 +41,13 @@ no public versioned HTTP contract and are intentionally not given invented
 routes. The exact Chat WebSocket route `/api/v1/chat/ws` forwards HTTP
 upgrade headers and disables proxy buffering.
 
+For local Docker Compose development only, the edge provides an index at
+`/docs/` and rewrites each service's stock FastAPI Swagger page under
+`/docs/<service>`. Each page reads only its matching
+`/docs/<service>/openapi.json` document. These documentation paths are not
+public API contracts and must not be added to production ingress or edge
+configuration.
+
 The selected image is the official stable
 `nginx:1.30.4-alpine@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46`.
 Nginx terminates local TLS using a developer-generated, untracked,
@@ -62,6 +69,8 @@ SigV4 canonical-request signatures.
 - Clients use one versioned API origin rather than service-specific ports.
 - Local development exercises TLS, route mapping, headers, basic limits, and
   WebSocket forwarding before Kubernetes.
+- Developers can inspect every service's local OpenAPI contract without
+  reopening direct service host ports.
 - Internal service routes and direct API host ports are not client entry points.
 - The edge is reproducibly pinned and its image is scanned in pull-request CI.
 

@@ -8,7 +8,7 @@ The platform is not a set of FastAPI processes sharing a database. Every service
 
 ## System context
 
-Clients communicate through the Nginx edge layer. Local Compose exposes the canonical `https://localhost` API origin, performs TLS termination, basic limits, edge headers, and Chat WebSocket forwarding; API services are private to the Compose network. Domain authorization remains the responsibility of each service. Presigned S3 object bytes remain direct to compatible object storage because their signed canonical request must not be rewritten by an edge path prefix.
+Clients communicate through the Nginx edge layer. Local Compose exposes the canonical `https://localhost` API origin, performs TLS termination, basic limits, edge headers, and Chat WebSocket forwarding; API services are private to the Compose network. Local-only Swagger pages are available below `https://localhost/docs/` and are not production ingress routes. Domain authorization remains the responsibility of each service. Presigned S3 object bytes remain direct to compatible object storage because their signed canonical request must not be rewritten by an edge path prefix.
 
 ```text
 Clients
