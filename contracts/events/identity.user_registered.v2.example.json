@@ -1,0 +1,17 @@
+{
+  "event_id": "a091afcb-a79e-4cf1-9c1d-8f2ad9e4e583",
+  "event_type": "identity.user_registered.v2",
+  "event_version": 2,
+  "aggregate_type": "user",
+  "aggregate_id": "96bb6b29-9cf6-45f0-af40-28a2ef8d1cb4",
+  "producer": "identity-service",
+  "occurred_at": "2026-08-28T16:00:00Z",
+  "correlation_id": "fbb4a629-0465-4a5e-bc84-d4e0f3a7e4ad",
+  "causation_id": null,
+  "trace_id": "0d077258c2ba4534ad22f3d9d4e6160a",
+  "payload": {
+    "user_id": "96bb6b29-9cf6-45f0-af40-28a2ef8d1cb4",
+    "phone": "989121234567",
+    "roles": ["customer"]
+  }
+}

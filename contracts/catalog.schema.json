@@ -39,6 +39,7 @@
           "enum": [
             "event-envelope",
             "api-error-envelope",
+            "service-openapi",
             "domain-event",
             "dead-letter-envelope",
             "realtime-client-protocol"

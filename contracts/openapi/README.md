@@ -1,6 +1,6 @@
 # OpenAPI Contracts
 
-This directory contains the shared API error envelope and, once services exist, exported versioned OpenAPI documents grouped by service.
+This directory contains the shared API error envelope and reviewed versioned OpenAPI documents grouped by service. `chat-support.v1.openapi.json` is the canonical contract for Chat's customer-support queue operations. `identity-auth.v1.openapi.json` is the canonical public contract for administrator password and customer OTP authentication; internal service endpoints are excluded.
 
 The generated FastAPI OpenAPI document is not accepted as an unreviewed implementation artifact. Contract changes are reviewed for compatibility and exported schemas are validated in CI.
 

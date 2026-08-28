@@ -135,10 +135,17 @@ services:
       IDENTITY_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
       IDENTITY_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       IDENTITY_KAFKA_PUBLISHER_ENABLED: "true"
+      IDENTITY_OTP_REDIS_URL: redis://redis:6379/1
+      IDENTITY_OTP_NOTIFICATION_BASE_URL: http://notification-service:8000
+      IDENTITY_INTERNAL_OTP_SHARED_SECRET: ${PLATFORM_INTERNAL_OTP_SHARED_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      notification-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
@@ -329,6 +336,11 @@ services:
       NOTIFICATION_TASK_DISPATCHER_ENABLED: "true"
       NOTIFICATION_SMTP_HOST: mailpit
       NOTIFICATION_SMTP_PORT: "1025"
+      NOTIFICATION_INTERNAL_OTP_SHARED_SECRET: ${PLATFORM_INTERNAL_OTP_SHARED_SECRET:-}
+      NOTIFICATION_IDENTITY_OTP_BASE_URL: http://identity-service:8000
+      NOTIFICATION_SMSIR_ENABLED: ${NOTIFICATION_SMSIR_ENABLED:-false}
+      NOTIFICATION_SMSIR_API_KEY: ${NOTIFICATION_SMSIR_API_KEY:-}
+      NOTIFICATION_SMSIR_LINE_NUMBER: ${NOTIFICATION_SMSIR_LINE_NUMBER:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -441,6 +453,27 @@ services:
       rabbitmq:
         condition: service_healthy
       mailpit:
+        condition: service_healthy
+
+  notification-sms-worker:
+    image: fastapi-microservices-platform-notification-service:0.6.1-local
+    pull_policy: never
+    command: ["celery", "-A", "notification_service.workers.celery_app:celery_app", "worker", "--loglevel=INFO", "--without-mingle", "--without-gossip", "-Q", "notification.sms"]
+    environment:
+      NOTIFICATION_ENVIRONMENT: local
+      NOTIFICATION_DATABASE_URL: postgresql+asyncpg://notification_service:notification-local-only@postgres:5432/notification_service
+      NOTIFICATION_RABBITMQ_URL: amqp://platform:platform-local-only@rabbitmq:5672//
+      NOTIFICATION_INTERNAL_OTP_SHARED_SECRET: ${PLATFORM_INTERNAL_OTP_SHARED_SECRET:-}
+      NOTIFICATION_IDENTITY_OTP_BASE_URL: http://identity-service:8000
+      NOTIFICATION_SMSIR_ENABLED: ${NOTIFICATION_SMSIR_ENABLED:-false}
+      NOTIFICATION_SMSIR_API_KEY: ${NOTIFICATION_SMSIR_API_KEY:-}
+      NOTIFICATION_SMSIR_LINE_NUMBER: ${NOTIFICATION_SMSIR_LINE_NUMBER:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      identity-service:
         condition: service_healthy
 
   media-worker:

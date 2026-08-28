@@ -1,7 +1,7 @@
 import base64
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import cast
+from typing import Literal, cast
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -10,7 +10,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chat_service.media import MediaAttachmentGateway
-from chat_service.models import Conversation, ConversationParticipant, Message, MessageAttachment
+from chat_service.models import (
+    Conversation,
+    ConversationParticipant,
+    Message,
+    MessageAttachment,
+    SupportConversation,
+    utc_now,
+)
 from chat_service.schemas import (
     AttachmentDownloadResponse,
     AttachmentResponse,
@@ -22,7 +29,14 @@ from chat_service.schemas import (
     MessagePage,
     MessageResponse,
     SendMessageFrame,
+    SupportConversationDetails,
+    SupportQueueItem,
+    SupportQueuePage,
 )
+from platform_auth import AuthClaims
+
+SUPPORT_AGENT_ROLES = frozenset({"admin", "support_agent"})
+ACTIVE_SUPPORT_STATUSES = ("queued", "claimed")
 
 
 @dataclass(frozen=True)
@@ -30,6 +44,12 @@ class SentMessage:
     message: MessageResponse
     participant_ids: list[UUID]
     duplicate: bool
+
+
+@dataclass(frozen=True)
+class SupportConversationResult:
+    conversation: ConversationResponse
+    created: bool
 
 
 def encode_cursor(*, created_at: datetime, message_id: UUID) -> str:
@@ -81,6 +101,33 @@ async def _participant_ids(db: AsyncSession, *, conversation_id: UUID) -> list[U
     return list(values)
 
 
+def _require_customer(claims: AuthClaims) -> None:
+    if "customer" not in claims.roles:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="customer role required")
+
+
+def _require_support_agent(claims: AuthClaims) -> None:
+    if not SUPPORT_AGENT_ROLES.intersection(claims.roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="support agent role required"
+        )
+
+
+async def _support_details(
+    db: AsyncSession, *, conversation_id: UUID
+) -> SupportConversationDetails | None:
+    support = await db.get(SupportConversation, conversation_id)
+    if support is None:
+        return None
+    return SupportConversationDetails(
+        status=cast(Literal["queued", "claimed", "closed"], support.status),
+        customer_subject_id=support.customer_subject_id,
+        assigned_admin_subject_id=support.assigned_admin_subject_id,
+        claimed_at=support.claimed_at,
+        closed_at=support.closed_at,
+    )
+
+
 async def _unread_count(db: AsyncSession, *, participant: ConversationParticipant) -> int:
     statement = (
         select(func.count())
@@ -116,6 +163,7 @@ async def _conversation_response(
         created_at=conversation.created_at,
         last_message_at=conversation.last_message_at,
         unread_count=await _unread_count(db, participant=participant),
+        support=await _support_details(db, conversation_id=conversation.id),
     )
 
 
@@ -133,6 +181,193 @@ async def create_conversation(
     )
     await db.commit()
     return await _conversation_response(db, conversation=conversation, subject_id=subject_id)
+
+
+async def create_support_conversation(
+    db: AsyncSession, *, claims: AuthClaims
+) -> SupportConversationResult:
+    _require_customer(claims)
+    existing_conversation_id: UUID | None = None
+    created = False
+    try:
+        async with db.begin():
+            existing = await db.scalar(
+                select(SupportConversation)
+                .where(
+                    SupportConversation.customer_subject_id == claims.subject,
+                    SupportConversation.status.in_(ACTIVE_SUPPORT_STATUSES),
+                )
+                .with_for_update()
+            )
+            if existing is not None:
+                existing_conversation_id = existing.conversation_id
+            else:
+                conversation = Conversation(created_by_subject_id=claims.subject)
+                db.add(conversation)
+                await db.flush()
+                db.add(
+                    ConversationParticipant(
+                        conversation_id=conversation.id,
+                        subject_id=claims.subject,
+                    )
+                )
+                db.add(
+                    SupportConversation(
+                        conversation_id=conversation.id,
+                        customer_subject_id=claims.subject,
+                        status="queued",
+                    )
+                )
+                existing_conversation_id = conversation.id
+                created = True
+    except IntegrityError as exc:
+        await db.rollback()
+        existing = await db.scalar(
+            select(SupportConversation).where(
+                SupportConversation.customer_subject_id == claims.subject,
+                SupportConversation.status.in_(ACTIVE_SUPPORT_STATUSES),
+            )
+        )
+        if existing is None:
+            raise exc
+        existing_conversation_id = existing.conversation_id
+        created = False
+
+    if existing_conversation_id is None:
+        raise RuntimeError("support conversation was not persisted")
+    persisted_conversation = await db.get(Conversation, existing_conversation_id)
+    if persisted_conversation is None:
+        raise RuntimeError("support conversation parent was not persisted")
+    return SupportConversationResult(
+        conversation=await _conversation_response(
+            db, conversation=persisted_conversation, subject_id=claims.subject
+        ),
+        created=created,
+    )
+
+
+async def list_support_queue(
+    db: AsyncSession, *, claims: AuthClaims, limit: int
+) -> SupportQueuePage:
+    _require_support_agent(claims)
+    rows = list(
+        await db.execute(
+            select(SupportConversation, Conversation)
+            .join(Conversation, Conversation.id == SupportConversation.conversation_id)
+            .where(SupportConversation.status == "queued")
+            .order_by(
+                Conversation.last_message_at.desc().nullslast(),
+                SupportConversation.created_at,
+            )
+            .limit(limit)
+        )
+    )
+    return SupportQueuePage(
+        items=[
+            SupportQueueItem(
+                conversation_id=support.conversation_id,
+                customer_subject_id=support.customer_subject_id,
+                created_at=support.created_at,
+                last_message_at=conversation.last_message_at,
+            )
+            for support, conversation in rows
+        ]
+    )
+
+
+async def claim_support_conversation(
+    db: AsyncSession, *, conversation_id: UUID, claims: AuthClaims
+) -> ConversationResponse:
+    _require_support_agent(claims)
+    async with db.begin():
+        support = await db.scalar(
+            select(SupportConversation)
+            .where(SupportConversation.conversation_id == conversation_id)
+            .with_for_update()
+        )
+        if support is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="support conversation not found"
+            )
+        if support.status != "queued":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="support conversation is no longer available",
+            )
+        support.status = "claimed"
+        support.assigned_admin_subject_id = claims.subject
+        support.claimed_at = utc_now()
+        db.add(
+            ConversationParticipant(
+                conversation_id=conversation_id,
+                subject_id=claims.subject,
+            )
+        )
+    conversation = await db.get(Conversation, conversation_id)
+    if conversation is None:
+        raise RuntimeError("claimed support conversation was not persisted")
+    return await _conversation_response(db, conversation=conversation, subject_id=claims.subject)
+
+
+async def release_support_conversation(
+    db: AsyncSession, *, conversation_id: UUID, claims: AuthClaims
+) -> None:
+    _require_support_agent(claims)
+    async with db.begin():
+        support = await db.scalar(
+            select(SupportConversation)
+            .where(SupportConversation.conversation_id == conversation_id)
+            .with_for_update()
+        )
+        if support is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="support conversation not found"
+            )
+        if support.status != "claimed" or support.assigned_admin_subject_id != claims.subject:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="support conversation not found"
+            )
+        participant = await _require_participant(
+            db, conversation_id=conversation_id, subject_id=claims.subject, lock=True
+        )
+        await db.delete(participant)
+        support.status = "queued"
+        support.assigned_admin_subject_id = None
+        support.claimed_at = None
+
+
+async def close_support_conversation(
+    db: AsyncSession, *, conversation_id: UUID, claims: AuthClaims
+) -> ConversationResponse:
+    _require_support_agent(claims)
+    async with db.begin():
+        support = await db.scalar(
+            select(SupportConversation)
+            .where(SupportConversation.conversation_id == conversation_id)
+            .with_for_update()
+        )
+        if support is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="support conversation not found"
+            )
+        if support.status != "claimed" or support.assigned_admin_subject_id != claims.subject:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="support conversation not found"
+            )
+        support.status = "closed"
+        support.closed_at = utc_now()
+    conversation = await db.get(Conversation, conversation_id)
+    if conversation is None:
+        raise RuntimeError("closed support conversation was not persisted")
+    return await _conversation_response(db, conversation=conversation, subject_id=claims.subject)
+
+
+async def _require_sendable_conversation(db: AsyncSession, *, conversation_id: UUID) -> None:
+    support = await db.get(SupportConversation, conversation_id)
+    if support is not None and support.status == "closed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="support conversation is closed"
+        )
 
 
 async def list_conversations(db: AsyncSession, *, subject_id: UUID, limit: int) -> ConversationPage:
@@ -335,6 +570,7 @@ async def send_message(
     await _require_participant(
         db, conversation_id=payload.conversation_id, subject_id=sender_subject_id
     )
+    await _require_sendable_conversation(db, conversation_id=payload.conversation_id)
     await db.rollback()
     attachments = await media_gateway.validate_attachments(
         asset_ids=payload.attachment_ids, access_token=access_token
@@ -348,6 +584,7 @@ async def send_message(
                 subject_id=sender_subject_id,
                 lock=True,
             )
+            await _require_sendable_conversation(db, conversation_id=payload.conversation_id)
             existing = await _existing_message(
                 db, sender_subject_id=sender_subject_id, client_message_id=payload.client_message_id
             )

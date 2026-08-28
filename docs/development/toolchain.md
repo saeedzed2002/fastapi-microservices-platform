@@ -198,6 +198,33 @@ source for the workspace.
 - Owner: platform engineering. Next review: before `Phase 8` or `2026-09-25`,
   whichever occurs first.
 
+## Customer OTP selection evidence
+
+- The customer OTP implementation introduces no new provider SDK, broker, or
+  runtime image. `redis-py` `8.1.0` and `HTTPX` `0.28.1` are already locked,
+  reviewed dependencies and are used only for Identity's bounded Redis state
+  and authenticated, timeout-bounded private HTTP calls. The workspace lock
+  remains the reproducible dependency resolution.
+- The selected external provider integration is the official `SMS.ir` REST
+  Bulk endpoint, `POST /v1/send/bulk`, using the documented `X-API-KEY`,
+  numeric `lineNumber`, message text, and recipient list. It is implemented
+  with Python's standard library to avoid an unreviewed SDK. Provider response
+  bodies and credentials are not logged. The adapter records only a provider
+  acceptance identifier, not a carrier delivery claim.
+- The current panel workflow does not provide an approved `SMS.ir` template,
+  so the Bulk path is used only with a services-enabled line. The documented
+  `Verify` API is the future replacement when a template ID is provisioned;
+  that change must be reviewed as a provider-contract migration before use.
+  This is an operational limitation: recipients subject to carrier blocking
+  can fail to receive Bulk SMS despite provider acceptance.
+- Official sources reviewed on `2026-08-28`: [SMS.ir REST API](https://sms.ir/rest-api/),
+  [Bulk API](https://sms.ir/rest-api/), and [Verify API](https://sms.ir/rest-api/).
+  The provider interface is external and versioned by `v1`; no local provider
+  dependency is pinned. The service configuration is secret-only and the
+  selected worker retries are bounded and idempotent at the local delivery row.
+- Owner: platform engineering. Next review: before enabling a production SMS
+  line, adopting a provider template, or `2026-09-25`, whichever occurs first.
+
 
 ## Edge selection evidence
 

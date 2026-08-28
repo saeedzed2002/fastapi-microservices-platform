@@ -1,0 +1,92 @@
+# SMS.ir customer OTP runbook
+
+## Local configuration
+
+Copy the repository `.env.example` to `.env`. Generate a different internal
+secret for every environment, then set all values below in the ignored `.env`:
+
+```dotenv
+PLATFORM_INTERNAL_OTP_SHARED_SECRET=<at-least-32-random-characters>
+NOTIFICATION_SMSIR_ENABLED=true
+NOTIFICATION_SMSIR_API_KEY=<SMS.ir-api-key>
+NOTIFICATION_SMSIR_LINE_NUMBER=<services-enabled-line-number>
+```
+
+Never place these values in a service `.env.example`, command history, test
+fixture, source file, screenshot, issue, or Git commit.
+
+The configured line must be services-enabled. The initial adapter uses the
+`SMS.ir` Bulk endpoint because no provider template is configured. Provider
+acceptance is not handset delivery confirmation; use the panel's message report
+with the stored provider message ID when investigating delivery.
+
+## Start and migrate
+
+```powershell
+pwsh -NoProfile -File scripts/platform.ps1 -Task migrate-identity
+pwsh -NoProfile -File scripts/platform.ps1 -Task migrate-customer
+pwsh -NoProfile -File scripts/platform.ps1 -Task migrate-notification
+docker compose --env-file .env -f infrastructure/compose/docker-compose.yml up -d --build
+```
+
+The `notification-sms-worker` must be running. A missing secret or SMS
+configuration deliberately produces `503` from the public OTP request endpoint;
+it never falls back to a fake code or an unprotected provider call.
+
+The explicit `--env-file .env` is required because the Compose file is under
+`infrastructure/compose/`, while the ignored local configuration is at the
+repository root. Omitting it makes Compose use an unrelated or missing `.env`
+next to the Compose file and leaves the OTP configuration empty inside the
+containers.
+
+## Public flow
+
+Request a code:
+
+```http
+POST /api/v1/auth/otp/request
+Content-Type: application/json
+
+{"phone":"09121234567"}
+```
+
+Verify it:
+
+```http
+POST /api/v1/auth/otp/verify
+Content-Type: application/json
+
+{"phone":"09121234567","code":"123456"}
+```
+
+The normal response is `202` for request and `200` for verification. A customer
+is created only after a correct code is verified. The response contains the
+normal access/refresh token pair. Administrator login continues through
+`POST /api/v1/auth/login` with email and password.
+
+## Local administrator provisioning
+
+Customer OTP does not create administrator privileges. To create the first
+local administrator without adding a public registration endpoint, run:
+
+```powershell
+pwsh -NoProfile -File scripts/platform.ps1 -Task provision-admin -AdminEmail admin@example.com
+```
+
+The command prompts twice for a password and refuses to overwrite an existing
+Identity email. Do not pass the password through a command-line argument,
+environment variable, script, screenshot, or commit. Role changes and password
+resets for existing administrators remain an audited operational workflow and
+are not part of this bootstrap command.
+
+## Failure handling
+
+- `429`: wait for the resend cooldown or phone request window; do not retry in a loop.
+- `400`: the code is invalid, expired, or has reached the verification-attempt cap.
+- `503`: restore Redis, the private Identity/Notification secret, Notification,
+  RabbitMQ, or the SMS provider configuration before retrying.
+- `FAILED` delivery in Notification: inspect the provider configuration and the
+  worker logs. Logs must not contain the code, API key, request body, or provider
+  response body.
+- `SENT` means `SMS.ir` accepted the message. It is not a carrier delivery
+  receipt.

@@ -162,7 +162,7 @@ foreach ($adrFile in $adrFiles) {
 
 $catalogPath = Join-Path $repositoryPath "contracts/catalog.json"
 $catalog = Get-Content -LiteralPath $catalogPath -Raw | ConvertFrom-Json -Depth 100
-$allowedKinds = @("event-envelope", "api-error-envelope", "domain-event", "dead-letter-envelope", "realtime-client-protocol")
+$allowedKinds = @("event-envelope", "api-error-envelope", "service-openapi", "domain-event", "dead-letter-envelope", "realtime-client-protocol")
 $allowedStatuses = @("reserved", "proposed", "active", "deprecated", "retired")
 
 if ($catalog.catalog_schema -ne "catalog.schema.json") {

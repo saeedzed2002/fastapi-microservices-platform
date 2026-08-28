@@ -11,19 +11,33 @@ from platform_messaging import KafkaDlqPolicy, process_record_with_dead_letter
 
 
 async def handle_identity_event(payload: dict[str, Any]) -> None:
-    if payload.get("event_type") != "identity.user_registered.v1":
+    event_type = payload.get("event_type")
+    if event_type not in {"identity.user_registered.v1", "identity.user_registered.v2"}:
         return
     event_payload = payload.get("payload", {})
     event_id = payload.get("event_id")
     user_id = event_payload.get("user_id")
     email = event_payload.get("email")
-    if not isinstance(event_id, str) or not isinstance(user_id, str) or not isinstance(email, str):
-        raise ValueError("identity.user_registered.v1 has invalid payload")
+    phone = event_payload.get("phone")
+    if (
+        not isinstance(event_id, str)
+        or not isinstance(user_id, str)
+        or not isinstance(event_type, str)
+        or (email is not None and not isinstance(email, str))
+        or (phone is not None and not isinstance(phone, str))
+        or (email is None and phone is None)
+    ):
+        raise ValueError("identity user registration event has invalid payload")
     from uuid import UUID
 
     async with get_session_factory()() as db:
         await provision_identity_customer(
-            db, event_id=UUID(event_id), user_id=UUID(user_id), email=email
+            db,
+            event_id=UUID(event_id),
+            event_type=event_type,
+            user_id=UUID(user_id),
+            email=email,
+            phone=phone,
         )
         await db.commit()
 

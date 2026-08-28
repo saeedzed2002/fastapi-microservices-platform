@@ -4,12 +4,14 @@ FastAPI Microservices Platform is a backend-only, production-oriented e-commerce
 
 ## Project status
 
-The repository is currently in **Phase 6 — Invoice & Notification**.
+The repository is currently in **Phase 7 — Realtime Chat**, with customer
+phone-OTP authentication being completed before the later Search phase.
 
-Phase 6 adds Order-owned generated Invoices and Notification-owned email
-delivery. The `Kafka -> RabbitMQ/Celery` handoff uses durable task intents,
-publisher confirmation, idempotent workers, S3-compatible storage, and a local
-Mailpit SMTP sink.
+The current increment adds a customer OTP flow that keeps raw codes in
+Identity-owned temporary Redis state, dispatches SMS through Notification's
+durable task intent and Celery worker, and keeps administrator email/password
+authentication separate. It uses the configured `SMS.ir` Bulk adapter only
+after a local secret configuration is supplied.
 
 ## Architecture at a glance
 
@@ -92,6 +94,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Testing strategy](docs/development/testing-strategy.md)
 - [CI/CD strategy](docs/development/ci-cd.md)
 - [Invoice and notification runbook](docs/runbooks/invoice-notification.md)
+- [SMS OTP runbook](docs/runbooks/sms-otp.md)
 - [Edge gateway runbook](docs/runbooks/edge-gateway.md)
 - [Phase 0 plan](docs/development/phase-0-plan.md)
 - [Phase 1 plan](docs/development/phase-1-plan.md)
@@ -99,6 +102,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Phase 4 plan](docs/development/phase-4-plan.md)
 - [Phase 5 plan](docs/development/phase-5-plan.md)
 - [Phase 6 plan](docs/development/phase-6-plan.md)
+- [Phase 7 plan](docs/development/phase-7-plan.md)
 
 ## Roadmap
 
@@ -145,6 +149,7 @@ Use `scripts/platform.ps1` for repeatable local tasks.
     pwsh -File .\scripts\platform.ps1 -Task migrate-order
     pwsh -File .\scripts\platform.ps1 -Task migrate-payment
     pwsh -File .\scripts\platform.ps1 -Task migrate-notification
+    pwsh -File .\scripts\platform.ps1 -Task migrate-chat
     $env:RUN_E2E = "1"; uv run pytest tests/e2e/test_phase6_checkout_notification.py
 
 ## License

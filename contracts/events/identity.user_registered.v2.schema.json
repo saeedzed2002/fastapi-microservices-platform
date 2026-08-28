@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fastapi-platform.local/contracts/events/identity.user_registered.v2.schema.json",
+  "title": "Identity phone customer registered event payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["user_id", "phone", "roles"],
+  "properties": {
+    "user_id": {"type": "string", "format": "uuid"},
+    "phone": {"type": "string", "pattern": "^989[0-9]{9}$"},
+    "roles": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1, "maxLength": 64},
+      "uniqueItems": true
+    }
+  }
+}

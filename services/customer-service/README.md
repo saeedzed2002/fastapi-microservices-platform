@@ -27,5 +27,7 @@ are available.
     pwsh -File .\scripts/platform.ps1 -Task migrate-customer
 
 The consumer creates or updates one local profile from each
-identity.user_registered.v1 event. Reprocessing the same event does not create a
-second profile because the identity user ID is the customer primary key.
+`identity.user_registered.v1` or `identity.user_registered.v2` event. The
+phone-only `v2` payload has no email address. Reprocessing either event does
+not create a second profile because the identity user ID is the customer
+primary key.

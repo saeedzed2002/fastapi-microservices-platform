@@ -9,11 +9,30 @@
       "kind": "domain-event",
       "owner": "identity-service",
       "consumers": ["customer-service"],
-      "status": "active",
+      "status": "deprecated",
       "topic": "fastapi-platform.identity.events.v1",
       "message_key": "aggregate_id",
       "notes": "Customer creates its own profile projection from this durable identity fact.",
       "schema": "events/identity.user_registered.v1.schema.json"
+    },
+    {
+      "name": "identity.user_registered.v2",
+      "kind": "domain-event",
+      "owner": "identity-service",
+      "consumers": ["customer-service"],
+      "status": "active",
+      "topic": "fastapi-platform.identity.events.v1",
+      "message_key": "aggregate_id",
+      "notes": "Phone-only customer registration after successful OTP verification. Raw OTP values never enter Kafka.",
+      "schema": "events/identity.user_registered.v2.schema.json"
+    },
+    {
+      "name": "identity.auth.v1",
+      "kind": "service-openapi",
+      "owner": "identity-service",
+      "status": "active",
+      "notes": "Public customer OTP and administrator password authentication endpoints. Internal OTP delivery retrieval is intentionally excluded.",
+      "schema": "openapi/identity-auth.v1.openapi.json"
     },
     {
       "name": "event-envelope.v1",
@@ -46,6 +65,14 @@
       "status": "active",
       "notes": "Bidirectional WebSocket client protocol. Sender acknowledgements follow the local Chat PostgreSQL commit; messages may be duplicated across reconnect or Redis fan-out and are deduplicated by message_id.",
       "schema": "realtime/chat.v1.schema.json"
+    },
+    {
+      "name": "chat.support.v1",
+      "kind": "service-openapi",
+      "owner": "chat-service",
+      "status": "active",
+      "notes": "Customer support queue creation, metadata-only agent queue listing, atomic claim, release, and close operations. The assigned agent becomes the only agent participant.",
+      "schema": "openapi/chat-support.v1.openapi.json"
     },
     {
       "name": "order.created.v1",

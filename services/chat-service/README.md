@@ -17,6 +17,14 @@ limiting, and Media's REST APIs.
 
 - `POST /api/v1/chat/conversations` creates a conversation and always includes
   the authenticated caller as a participant.
+- `POST /api/v1/chat/support/conversations` creates or reuses the caller's
+  active customer-support request. The customer does not submit an agent ID.
+- `GET /api/v1/chat/support/queue` returns metadata-only queued requests to an
+  `admin` or `support_agent`.
+- `POST /api/v1/chat/support/conversations/{conversation_id}/claim` atomically
+  makes one eligible agent the only assigned agent participant. `release`
+  returns the request to the queue and removes that agent's membership; `close`
+  preserves history and blocks new messages.
 - `GET /api/v1/chat/conversations` lists the caller's conversations.
 - `GET /api/v1/chat/conversations/{conversation_id}/messages` returns stable
   cursor pages. Use either `before` for older history or `after` for reconnect
@@ -40,6 +48,8 @@ the history endpoint.
 
 The canonical frame contract is
 [`chat.v1.schema.json`](../../contracts/realtime/chat.v1.schema.json).
+The support queue REST contract is
+[`chat-support.v1.openapi.json`](../../contracts/openapi/chat-support.v1.openapi.json).
 
 ## Delivery and attachment boundaries
 

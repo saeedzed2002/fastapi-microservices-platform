@@ -4,7 +4,12 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from notification_service.models import InboxMessage, NotificationDelivery, TaskIntent
+from notification_service.models import (
+    InboxMessage,
+    NotificationDelivery,
+    SmsOtpDelivery,
+    TaskIntent,
+)
 
 
 async def accept_invoice_generated(db: AsyncSession, envelope: dict[str, object]) -> bool:
@@ -41,3 +46,22 @@ async def accept_invoice_generated(db: AsyncSession, envelope: dict[str, object]
         )
     await db.commit()
     return delivery is not None
+
+
+async def accept_otp_sms_delivery(
+    db: AsyncSession, *, delivery_id: UUID, phone: str
+) -> SmsOtpDelivery:
+    delivery = await db.get(SmsOtpDelivery, delivery_id, with_for_update=True)
+    if delivery is not None:
+        return delivery
+    delivery = SmsOtpDelivery(id=delivery_id, phone=phone)
+    db.add(delivery)
+    await db.flush()
+    db.add(
+        TaskIntent(
+            task_name="notification.send_otp_sms.v1",
+            payload={"delivery_id": str(delivery.id)},
+        )
+    )
+    await db.commit()
+    return delivery

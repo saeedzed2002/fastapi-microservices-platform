@@ -14,7 +14,7 @@ class CustomerResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    email: str
+    email: str | None
     display_name: str
     phone: str | None
     avatar_media_id: UUID | None

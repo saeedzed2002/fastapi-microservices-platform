@@ -77,9 +77,7 @@ async def upsert_profile(
 ) -> CustomerResponse:
     customer = await db.get(Customer, claims.subject)
     if customer is None:
-        customer = await provision_customer(
-            db, user_id=claims.subject, email=f"{claims.subject}@unknown.invalid"
-        )
+        customer = await provision_customer(db, user_id=claims.subject, email=None)
     customer.display_name = payload.display_name
     customer.phone = payload.phone
     customer.avatar_media_id = payload.avatar_media_id

@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from chat_service.application import decode_cursor, encode_cursor
 from chat_service.media import build_media_access_proof
-from chat_service.schemas import SendMessageFrame
+from chat_service.schemas import SendMessageFrame, SupportConversationDetails
 
 
 def test_chat_protocol_example_matches_canonical_schema() -> None:
@@ -68,3 +68,8 @@ def test_media_access_proof_has_a_stable_canonical_payload() -> None:
         )
         == expected
     )
+
+
+def test_support_conversation_details_rejects_unknown_states() -> None:
+    with pytest.raises(ValidationError):
+        SupportConversationDetails(status="unknown", customer_subject_id=uuid4())  # type: ignore[arg-type]

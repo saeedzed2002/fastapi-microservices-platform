@@ -23,6 +23,8 @@ ADRs record decisions that materially affect service ownership, contracts, durab
 
 | ADR | Status | Decision |
 |---|---|---|
+| [ADR-020](ADR-020-customer-phone-otp-authentication.md) | Accepted | Customer phone OTP authentication and asynchronous SMS delivery |
+| [ADR-019](ADR-019-chat-support-queue-assignment.md) | Accepted | Chat support queue assignment |
 | [ADR-017](ADR-017-realtime-chat-delivery-and-media-access.md) | Accepted | Realtime Chat delivery and Media access |
 | [ADR-016](ADR-016-kafka-consumer-dead-letter-policy.md) | Accepted | Kafka consumer dead-letter policy |
 | [ADR-015](ADR-015-invoice-delivery-handoff.md) | Accepted | Durable invoice and notification handoff |

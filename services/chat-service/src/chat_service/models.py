@@ -43,6 +43,29 @@ class ConversationParticipant(Base):
     last_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class SupportConversation(Base):
+    __tablename__ = "support_conversations"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('queued', 'claimed', 'closed')",
+            name="ck_support_conversations_status",
+        ),
+    )
+
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), primary_key=True
+    )
+    customer_subject_id: Mapped[UUID] = mapped_column(index=True)
+    status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
+    assigned_admin_subject_id: Mapped[UUID | None] = mapped_column(index=True)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
 class Message(Base):
     __tablename__ = "messages"
     __table_args__ = (

@@ -14,11 +14,12 @@ dual-write failure window. Notification must not query Customer or Order data.
 
 Order consumes its durable `order.confirmed.v1` fact with an independent Kafka
 consumer group. In one local transaction it records the Inbox fact, creates one
-Invoice and one `TaskIntent`. The dispatcher claims a pending intent with
-`FOR UPDATE SKIP LOCKED`, records `DISPATCHING`, publishes a confirmed Celery
-message, then records `DISPATCHED`. An uncertain publish result may produce a
-duplicate task; the Invoice order uniqueness and deterministic object key make
-the worker idempotent.
+Invoice and one `TaskIntent`. The dispatcher claims a pending or lease-expired
+intent with `FOR UPDATE SKIP LOCKED`, records `DISPATCHING` together with a
+unique claim token and lease timestamp, publishes a confirmed Celery message,
+then records `DISPATCHED` only when it still owns that claim. An uncertain
+publish result may produce a duplicate task; the Invoice order uniqueness and
+deterministic object key make the worker idempotent.
 
 The Invoice worker renders a `PDF` from immutable Order items, writes it to the
 Order-owned S3-compatible bucket, persists invoice metadata, then adds
@@ -40,6 +41,8 @@ provider idempotency remain external configuration.
   another service database.
 - RabbitMQ unavailability leaves a recoverable pending task intent rather than
   losing work.
+- A dispatcher crash after claim is recoverable after the bounded claim lease;
+  an older dispatcher cannot overwrite a reclaimed task's state.
 - Repeated Kafka or Celery delivery cannot create a second Invoice or delivery.
 
 ### Negative and risks

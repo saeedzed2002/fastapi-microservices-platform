@@ -11,6 +11,12 @@ Security is enforced at every service boundary and throughout delivery; the edge
 - Make logout and revocation semantics explicit, including expiry and Redis-outage behavior.
 - Store only hashed refresh-token material where practical.
 - Rotate signing keys through a documented distribution and overlap process.
+- For customer OTP, store the verification hash and abuse controls in Identity
+  Redis, retain the raw code only in a separate short-lived Identity delivery
+  key, and fail closed when that security state is unavailable. The raw code
+  must not enter PostgreSQL, Kafka, RabbitMQ, Celery payloads, logs, or traces.
+- Allow password login only for an existing administrator role. Customer
+  registration and sign-in use the phone OTP endpoints.
 
 The signing algorithm, JWKS/key-distribution mechanism, claim set, and service-to-service identity model are Phase 2 design decisions.
 

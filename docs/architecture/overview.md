@@ -133,6 +133,17 @@ authenticated WebSocket message
 
 Redis failure may interrupt cross-pod realtime delivery but cannot lose committed chat messages. Clients recover from durable history using stable cursors or message IDs. Redis-backed connection limiting is fail-closed; Pub/Sub and presence are not. A Chat-authorized participant receives a Media-generated short-lived attachment URL only after Chat membership validation and Media verification of a short-lived service proof.
 
+## Customer-support chat assignment
+
+A customer creates a support conversation without selecting an administrator.
+Chat persists it in the support queue with only the customer as a participant.
+Eligible agents can inspect queue metadata, but not message content. Claiming uses
+a Chat PostgreSQL row lock and adds one agent participant in the same transaction;
+the claimed conversation disappears from the queue and all other agents fail the
+normal Chat membership checks. The assigned agent can release it back to the
+queue or close it. This authorization state is durable and is never stored only
+in Redis.
+
 ## Runtime model
 
 API pods are stateless and normally run one application process per pod. Workers and consumers are separate workloads. Durable files are never written to container-local paths. Configuration is environment-based, secrets are externalized, and all workloads require appropriate startup, liveness, readiness, shutdown, and resource behavior.

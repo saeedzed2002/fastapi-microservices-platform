@@ -20,4 +20,5 @@ Phase 0 reserves these operational obligations; runnable commands and thresholds
 Implemented: [Kafka dead-letter inspection and replay](kafka-dlq.md),
 [checkout and invoice recovery](checkout-saga.md),
 [invoice and notification recovery](invoice-notification.md), and
-[Chat realtime delivery and attachment access](chat-realtime.md).
+[Chat realtime delivery and attachment access](chat-realtime.md), and
+[SMS.ir customer OTP delivery](sms-otp.md).

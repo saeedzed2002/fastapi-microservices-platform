@@ -26,7 +26,7 @@ class Customer(Base):
     __tablename__ = "customers"
 
     id: Mapped[UUID] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(String(320), index=True)
+    email: Mapped[str | None] = mapped_column(String(320), index=True)
     display_name: Mapped[str] = mapped_column(String(120))
     phone: Mapped[str | None] = mapped_column(String(32))
     avatar_media_id: Mapped[UUID | None] = mapped_column()

@@ -17,8 +17,9 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
-    password_hash: Mapped[str] = mapped_column(String(512))
+    email: Mapped[str | None] = mapped_column(String(320), unique=True, index=True)
+    phone: Mapped[str | None] = mapped_column(String(16), unique=True, index=True)
+    password_hash: Mapped[str | None] = mapped_column(String(512))
     status: Mapped[str] = mapped_column(String(32), default="active")
     roles: Mapped[list[str]] = mapped_column(JSON, default=lambda: ["customer"])
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

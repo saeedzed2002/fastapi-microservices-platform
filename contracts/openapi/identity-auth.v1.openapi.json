@@ -1,0 +1,56 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "Identity Authentication API", "version": "1.0.0"},
+  "paths": {
+    "/api/v1/auth/register": {
+      "post": {
+        "summary": "Deprecated customer password registration endpoint",
+        "deprecated": true,
+        "responses": {"410": {"description": "Customer password registration is disabled"}}
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "summary": "Authenticate an administrator with email and password",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AdminLoginRequest"}}}},
+        "responses": {"200": {"description": "Authenticated"}, "401": {"description": "Invalid administrator credentials"}}
+      }
+    },
+    "/api/v1/auth/otp/request": {
+      "post": {
+        "summary": "Request a customer sign-in code",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OtpRequest"}}}},
+        "responses": {"202": {"description": "OTP accepted for delivery"}, "429": {"description": "Rate limited"}, "503": {"description": "OTP delivery unavailable"}}
+      }
+    },
+    "/api/v1/auth/otp/verify": {
+      "post": {
+        "summary": "Verify a customer sign-in code and issue tokens",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OtpVerifyRequest"}}}},
+        "responses": {"200": {"description": "Authenticated"}, "400": {"description": "Invalid or expired OTP"}, "503": {"description": "OTP state unavailable"}}
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AdminLoginRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["email", "password"],
+        "properties": {"email": {"type": "string", "format": "email"}, "password": {"type": "string", "minLength": 1}}
+      },
+      "OtpRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["phone"],
+        "properties": {"phone": {"type": "string", "description": "Iranian mobile number in supported local or international notation"}}
+      },
+      "OtpVerifyRequest": {
+        "allOf": [
+          {"$ref": "#/components/schemas/OtpRequest"},
+          {"type": "object", "required": ["code"], "properties": {"code": {"type": "string", "pattern": "^[0-9]{6}$"}}}
+        ]
+      }
+    }
+  }
+}

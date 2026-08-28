@@ -41,6 +41,12 @@ no public versioned HTTP contract and are intentionally not given invented
 routes. The exact Chat WebSocket route `/api/v1/chat/ws` forwards HTTP
 upgrade headers and disables proxy buffering.
 
+The local edge resolves each Compose service name through Docker's embedded DNS
+at request time with a bounded cache. A recreated API container can therefore
+receive a new container IP without forcing an edge restart or accidentally
+routing a request to a reused IP. This resolver configuration is Docker Compose
+specific and is not a Kubernetes ingress implementation.
+
 For local Docker Compose development only, the edge provides an index at
 `/docs/` and rewrites each service's stock FastAPI Swagger page under
 `/docs/<service>`. Each page reads only its matching
@@ -81,6 +87,9 @@ SigV4 canonical-request signatures.
   for this local self-signed endpoint.
 - Nginx source-IP limits are per edge instance and are not a distributed
   security control. Service-owned Redis-backed limits remain mandatory.
+- Docker's embedded resolver is a local Compose dependency. Kubernetes must
+  implement equivalent service discovery through its own ingress/controller
+  configuration rather than copying the resolver address.
 - The edge readiness endpoint proves edge-process availability, not universal
   domain-service health.
 - Kubernetes must configure trusted proxy source handling deliberately before
@@ -113,6 +122,8 @@ policy, and the distinction between edge routing and service authorization.
 ## Validation
 
 - Validate the Nginx configuration with `nginx -t` in the pinned container.
+- Recreate an API container and prove that edge routing still reaches the
+  replacement without recreating edge.
 - Validate the Compose model and start the complete local platform.
 - Prove HTTPS routing, security headers, HTTP redirect, internal-route denial,
   sensitive-route `429` behavior, and absence of the former Identity host

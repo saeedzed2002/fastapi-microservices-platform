@@ -37,7 +37,7 @@ Testcontainers is the preferred candidate when its current stable toolchain is v
 
 Checkout eventually covers registration, product creation, stock, cart, order snapshot, reservation, payment, confirmation, invoice generation, object upload, and notification completion.
 
-Chat covers two authenticated users, membership, database commit before ACK, realtime delivery, reconnect catch-up, deduplication, attachments, and later multi-pod fan-out. Edge coverage proves HTTPS routing, redirect, headers, basic rate limits, blocked internal paths, no direct API host port, and Chat WebSocket upgrades.
+Chat covers two authenticated users, membership, database commit before ACK, realtime delivery, reconnect catch-up, deduplication, attachments, and later multi-pod fan-out. Customer support coverage also proves metadata-only queue visibility, atomic single-agent claim, loss of access after release, and denial of unclaimed agents. Edge coverage proves HTTPS routing, redirect, headers, basic rate limits, blocked internal paths, no direct API host port, and Chat WebSocket upgrades.
 
 Asynchronous tests use bounded polling of observable state. Fixed sleeps are avoided. Tests isolate identifiers, clean data, control time where possible, and report which stage failed.
 

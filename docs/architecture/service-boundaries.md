@@ -10,6 +10,14 @@ Owns accounts, credential hashes, access/refresh-token lifecycle, device/session
 
 Does not own customer profiles, addresses, preferences, carts, orders, or payment records.
 
+Customers authenticate with phone and OTP; administrators authenticate with
+email and password. Identity owns the normalized phone, code hash, verification
+attempts, cooldown, rate limit, and short-lived delivery code in its own Redis
+namespace. It asks Notification for directed SMS delivery through an
+authenticated private API, but never exposes raw OTP values in Kafka, durable
+storage, logs, or public responses. It emits only the post-verification
+`identity.user_registered.v2` domain fact.
+
 Primary interactions are synchronous authentication APIs, downstream token validation, asynchronous account lifecycle events, and Redis-backed short-lived security state where its failure policy is explicit.
 
 ### Customer Service
@@ -66,7 +74,10 @@ Owns notification templates, delivery attempts, delivery status, retries, and ch
 
 Does not own order/payment truth, invoice generation, or synchronous checkout behavior.
 
-It consumes domain events, records delivery intent, dispatches RabbitMQ tasks durably, and executes email/SMS through context-owned Celery workers.
+It consumes domain events, records delivery intent, dispatches RabbitMQ tasks
+durably, and executes email/SMS through context-owned Celery workers. For OTP,
+it persists provider-facing metadata and a task intent but retrieves the
+short-lived code from Identity only immediately before the provider call.
 
 ### Media Service
 
@@ -78,11 +89,11 @@ Clients transfer bytes directly to object storage. Media workers validate and tr
 
 ### Chat Service
 
-Owns conversations, participants, messages, durable attachment associations, chat authorization, and read/unread state if that feature is introduced.
+Owns conversations, participants, messages, durable attachment associations, support-queue assignment, chat authorization, and read/unread state if that feature is introduced.
 
 Does not own identity credentials, binary attachment storage, or durable presence.
 
-It serves HTTP/WebSocket clients, commits messages to PostgreSQL before acknowledgement/fan-out, uses Redis for cross-pod delivery and presence, and references authorized Media assets. When a participant needs an attachment URL, Chat validates its own membership and requests a short-lived Media URL through a signed internal REST proof; Media continues to own bytes, lifecycle, and URL generation without querying Chat data.
+It serves HTTP/WebSocket clients, commits messages to PostgreSQL before acknowledgement/fan-out, uses Redis for cross-pod delivery and presence, and references authorized Media assets. Customer-support conversations are queued in Chat PostgreSQL and atomically claimed by one eligible agent, who then becomes the only agent participant. When a participant needs an attachment URL, Chat validates its own membership and requests a short-lived Media URL through a signed internal REST proof; Media continues to own bytes, lifecycle, and URL generation without querying Chat data.
 
 ## Later services
 

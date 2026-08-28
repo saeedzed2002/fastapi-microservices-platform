@@ -96,6 +96,29 @@ Task queues are owned by bounded context and workload. Every task defines acknow
 
 A Kafka consumer or database transaction cannot directly publish a task and assume atomicity. Before the first critical flow relies on RabbitMQ, its consuming phase must define a durable task-dispatch record/outbox or an equally explicit publisher-confirm and consumer-offset protocol.
 
+Notification task intents use a bounded dispatch claim lease and a unique claim
+token. A dispatcher crash after claim therefore leaves work recoverable; a
+stale dispatcher cannot overwrite a newer claim's result. A task can still be
+delivered more than once after an ambiguous broker confirmation, so its worker
+must remain idempotent.
+
+## Customer OTP delivery
+
+```text
+customer OTP request
+   -> Identity short-lived Redis challenge and rate controls
+   -> authenticated private Notification request
+   -> Notification PostgreSQL delivery + TaskIntent (one transaction)
+   -> RabbitMQ notification.sms task containing delivery_id only
+   -> Notification worker fetches the still-valid code from Identity
+   -> SMS provider acceptance
+```
+
+The raw code exists only in Identity's bounded temporary Redis state and the
+in-memory private request that immediately uses it. Redis loss fails the
+security flow closed. Notification, RabbitMQ, Celery, Kafka, logs, and durable
+provider metadata receive no raw OTP value.
+
 ## Chat consistency
 
 Chat commits a Message to PostgreSQL before sender acknowledgement and Redis publication. It fans out locally before its cross-pod publication; an origin instance ignores its own Redis notification. Redis loss therefore degrades live delivery, not durability. Clients use stable IDs/cursors to retrieve missed messages and deduplicate frames after reconnect.

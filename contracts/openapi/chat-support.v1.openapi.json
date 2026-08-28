@@ -1,0 +1,117 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Chat Support Queue API",
+    "version": "v1",
+    "description": "Customer support conversations are queued before one support agent atomically claims them. Queue readers never receive message content."
+  },
+  "paths": {
+    "/api/v1/chat/support/conversations": {
+      "post": {
+        "summary": "Create or return the caller's active support conversation",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Existing active conversation", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Conversation" } } } },
+          "201": { "description": "Queued conversation", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Conversation" } } } },
+          "403": { "description": "Caller has no customer role" }
+        }
+      }
+    },
+    "/api/v1/chat/support/queue": {
+      "get": {
+        "summary": "List queued support conversations without message content",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } }],
+        "responses": {
+          "200": { "description": "Queue metadata", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SupportQueuePage" } } } },
+          "403": { "description": "Caller has no support-agent role" }
+        }
+      }
+    },
+    "/api/v1/chat/support/conversations/{conversation_id}/claim": {
+      "post": {
+        "summary": "Atomically claim one queued support conversation",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ConversationId" }],
+        "responses": {
+          "200": { "description": "Claimed conversation", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Conversation" } } } },
+          "404": { "description": "No support conversation exists" },
+          "409": { "description": "Another agent already claimed or closed the conversation" }
+        }
+      }
+    },
+    "/api/v1/chat/support/conversations/{conversation_id}/release": {
+      "post": {
+        "summary": "Return the caller's claimed conversation to the queue",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ConversationId" }],
+        "responses": {
+          "204": { "description": "Conversation returned to the queue" },
+          "404": { "description": "Conversation is not claimed by this agent" }
+        }
+      }
+    },
+    "/api/v1/chat/support/conversations/{conversation_id}/close": {
+      "post": {
+        "summary": "Close the caller's claimed conversation",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ConversationId" }],
+        "responses": {
+          "200": { "description": "Closed conversation", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Conversation" } } } },
+          "404": { "description": "Conversation is not claimed by this agent" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "parameters": {
+      "ConversationId": { "name": "conversation_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+    },
+    "schemas": {
+      "Conversation": {
+        "type": "object",
+        "required": ["id", "participant_ids", "created_by_subject_id", "created_at", "last_message_at", "unread_count", "support"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "participant_ids": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+          "created_by_subject_id": { "type": "string", "format": "uuid" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "last_message_at": { "type": ["string", "null"], "format": "date-time" },
+          "unread_count": { "type": "integer", "minimum": 0 },
+          "support": { "$ref": "#/components/schemas/SupportDetails" }
+        }
+      },
+      "SupportDetails": {
+        "type": "object",
+        "required": ["status", "customer_subject_id", "assigned_admin_subject_id", "claimed_at", "closed_at"],
+        "properties": {
+          "status": { "enum": ["queued", "claimed", "closed"] },
+          "customer_subject_id": { "type": "string", "format": "uuid" },
+          "assigned_admin_subject_id": { "type": ["string", "null"], "format": "uuid" },
+          "claimed_at": { "type": ["string", "null"], "format": "date-time" },
+          "closed_at": { "type": ["string", "null"], "format": "date-time" }
+        }
+      },
+      "SupportQueuePage": {
+        "type": "object",
+        "required": ["items"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/SupportQueueItem" } }
+        }
+      },
+      "SupportQueueItem": {
+        "type": "object",
+        "required": ["conversation_id", "customer_subject_id", "created_at", "last_message_at"],
+        "properties": {
+          "conversation_id": { "type": "string", "format": "uuid" },
+          "customer_subject_id": { "type": "string", "format": "uuid" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "last_message_at": { "type": ["string", "null"], "format": "date-time" }
+        }
+      }
+    }
+  }
+}

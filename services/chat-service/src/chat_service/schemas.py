@@ -9,6 +9,25 @@ class ConversationCreate(BaseModel):
     participant_ids: list[UUID] = Field(min_length=1, max_length=24)
 
 
+class SupportConversationDetails(BaseModel):
+    status: Literal["queued", "claimed", "closed"]
+    customer_subject_id: UUID
+    assigned_admin_subject_id: UUID | None = None
+    claimed_at: datetime | None = None
+    closed_at: datetime | None = None
+
+
+class SupportQueueItem(BaseModel):
+    conversation_id: UUID
+    customer_subject_id: UUID
+    created_at: datetime
+    last_message_at: datetime | None
+
+
+class SupportQueuePage(BaseModel):
+    items: list[SupportQueueItem]
+
+
 class AttachmentResponse(BaseModel):
     asset_id: UUID
     content_type: str
@@ -33,6 +52,7 @@ class ConversationResponse(BaseModel):
     created_at: datetime
     last_message_at: datetime | None
     unread_count: int
+    support: SupportConversationDetails | None = None
 
 
 class ConversationPage(BaseModel):

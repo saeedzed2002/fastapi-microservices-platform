@@ -11,8 +11,9 @@ COPY libs/platform-auth/src/platform_auth ./src/platform_auth
 
 RUN pip install --no-cache-dir --disable-pip-version-check \
     "aiokafka==0.14.0" "alembic==1.19.1" "argon2-cffi==25.1.0" \
-    "asyncpg==0.31.0" "email-validator==2.3.0" "fastapi==0.141.1" \
+    "asyncpg==0.31.0" "email-validator==2.3.0" "fastapi==0.141.1" "httpx==0.28.1" \
     "PyJWT[crypto]==2.13.0" "pydantic-settings==2.15.0" \
+    "redis==8.1.0" \
     "SQLAlchemy[asyncio]==2.0.52" "uvicorn[standard]==0.52.3"
 
 USER 10001

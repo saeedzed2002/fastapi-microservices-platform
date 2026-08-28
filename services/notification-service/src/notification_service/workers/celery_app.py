@@ -6,10 +6,10 @@ settings = get_settings()
 celery_app = Celery(
     "notification_service",
     broker=settings.rabbitmq_url,
-    include=["notification_service.workers.email_tasks"],
+    include=["notification_service.workers.email_tasks", "notification_service.workers.sms_tasks"],
 )
 celery_app.conf.update(
-    imports=("notification_service.workers.email_tasks",),
+    imports=("notification_service.workers.email_tasks", "notification_service.workers.sms_tasks"),
     task_default_queue="notification.email",
     task_serializer="json",
     accept_content=("json",),

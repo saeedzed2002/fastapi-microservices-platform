@@ -1,14 +1,21 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("install", "lint", "format-check", "typecheck", "test", "migrate-identity", "migrate-customer", "migrate-catalog", "migrate-media", "migrate-inventory", "migrate-cart", "migrate-order", "migrate-payment", "migrate-notification", "dev-up", "dev-down", "logs")]
-    [string]$Task
+    [ValidateSet("install", "lint", "format-check", "typecheck", "test", "migrate-identity", "migrate-customer", "migrate-catalog", "migrate-media", "migrate-inventory", "migrate-cart", "migrate-order", "migrate-payment", "migrate-notification", "migrate-chat", "provision-admin", "dev-up", "dev-down", "logs")]
+    [string]$Task,
+    [string]$AdminEmail
 )
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $uvPath = Join-Path $env:USERPROFILE ".local\bin\uv.exe"
 $composeFile = Join-Path $repoRoot "infrastructure\compose\docker-compose.yml"
+$composeEnvironmentFile = Join-Path $repoRoot ".env"
+$composeArguments = @("-f", $composeFile)
+
+if (Test-Path -LiteralPath $composeEnvironmentFile) {
+    $composeArguments = @("--env-file", $composeEnvironmentFile) + $composeArguments
+}
 
 if (-not (Test-Path $uvPath)) {
     throw "uv was not found at $uvPath. Install the verified version documented in docs/development/toolchain.md."
@@ -31,12 +38,19 @@ try {
         "migrate-order" { & $uvPath run --package order-service alembic -c services/order-service/alembic.ini upgrade head }
         "migrate-payment" { & $uvPath run --package payment-service alembic -c services/payment-service/alembic.ini upgrade head }
         "migrate-notification" { & $uvPath run --package notification-service alembic -c services/notification-service/alembic.ini upgrade head }
-        "dev-up" {
-            docker compose -f $composeFile build
-            docker compose -f $composeFile up -d
+        "migrate-chat" { & $uvPath run --package chat-service alembic -c services/chat-service/alembic.ini upgrade head }
+        "provision-admin" {
+            if ([string]::IsNullOrWhiteSpace($AdminEmail)) {
+                throw "-AdminEmail is required for provision-admin."
+            }
+            & $uvPath run --package identity-service python -m identity_service.admin_provision --email $AdminEmail
         }
-        "dev-down" { docker compose -f $composeFile down }
-        "logs" { docker compose -f $composeFile logs -f }
+        "dev-up" {
+            & docker compose @composeArguments build
+            & docker compose @composeArguments up -d
+        }
+        "dev-down" { & docker compose @composeArguments down }
+        "logs" { & docker compose @composeArguments logs -f }
     }
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }

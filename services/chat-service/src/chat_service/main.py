@@ -3,17 +3,22 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Query, WebSocket
+from fastapi import Depends, FastAPI, Query, Response, WebSocket, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chat_service.application import (
+    claim_support_conversation,
+    close_support_conversation,
     create_conversation,
+    create_support_conversation,
     get_attachment_download_url,
     get_conversation,
     list_conversations,
     list_messages,
+    list_support_queue,
     mark_read,
+    release_support_conversation,
 )
 from chat_service.auth import current_user
 from chat_service.config import get_settings
@@ -29,6 +34,7 @@ from chat_service.schemas import (
     MarkReadResponse,
     MessagePage,
     PresenceResponse,
+    SupportQueuePage,
 )
 from platform_auth import AuthClaims
 
@@ -77,6 +83,67 @@ async def create_conversation_endpoint(
     db: AsyncSession = Depends(get_session),
 ) -> ConversationResponse:
     return await create_conversation(db, subject_id=claims.subject, payload=payload)
+
+
+@app.post(
+    "/api/v1/chat/support/conversations",
+    response_model=ConversationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_support_conversation_endpoint(
+    response: Response,
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> ConversationResponse:
+    result = await create_support_conversation(db, claims=claims)
+    if not result.created:
+        response.status_code = status.HTTP_200_OK
+    return result.conversation
+
+
+@app.get("/api/v1/chat/support/queue", response_model=SupportQueuePage)
+async def list_support_queue_endpoint(
+    limit: int = Query(default=50, ge=1, le=100),
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> SupportQueuePage:
+    return await list_support_queue(db, claims=claims, limit=limit)
+
+
+@app.post(
+    "/api/v1/chat/support/conversations/{conversation_id}/claim",
+    response_model=ConversationResponse,
+)
+async def claim_support_conversation_endpoint(
+    conversation_id: UUID,
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> ConversationResponse:
+    return await claim_support_conversation(db, conversation_id=conversation_id, claims=claims)
+
+
+@app.post(
+    "/api/v1/chat/support/conversations/{conversation_id}/release",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def release_support_conversation_endpoint(
+    conversation_id: UUID,
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> None:
+    await release_support_conversation(db, conversation_id=conversation_id, claims=claims)
+
+
+@app.post(
+    "/api/v1/chat/support/conversations/{conversation_id}/close",
+    response_model=ConversationResponse,
+)
+async def close_support_conversation_endpoint(
+    conversation_id: UUID,
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> ConversationResponse:
+    return await close_support_conversation(db, conversation_id=conversation_id, claims=claims)
 
 
 @app.get("/api/v1/chat/conversations", response_model=ConversationPage)

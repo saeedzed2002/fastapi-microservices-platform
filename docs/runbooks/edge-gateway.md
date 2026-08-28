@@ -76,6 +76,10 @@ docker compose -f infrastructure/compose/docker-compose.yml config
   `-Force`, then recreate `edge`.
 - A `502` indicates that the mapped upstream service is unavailable; inspect
   its health and logs. Do not change routing to a direct host port.
+- A `404` accompanied by the wrong `upstream_addr` after an API container was
+  recreated indicates stale service discovery. The local edge resolves Docker
+  service names dynamically; validate its configuration with `nginx -t` and
+  wait for the bounded resolver cache before recreating edge.
 - A `429` is an edge source-IP limit. It is expected for repeated login,
   OTP/password-reset, upload, or WebSocket-upgrade attempts. Wait for the
   configured window and inspect the service-owned limit separately.
