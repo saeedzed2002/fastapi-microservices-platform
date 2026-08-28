@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import ssl
 import time
 from uuid import UUID, uuid4
 
@@ -40,42 +41,39 @@ def _receive_frame_type(socket: object, frame_type: str) -> dict[str, object]:
 
 
 def _create_ready_chat_attachment(*, base_url: str, access_token: str) -> UUID:
-    authorization = httpx.post(
-        f"{base_url}:8004/api/v1/media/uploads",
-        headers={"Authorization": f"Bearer {access_token}"},
-        json={
-            "purpose": "chat_attachment",
-            "content_type": "image/png",
-            "size_bytes": len(ONE_PIXEL_PNG),
-            "checksum_sha256": hashlib.sha256(ONE_PIXEL_PNG).hexdigest(),
-        },
-        timeout=10.0,
-    )
-    authorization.raise_for_status()
-    asset_id = UUID(authorization.json()["asset_id"])
-    upload = httpx.put(
-        authorization.json()["upload_url"],
-        content=ONE_PIXEL_PNG,
-        headers={"Content-Type": "image/png"},
-        timeout=10.0,
-    )
-    upload.raise_for_status()
-    completion = httpx.post(
-        f"{base_url}:8004/api/v1/media/assets/{asset_id}/complete",
-        headers={"Authorization": f"Bearer {access_token}"},
-        timeout=10.0,
-    )
-    completion.raise_for_status()
-    for _ in range(30):
-        asset = httpx.get(
-            f"{base_url}:8004/api/v1/media/assets/{asset_id}",
+    with httpx.Client(verify=False, timeout=10.0) as client:
+        authorization = client.post(
+            f"{base_url}/api/v1/media/uploads",
             headers={"Authorization": f"Bearer {access_token}"},
-            timeout=10.0,
+            json={
+                "purpose": "chat_attachment",
+                "content_type": "image/png",
+                "size_bytes": len(ONE_PIXEL_PNG),
+                "checksum_sha256": hashlib.sha256(ONE_PIXEL_PNG).hexdigest(),
+            },
         )
-        asset.raise_for_status()
-        if asset.json()["status"] == "ready":
-            return asset_id
-        time.sleep(1)
+        authorization.raise_for_status()
+        asset_id = UUID(authorization.json()["asset_id"])
+        upload = client.put(
+            authorization.json()["upload_url"],
+            content=ONE_PIXEL_PNG,
+            headers={"Content-Type": "image/png"},
+        )
+        upload.raise_for_status()
+        completion = client.post(
+            f"{base_url}/api/v1/media/assets/{asset_id}/complete",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        completion.raise_for_status()
+        for _ in range(30):
+            asset = client.get(
+                f"{base_url}/api/v1/media/assets/{asset_id}",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            asset.raise_for_status()
+            if asset.json()["status"] == "ready":
+                return asset_id
+            time.sleep(1)
     raise AssertionError("chat attachment did not reach ready state")
 
 
@@ -85,97 +83,100 @@ def test_realtime_chat_persists_before_ack_and_deduplicates_retries() -> None:
 
     from websockets.sync.client import connect
 
-    base_url = os.environ.get("E2E_BASE_URL", "http://localhost")
+    base_url = os.environ.get("E2E_BASE_URL", "https://localhost:8443")
     sender_id, recipient_id = uuid4(), uuid4()
     sender_token, recipient_token = _token(subject=sender_id), _token(subject=recipient_id)
     attachment_id = _create_ready_chat_attachment(base_url=base_url, access_token=sender_token)
-    conversation = httpx.post(
-        f"{base_url}:8010/api/v1/chat/conversations",
-        headers={"Authorization": f"Bearer {sender_token}"},
-        json={"participant_ids": [str(recipient_id)]},
-        timeout=10.0,
-    )
-    conversation.raise_for_status()
-    conversation_id = UUID(conversation.json()["id"])
-    client_message_id = uuid4()
-    request_id = uuid4()
+    websocket_ssl = ssl.create_default_context()
+    websocket_ssl.check_hostname = False
+    websocket_ssl.verify_mode = ssl.CERT_NONE
 
-    with connect(f"{base_url.replace('http', 'ws', 1)}:8010/api/v1/chat/ws") as recipient_socket:
-        recipient_socket.send(
-            json.dumps(
-                {
-                    "type": "chat.authenticate.v1",
-                    "request_id": str(uuid4()),
-                    "access_token": recipient_token,
-                }
-            )
+    with httpx.Client(verify=False, timeout=10.0) as client:
+        conversation = client.post(
+            f"{base_url}/api/v1/chat/conversations",
+            headers={"Authorization": f"Bearer {sender_token}"},
+            json={"participant_ids": [str(recipient_id)]},
         )
-        assert (
-            _receive_frame_type(recipient_socket, "chat.authenticated.v1")["type"]
-            == "chat.authenticated.v1"
-        )
-        with connect(f"{base_url.replace('http', 'ws', 1)}:8010/api/v1/chat/ws") as sender_socket:
-            sender_socket.send(
+        conversation.raise_for_status()
+        conversation_id = UUID(conversation.json()["id"])
+        client_message_id = uuid4()
+        request_id = uuid4()
+
+        websocket_url = f"{base_url.replace('https', 'wss', 1)}/api/v1/chat/ws"
+        with connect(websocket_url, ssl=websocket_ssl) as recipient_socket:
+            recipient_socket.send(
                 json.dumps(
                     {
                         "type": "chat.authenticate.v1",
                         "request_id": str(uuid4()),
-                        "access_token": sender_token,
+                        "access_token": recipient_token,
                     }
                 )
             )
             assert (
-                _receive_frame_type(sender_socket, "chat.authenticated.v1")["type"]
+                _receive_frame_type(recipient_socket, "chat.authenticated.v1")["type"]
                 == "chat.authenticated.v1"
             )
-            frame = {
-                "type": "chat.send_message.v1",
-                "request_id": str(request_id),
-                "client_message_id": str(client_message_id),
-                "conversation_id": str(conversation_id),
-                "content": "persist before acknowledgement",
-                "attachment_ids": [str(attachment_id)],
+            with connect(websocket_url, ssl=websocket_ssl) as sender_socket:
+                sender_socket.send(
+                    json.dumps(
+                        {
+                            "type": "chat.authenticate.v1",
+                            "request_id": str(uuid4()),
+                            "access_token": sender_token,
+                        }
+                    )
+                )
+                assert (
+                    _receive_frame_type(sender_socket, "chat.authenticated.v1")["type"]
+                    == "chat.authenticated.v1"
+                )
+                frame = {
+                    "type": "chat.send_message.v1",
+                    "request_id": str(request_id),
+                    "client_message_id": str(client_message_id),
+                    "conversation_id": str(conversation_id),
+                    "content": "persist before acknowledgement",
+                    "attachment_ids": [str(attachment_id)],
+                }
+                sender_socket.send(json.dumps(frame))
+                acknowledgement = _receive_frame_type(sender_socket, "chat.message_ack.v1")
+                assert acknowledgement["type"] == "chat.message_ack.v1"
+                assert not acknowledgement["duplicate"]
+                recipient_message = _receive_frame_type(recipient_socket, "chat.message.v1")
+                assert recipient_message["type"] == "chat.message.v1"
+                assert recipient_message["message_id"] == acknowledgement["message_id"]
+
+                sender_socket.send(json.dumps(frame))
+                duplicate_acknowledgement = _receive_frame_type(sender_socket, "chat.message_ack.v1")
+                assert duplicate_acknowledgement["type"] == "chat.message_ack.v1"
+                assert duplicate_acknowledgement["duplicate"]
+                assert duplicate_acknowledgement["message_id"] == acknowledgement["message_id"]
+
+        history = client.get(
+            f"{base_url}/api/v1/chat/conversations/{conversation_id}/messages",
+            headers={"Authorization": f"Bearer {recipient_token}"},
+        )
+        history.raise_for_status()
+        messages = history.json()["items"]
+        assert len(messages) == 1
+        assert messages[0]["id"] == acknowledgement["message_id"]
+        assert messages[0]["attachments"] == [
+            {
+                "asset_id": str(attachment_id),
+                "content_type": "image/png",
+                "size_bytes": len(ONE_PIXEL_PNG),
             }
-            sender_socket.send(json.dumps(frame))
-            acknowledgement = _receive_frame_type(sender_socket, "chat.message_ack.v1")
-            assert acknowledgement["type"] == "chat.message_ack.v1"
-            assert not acknowledgement["duplicate"]
-            recipient_message = _receive_frame_type(recipient_socket, "chat.message.v1")
-            assert recipient_message["type"] == "chat.message.v1"
-            assert recipient_message["message_id"] == acknowledgement["message_id"]
+        ]
 
-            sender_socket.send(json.dumps(frame))
-            duplicate_acknowledgement = _receive_frame_type(sender_socket, "chat.message_ack.v1")
-            assert duplicate_acknowledgement["type"] == "chat.message_ack.v1"
-            assert duplicate_acknowledgement["duplicate"]
-            assert duplicate_acknowledgement["message_id"] == acknowledgement["message_id"]
-
-    history = httpx.get(
-        f"{base_url}:8010/api/v1/chat/conversations/{conversation_id}/messages",
-        headers={"Authorization": f"Bearer {recipient_token}"},
-        timeout=10.0,
-    )
-    history.raise_for_status()
-    messages = history.json()["items"]
-    assert len(messages) == 1
-    assert messages[0]["id"] == acknowledgement["message_id"]
-    assert messages[0]["attachments"] == [
-        {
-            "asset_id": str(attachment_id),
-            "content_type": "image/png",
-            "size_bytes": len(ONE_PIXEL_PNG),
-        }
-    ]
-
-    attachment_url = httpx.get(
-        f"{base_url}:8010/api/v1/chat/conversations/{conversation_id}/messages/"
-        f"{acknowledgement['message_id']}/attachments/{attachment_id}/download-url",
-        headers={"Authorization": f"Bearer {recipient_token}"},
-        timeout=10.0,
-    )
-    attachment_url.raise_for_status()
-    assert attachment_url.json()["asset_id"] == str(attachment_id)
-    assert attachment_url.json()["content_type"] == "image/webp"
-    download = httpx.get(attachment_url.json()["download_url"], timeout=10.0)
-    download.raise_for_status()
-    assert download.headers["content-type"].startswith("image/webp")
+        attachment_url = client.get(
+            f"{base_url}/api/v1/chat/conversations/{conversation_id}/messages/"
+            f"{acknowledgement['message_id']}/attachments/{attachment_id}/download-url",
+            headers={"Authorization": f"Bearer {recipient_token}"},
+        )
+        attachment_url.raise_for_status()
+        assert attachment_url.json()["asset_id"] == str(attachment_id)
+        assert attachment_url.json()["content_type"] == "image/webp"
+        download = client.get(attachment_url.json()["download_url"])
+        download.raise_for_status()
+        assert download.headers["content-type"].startswith("image/webp")

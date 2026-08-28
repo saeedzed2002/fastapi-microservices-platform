@@ -8,7 +8,7 @@ The platform is not a set of FastAPI processes sharing a database. Every service
 
 ## System context
 
-Clients communicate through an edge layer that provides routing, TLS termination, basic limits, edge headers, and WebSocket forwarding. Domain authorization remains the responsibility of each service.
+Clients communicate through the Nginx edge layer. Local Compose exposes the canonical `https://localhost:8443` API origin, performs TLS termination, basic limits, edge headers, and Chat WebSocket forwarding; API services are private to the Compose network. Domain authorization remains the responsibility of each service. Presigned S3 object bytes remain direct to compatible object storage because their signed canonical request must not be rewritten by an edge path prefix.
 
 ```text
 Clients
@@ -84,7 +84,7 @@ Multiple service databases may run on one physical PostgreSQL instance locally. 
 
 ### Platform and delivery
 
-- Docker Compose provides local dependencies in Phase 1.
+- Docker Compose provides local dependencies and the pinned Nginx edge gateway. Generate its ignored self-signed certificate before starting the local stack; see the edge gateway runbook.
 - Kubernetes provides deployment, probes, scaling, disruption handling, policy, and controlled migrations in Phase 9.
 - Helm packages stable Kubernetes resources in Phase 10.
 - CI/CD grows from source validation to controlled immutable image delivery and verified rollout.

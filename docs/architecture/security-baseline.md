@@ -28,7 +28,7 @@ The signing algorithm, JWKS/key-distribution mechanism, claim set, and service-t
 - Document fail-open/fail-closed behavior per limit; authentication abuse controls cannot silently disappear.
 - Chat WebSocket connection limits are fail-closed if Redis is unavailable. Chat never accepts bearer tokens in its URL; the first versioned frame authenticates the connection before any Chat operation.
 - Use narrow CORS allowlists and explicit credential behavior per environment.
-- Apply appropriate security headers and TLS at the edge.
+- Apply appropriate security headers and TLS at the edge. Local Nginx accepts only `TLSv1.2` and `TLSv1.3`, forwards a generated request ID and trusted direct-peer address, and applies documented per-instance IP limits; these controls do not replace service-owned Redis-backed limits.
 
 ## Upload and object security
 

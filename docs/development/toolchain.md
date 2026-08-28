@@ -29,6 +29,7 @@ Phase 1 selects the minimum executable platform profile. Direct package constrai
 | RabbitMQ server/image | 1 | rabbitmq:4.3.5-management local | Supported stable release, Celery compatibility, quorum/DLX features and digest |
 | Celery | 1 | Not selected | Python/RabbitMQ compatibility, acknowledgement, retry and shutdown semantics |
 | Redis server/image | 1 | redis:8.10.0 local | Supported stable release, persistence/degradation policy and digest |
+| Nginx edge image | 7 | `nginx:1.30.4-alpine@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46` | Stable Nginx line, official image, TLS/WebSocket/limit-module compatibility, digest pin, security scan |
 | Redis Python client | 4 | 8.1.0 | Python/server compatibility, async cache commands and failure behavior |
 | S3 Python client | 1 | Not selected | Signing, checksum, multipart and presigned-request behavior |
 | MinIO image | 1 | locally built from `minio/minio` `RELEASE.2025-10-15T17-29-55Z` at `9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a` | Latest upstream security release; MinIO no longer publishes a matching official container image, so Compose builds the official release source with its required `Go` `1.24.8` toolchain. The Dockerfile verifies that the checked-out tag resolves to the recorded commit; builder and runtime base images are digest-pinned and the runtime is non-root. |
@@ -194,5 +195,31 @@ source for the workspace.
   [HTTPX `0.28.1` on PyPI](https://pypi.org/project/httpx/0.28.1/), and
   [HTTPX asynchronous documentation](https://www.python-httpx.org/async/), and
   [uv Docker integration](https://docs.astral.sh/uv/guides/integration/docker/).
+- Owner: platform engineering. Next review: before `Phase 8` or `2026-09-25`,
+  whichever occurs first.
+
+
+## Edge selection evidence
+
+- Nginx `1.30.4` was the latest stable release when reviewed on `2026-08-28`.
+  The local edge uses the official `nginx:1.30.4-alpine` image pinned to its
+  multi-architecture index digest
+  `sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46`.
+  The selected image supports the required reverse proxy, TLS, request-limit,
+  and WebSocket upgrade directives without adding an application dependency.
+- Compatibility: the edge listens on unprivileged local ports, runs as the
+  image's non-root UID `101`, and uses writable temporary paths only on
+  Compose `tmpfs` mounts. API route prefixes are forwarded unchanged, while
+  MinIO remains direct for S3 SigV4 presigned byte paths.
+- Security and operations: the configuration disables server tokens, limits TLS
+  to `TLSv1.2` and `TLSv1.3`, disables session tickets, supplies basic
+  source-IP limits and security headers, and marks the root filesystem
+  read-only. Pull-request CI scans the exact image for `HIGH` and `CRITICAL`
+  findings using the existing pinned Trivy action. This does not claim the
+  image has no unknown or future vulnerabilities.
+- Official sources reviewed: [Nginx downloads](https://nginx.org/en/download.html),
+  [official Nginx Docker image](https://hub.docker.com/_/nginx),
+  [request-limit module](https://nginx.org/en/docs/http/ngx_http_limit_req_module.html),
+  and [WebSocket proxying](https://nginx.org/en/docs/http/websocket.html).
 - Owner: platform engineering. Next review: before `Phase 8` or `2026-09-25`,
   whichever occurs first.

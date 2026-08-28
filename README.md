@@ -92,6 +92,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Testing strategy](docs/development/testing-strategy.md)
 - [CI/CD strategy](docs/development/ci-cd.md)
 - [Invoice and notification runbook](docs/runbooks/invoice-notification.md)
+- [Edge gateway runbook](docs/runbooks/edge-gateway.md)
 - [Phase 0 plan](docs/development/phase-0-plan.md)
 - [Phase 1 plan](docs/development/phase-1-plan.md)
 - [Phase 2 plan](docs/development/phase-2-plan.md)
@@ -119,13 +120,19 @@ The complete intended layout is documented in [repository structure](docs/archit
 
 ## Local development
 
-Phase 6 adds Notification on port `8009` and the local Mailpit UI on port
-`8025`. `dev-up` first builds API images and then starts Compose; this lets
+The local edge gateway is the only public API entry point: use
+`https://localhost:8443/api/v1/...` and `wss://localhost:8443/api/v1/chat/ws`.
+Generate its ignored self-signed certificate once before `dev-up` with
+`pwsh -NoProfile -File .\\scripts\\new_local_edge_certificate.ps1`. The HTTP
+listener `8080` redirects to TLS. API services no longer publish host ports;
+MinIO `9000` and the Mailpit UI `8025` remain direct local development endpoints.
+`dev-up` first builds API images and then starts Compose; this lets
 the Invoice and Notification workers consume the same built service images.
 Use `scripts/platform.ps1` for repeatable local tasks.
 
     pwsh -File .\scripts\platform.ps1 -Task install
     pwsh -File .\scripts\platform.ps1 -Task test
+    pwsh -NoProfile -File .\scripts\new_local_edge_certificate.ps1
     pwsh -File .\scripts\platform.ps1 -Task dev-up
     pwsh -File .\scripts\platform.ps1 -Task migrate-identity
     pwsh -File .\scripts\platform.ps1 -Task migrate-customer

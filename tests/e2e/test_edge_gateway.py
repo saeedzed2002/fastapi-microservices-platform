@@ -1,0 +1,40 @@
+import os
+import socket
+
+import httpx
+import pytest
+
+pytestmark = pytest.mark.e2e
+
+
+def test_edge_routes_tls_headers_and_sensitive_rate_limit() -> None:
+    if os.environ.get("RUN_E2E") != "1":
+        pytest.skip("set RUN_E2E=1 after starting the local Docker Compose platform")
+
+    base_url = os.environ.get("E2E_BASE_URL", "https://localhost:8443")
+    with httpx.Client(verify=False, follow_redirects=False, timeout=10.0) as client:
+        ready = client.get(f"{base_url}/health/ready")
+        ready.raise_for_status()
+        assert ready.text == "ok"
+        assert ready.headers["strict-transport-security"] == "max-age=31536000"
+        assert ready.headers["x-content-type-options"] == "nosniff"
+        assert ready.headers["x-frame-options"] == "DENY"
+        assert ready.headers["referrer-policy"] == "no-referrer"
+
+        redirect = client.get("http://127.0.0.1:8080/api/v1/reference")
+        assert redirect.status_code == 308
+        assert redirect.headers["location"] == "https://localhost:8443/api/v1/reference"
+
+        reference = client.get(f"{base_url}/api/v1/reference")
+        reference.raise_for_status()
+        assert reference.headers["x-request-id"]
+
+        internal = client.get(f"{base_url}/api/internal/v1/media/assets")
+        assert internal.status_code == 404
+
+        responses = [client.post(f"{base_url}/api/v1/auth/login", json={}) for _ in range(6)]
+        assert responses[-1].status_code == 429
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as direct_api_socket:
+        direct_api_socket.settimeout(1.0)
+        assert direct_api_socket.connect_ex(("127.0.0.1", 8001)) != 0

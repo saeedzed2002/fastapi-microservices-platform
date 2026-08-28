@@ -42,7 +42,8 @@ def test_checkout_generates_invoice_and_sends_notification() -> None:
 
     import boto3
 
-    base_url = os.environ.get("E2E_BASE_URL", "http://localhost")
+    base_url = os.environ.get("E2E_BASE_URL", "https://localhost:8443")
+    mailpit_base_url = os.environ.get("E2E_MAILPIT_BASE_URL", "http://localhost:8025")
     user_id, admin_id = str(uuid4()), str(uuid4())
     user_headers = {"Authorization": f"Bearer {_token(subject=user_id, roles=('customer',))}"}
     admin_token = _token(subject=admin_id, roles=("admin", "catalog_admin", "inventory_admin"))
@@ -50,14 +51,14 @@ def test_checkout_generates_invoice_and_sends_notification() -> None:
     suffix = uuid4().hex[:12]
     sku = f"P6-{suffix}"
 
-    with httpx.Client(timeout=10.0) as client:
+    with httpx.Client(timeout=10.0, verify=False) as client:
         client.put(
-            f"{base_url}:8002/api/v1/customers/me",
+            f"{base_url}/api/v1/customers/me",
             headers=user_headers,
             json={"display_name": "Phase Six E2E"},
         ).raise_for_status()
         address = client.post(
-            f"{base_url}:8002/api/v1/customers/me/addresses",
+            f"{base_url}/api/v1/customers/me/addresses",
             headers=user_headers,
             json={
                 "label": "Test",
@@ -71,7 +72,7 @@ def test_checkout_generates_invoice_and_sends_notification() -> None:
         )
         address.raise_for_status()
         product = client.post(
-            f"{base_url}:8003/api/v1/catalog/products",
+            f"{base_url}/api/v1/catalog/products",
             headers=admin_headers,
             json={
                 "name": f"Phase 6 {suffix}",
@@ -85,23 +86,23 @@ def test_checkout_generates_invoice_and_sends_notification() -> None:
         product.raise_for_status()
         product_id = product.json()["id"]
         variant = client.post(
-            f"{base_url}:8003/api/v1/catalog/products/{product_id}/variants",
+            f"{base_url}/api/v1/catalog/products/{product_id}/variants",
             headers=admin_headers,
             json={"sku": sku, "name": "Default", "attributes": {}},
         )
         variant.raise_for_status()
         client.post(
-            f"{base_url}:8003/api/v1/catalog/products/{product_id}/publish",
+            f"{base_url}/api/v1/catalog/products/{product_id}/publish",
             headers=admin_headers,
         ).raise_for_status()
         client.post(
-            f"{base_url}:8005/api/v1/inventory/stock-items",
+            f"{base_url}/api/v1/inventory/stock-items",
             headers=admin_headers,
             json={"sku": sku, "initial_quantity": 2},
         ).raise_for_status()
-        previous_messages = len(client.get(f"{base_url}:8025/api/v1/messages").json()["messages"])
+        previous_messages = len(client.get(f"{mailpit_base_url}/api/v1/messages").json()["messages"])
         order = client.post(
-            f"{base_url}:8007/api/v1/orders",
+            f"{base_url}/api/v1/orders",
             headers={**user_headers, "Idempotency-Key": f"phase6-{suffix}"},
             json={
                 "address_id": address.json()["id"],
@@ -113,14 +114,14 @@ def test_checkout_generates_invoice_and_sends_notification() -> None:
         order_id = order.json()["id"]
 
         def order_is_confirmed() -> bool:
-            response = client.get(f"{base_url}:8007/api/v1/orders/{order_id}", headers=user_headers)
+            response = client.get(f"{base_url}/api/v1/orders/{order_id}", headers=user_headers)
             response.raise_for_status()
             return response.json()["status"] == "CONFIRMED"
 
         _wait_for(order_is_confirmed)
         object_store = boto3.client(
             "s3",
-            endpoint_url=os.environ.get("E2E_S3_ENDPOINT", f"{base_url}:9000"),
+            endpoint_url=os.environ.get("E2E_S3_ENDPOINT", "http://localhost:9000"),
             aws_access_key_id=os.environ.get("E2E_S3_ACCESS_KEY", "minio-local"),
             aws_secret_access_key=os.environ.get("E2E_S3_SECRET_KEY", "minio-local-only"),
             region_name="us-east-1",
@@ -134,7 +135,7 @@ def test_checkout_generates_invoice_and_sends_notification() -> None:
             except Exception:
                 return False
             return (
-                len(client.get(f"{base_url}:8025/api/v1/messages").json()["messages"])
+                len(client.get(f"{mailpit_base_url}/api/v1/messages").json()["messages"])
                 > previous_messages
             )
 

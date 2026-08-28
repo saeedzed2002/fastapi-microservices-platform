@@ -108,8 +108,6 @@ services:
     environment:
       PLATFORM_ENVIRONMENT: local
       PLATFORM_LOG_LEVEL: INFO
-    ports:
-      - "127.0.0.1:8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -137,8 +135,6 @@ services:
       IDENTITY_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
       IDENTITY_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       IDENTITY_KAFKA_PUBLISHER_ENABLED: "true"
-    ports:
-      - "127.0.0.1:8001:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -160,8 +156,6 @@ services:
       CUSTOMER_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
       CUSTOMER_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       CUSTOMER_KAFKA_CONSUMER_ENABLED: "true"
-    ports:
-      - "127.0.0.1:8002:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -181,8 +175,6 @@ services:
       CATALOG_ENVIRONMENT: local
       CATALOG_DATABASE_URL: postgresql+asyncpg://catalog_service:catalog-local-only@postgres:5432/catalog_service
       CATALOG_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
-    ports:
-      - "127.0.0.1:8003:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -208,8 +200,6 @@ services:
       MEDIA_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       MEDIA_TASK_DISPATCHER_ENABLED: "true"
       MEDIA_KAFKA_PUBLISHER_ENABLED: "true"
-    ports:
-      - "127.0.0.1:8004:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -236,8 +226,6 @@ services:
       INVENTORY_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       INVENTORY_KAFKA_PUBLISHER_ENABLED: "true"
       INVENTORY_KAFKA_CONSUMER_ENABLED: "true"
-    ports:
-      - "127.0.0.1:8005:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -258,8 +246,6 @@ services:
       CART_DATABASE_URL: postgresql+asyncpg://cart_service:cart-local-only@postgres:5432/cart_service
       CART_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
       CART_REDIS_URL: redis://redis:6379/0
-    ports:
-      - "127.0.0.1:8006:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -289,8 +275,6 @@ services:
       ORDER_TASK_DISPATCHER_ENABLED: "true"
       ORDER_RABBITMQ_URL: amqp://platform:platform-local-only@rabbitmq:5672//
       ORDER_S3_ENDPOINT_URL: http://minio:9000
-    ports:
-      - "127.0.0.1:8007:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -320,8 +304,6 @@ services:
       PAYMENT_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       PAYMENT_KAFKA_PUBLISHER_ENABLED: "true"
       PAYMENT_KAFKA_CONSUMER_ENABLED: "true"
-    ports:
-      - "127.0.0.1:8008:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -347,8 +329,6 @@ services:
       NOTIFICATION_TASK_DISPATCHER_ENABLED: "true"
       NOTIFICATION_SMTP_HOST: mailpit
       NOTIFICATION_SMTP_PORT: "1025"
-    ports:
-      - "127.0.0.1:8009:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -376,8 +356,6 @@ services:
       CHAT_MEDIA_BASE_URL: http://media-service:8000
       CHAT_MEDIA_INTERNAL_ACCESS_SECRET: local-development-chat-media-access-secret-change-me-32-bytes
       CHAT_REDIS_URL: redis://redis:6379/0
-    ports:
-      - "127.0.0.1:8010:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -389,6 +367,45 @@ services:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
       interval: 10s
       timeout: 5s
+      retries: 12
+
+  edge:
+    image: nginx:1.30.4-alpine@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46
+    user: "101:101"
+    read_only: true
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8443:8443"
+    volumes:
+      - ../edge/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../edge:/etc/nginx/edge:ro
+      - ../edge/tls:/etc/nginx/tls:ro
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    depends_on:
+      reference-service:
+        condition: service_healthy
+      identity-service:
+        condition: service_healthy
+      customer-service:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+      media-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      cart-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      chat-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/health/ready || exit 1"]
+      interval: 5s
+      timeout: 3s
       retries: 12
 
   order-invoice-worker:
