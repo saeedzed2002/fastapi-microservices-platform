@@ -38,7 +38,6 @@ def test_access_token_rejects_wrong_secret() -> None:
         decode_access_token(token, secret="b" * 40, issuer="issuer", audience="audience")
 
 
-
 def _signed_access_token(*, issued_at: datetime, expires_at: datetime) -> str:
     return jwt.encode(
         {
