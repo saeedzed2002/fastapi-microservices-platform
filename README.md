@@ -121,7 +121,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 ## Local development
 
 The local edge gateway is the only public API entry point: use
-`https://localhost:8443/api/v1/...` and `wss://localhost:8443/api/v1/chat/ws`.
+`https://localhost/api/v1/...` and `wss://localhost/api/v1/chat/ws`.
 Generate its ignored self-signed certificate once before `dev-up` with
 `pwsh -NoProfile -File .\\scripts\\new_local_edge_certificate.ps1`. The HTTP
 listener `8080` redirects to TLS. API services no longer publish host ports;

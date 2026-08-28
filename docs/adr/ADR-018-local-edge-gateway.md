@@ -22,8 +22,8 @@ canonical URI and signature must remain unchanged.
 ## Decision
 
 Docker Compose runs one non-root, read-only Nginx edge container. It exposes
-`https://localhost:8443` as the canonical local API address and redirects
-ordinary HTTP requests from `http://localhost:8080`. The service route
+`https://localhost` as the canonical local API address and redirects
+ordinary HTTP requests from `http://localhost`. The service route
 prefixes are preserved exactly:
 
 - `/api/v1/auth/` -> Identity
@@ -91,7 +91,7 @@ SigV4 canonical-request signatures.
 ## Compatibility and migration
 
 Existing public URI prefixes and service contracts do not change. Local callers
-must switch to `https://localhost:8443` and generate a certificate with
+must switch to `https://localhost` and generate a certificate with
 `pwsh -NoProfile -File scripts/new_local_edge_certificate.ps1` before
 starting Compose. HTTP callers receive a `308` redirect. The local
 certificate and private key are ignored by Git and must never be promoted to a

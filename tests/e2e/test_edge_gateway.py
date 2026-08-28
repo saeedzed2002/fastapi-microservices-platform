@@ -11,7 +11,7 @@ def test_edge_routes_tls_headers_and_sensitive_rate_limit() -> None:
     if os.environ.get("RUN_E2E") != "1":
         pytest.skip("set RUN_E2E=1 after starting the local Docker Compose platform")
 
-    base_url = os.environ.get("E2E_BASE_URL", "https://localhost:8443")
+    base_url = os.environ.get("E2E_BASE_URL", "https://localhost")
     with httpx.Client(verify=False, follow_redirects=False, timeout=10.0) as client:
         ready = client.get(f"{base_url}/health/ready")
         ready.raise_for_status()
@@ -21,9 +21,13 @@ def test_edge_routes_tls_headers_and_sensitive_rate_limit() -> None:
         assert ready.headers["x-frame-options"] == "DENY"
         assert ready.headers["referrer-policy"] == "no-referrer"
 
-        redirect = client.get("http://127.0.0.1:8080/api/v1/reference")
+        root = client.get(base_url)
+        root.raise_for_status()
+        assert root.json() == {"status": "ok", "api_base": "/api/v1"}
+
+        redirect = client.get("http://127.0.0.1/api/v1/reference")
         assert redirect.status_code == 308
-        assert redirect.headers["location"] == "https://localhost:8443/api/v1/reference"
+        assert redirect.headers["location"] == "https://localhost/api/v1/reference"
 
         reference = client.get(f"{base_url}/api/v1/reference")
         reference.raise_for_status()

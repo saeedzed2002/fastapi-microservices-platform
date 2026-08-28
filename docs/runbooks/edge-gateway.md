@@ -3,8 +3,8 @@
 ## Scope
 
 The local edge container is the only public entry point for versioned APIs and
-the Chat WebSocket. Its canonical local address is `https://localhost:8443`.
-The HTTP listener at `http://localhost:8080` redirects ordinary requests to
+the Chat WebSocket. Its canonical local address is `https://localhost`.
+The HTTP listener at `http://localhost` redirects ordinary requests to
 TLS and exposes health endpoints for container checks.
 
 This runbook applies to local Compose only. It does not establish a production
@@ -28,8 +28,8 @@ developer machine.
 
 ```powershell
 docker compose -f infrastructure/compose/docker-compose.yml up -d --build --wait
-curl.exe -k https://localhost:8443/health/ready
-curl.exe -i http://localhost:8080/api/v1/reference
+curl.exe -k https://localhost/health/ready
+curl.exe -i http://localhost/api/v1/reference
 docker compose -f infrastructure/compose/docker-compose.yml ps edge
 ```
 
@@ -39,8 +39,9 @@ self-signed.
 
 ## Routing checks
 
-- Call public APIs through `https://localhost:8443/api/v1/...`.
-- Connect Chat through `wss://localhost:8443/api/v1/chat/ws`.
+- Open `https://localhost` to verify the edge root response.
+- Call public APIs through `https://localhost/api/v1/...`.
+- Connect Chat through `wss://localhost/api/v1/chat/ws`.
 - A request to `/api/internal/` must return `404`.
 - No direct host publication exists for service ports `8000` through
   `8010`.
@@ -52,7 +53,7 @@ self-signed.
 ```powershell
 docker compose -f infrastructure/compose/docker-compose.yml logs --no-color edge
 docker compose -f infrastructure/compose/docker-compose.yml exec edge nginx -t
-curl.exe -k -i https://localhost:8443/api/v1/reference
+curl.exe -k -i https://localhost/api/v1/reference
 docker compose -f infrastructure/compose/docker-compose.yml config
 ```
 

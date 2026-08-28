@@ -150,7 +150,7 @@ def test_realtime_chat_persists_before_ack_and_deduplicates_retries() -> None:
     if os.environ.get("RUN_E2E") != "1":
         pytest.skip("set RUN_E2E=1 after starting the local Docker Compose platform")
 
-    base_url = os.environ.get("E2E_BASE_URL", "https://localhost:8443")
+    base_url = os.environ.get("E2E_BASE_URL", "https://localhost")
     sender_id, recipient_id = uuid4(), uuid4()
     sender_token, recipient_token = _token(subject=sender_id), _token(subject=recipient_id)
     attachment_id = _create_ready_chat_attachment(base_url=base_url, access_token=sender_token)

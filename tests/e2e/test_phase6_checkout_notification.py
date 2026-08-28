@@ -42,7 +42,7 @@ def test_checkout_generates_invoice_and_sends_notification() -> None:
 
     import boto3
 
-    base_url = os.environ.get("E2E_BASE_URL", "https://localhost:8443")
+    base_url = os.environ.get("E2E_BASE_URL", "https://localhost")
     mailpit_base_url = os.environ.get("E2E_MAILPIT_BASE_URL", "http://localhost:8025")
     user_id, admin_id = str(uuid4()), str(uuid4())
     user_headers = {"Authorization": f"Bearer {_token(subject=user_id, roles=('customer',))}"}
