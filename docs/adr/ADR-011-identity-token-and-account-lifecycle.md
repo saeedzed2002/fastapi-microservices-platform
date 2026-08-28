@@ -18,7 +18,9 @@ be provisioned after the identity transaction commits.
 Identity-service owns users, password hashes, refresh sessions, and authentication
 state. Passwords use Argon2id. Access tokens are short-lived JWTs signed with
 HS256 using an environment-provided secret of at least 32 bytes, with explicit
-issuer and audience claims. The initial access lifetime is 15 minutes.
+issuer and audience claims. The initial access lifetime is 15 minutes. Consumers
+require the issued-at claim and accept it at most two seconds in the future to
+tolerate bounded clock skew; expiration remains strict.
 
 Refresh tokens are opaque values. Only a SHA-256 hash is stored. Every refresh
 rotates the session token while retaining its family identifier; logout revokes

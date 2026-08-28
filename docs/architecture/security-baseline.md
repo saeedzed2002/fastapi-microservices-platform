@@ -6,6 +6,7 @@ Security is enforced at every service boundary and throughout delivery; the edge
 
 - Hash passwords with Argon2id using reviewed, operationally measured parameters.
 - Use short-lived signed JWT access tokens with explicit issuer and audience validation.
+- Require the issued-at claim, accept no more than two seconds of future issuance for bounded clock skew, and keep expiration validation strict.
 - Rotate refresh tokens and detect reuse at the token-family/session level.
 - Make logout and revocation semantics explicit, including expiry and Redis-outage behavior.
 - Store only hashed refresh-token material where practical.

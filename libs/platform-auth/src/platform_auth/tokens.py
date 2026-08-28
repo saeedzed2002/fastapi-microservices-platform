@@ -7,6 +7,9 @@ import jwt
 from jwt import InvalidTokenError
 
 
+MAX_ISSUED_AT_CLOCK_SKEW = timedelta(seconds=2)
+
+
 class TokenError(ValueError):
     """Raised when an access token is invalid or has the wrong purpose."""
 
@@ -58,7 +61,10 @@ def decode_access_token(
             algorithms=["HS256"],
             issuer=issuer,
             audience=audience,
-            options={"require": ["sub", "jti", "roles", "token_type", "iat", "exp"]},
+            options={
+                "require": ["sub", "jti", "roles", "token_type", "iat", "exp"],
+                "verify_iat": False,
+            },
         )
     except (InvalidTokenError, ValueError) as exc:
         raise TokenError("invalid access token") from exc
@@ -69,8 +75,14 @@ def decode_access_token(
         subject = UUID(str(payload["sub"]))
         token_id = UUID(str(payload["jti"]))
         roles = tuple(str(role) for role in payload["roles"])
-        issued_at = datetime.fromtimestamp(float(payload["iat"]), tz=UTC)
+        raw_issued_at = payload["iat"]
+        if isinstance(raw_issued_at, bool):
+            raise TypeError("issued-at claim must be numeric")
+        issued_at = datetime.fromtimestamp(float(raw_issued_at), tz=UTC)
         expires_at = datetime.fromtimestamp(float(payload["exp"]), tz=UTC)
     except (KeyError, TypeError, ValueError, OverflowError) as exc:
         raise TokenError("invalid access token claims") from exc
+
+    if issued_at > datetime.now(UTC) + MAX_ISSUED_AT_CLOCK_SKEW:
+        raise TokenError("access token issued in the future")
     return AuthClaims(subject, token_id, roles, issued_at, expires_at)
