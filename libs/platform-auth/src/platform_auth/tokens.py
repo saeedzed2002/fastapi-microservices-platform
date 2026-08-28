@@ -6,7 +6,6 @@ from uuid import UUID, uuid4
 import jwt
 from jwt import InvalidTokenError
 
-
 MAX_ISSUED_AT_CLOCK_SKEW = timedelta(seconds=2)
 
 
