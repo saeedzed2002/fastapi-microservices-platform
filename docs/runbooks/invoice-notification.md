@@ -6,6 +6,12 @@ An Order is `CONFIRMED`, but its Order-owned Invoice remains `PENDING`,
 `GENERATING`, or `FAILED`; or Notification delivery remains `PENDING`,
 `SENDING`, or `FAILED` beyond the operational threshold.
 
+A checkout returns `409 checkout email unavailable` when the customer profile
+has no saved contact email. This is a pre-checkout profile condition, not an
+invoice-worker failure: save the contact email through Customer-service before
+retrying checkout. Order snapshots that email once; later profile edits do not
+rewrite a historical recipient or replay an existing invoice notification.
+
 ## Safe checks
 
 1. Check the readiness endpoints for `order-service`, `notification-service`,

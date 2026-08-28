@@ -1,16 +1,37 @@
 import asyncio
+import base64
+import binascii
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import cast
 from uuid import UUID, uuid4
 
 import httpx
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
-from order_service.models import InboxMessage, Order, OrderItem, OrderStateTransition, OutboxMessage
-from order_service.schemas import OrderItemResponse, OrderResponse
+from order_service.models import (
+    InboxMessage,
+    Invoice,
+    Order,
+    OrderItem,
+    OrderStateTransition,
+    OutboxMessage,
+)
+from order_service.schemas import (
+    AdminOrderPage,
+    AdminOrderResponse,
+    CustomerOrderPage,
+    InvoiceSummaryResponse,
+    OrderItemResponse,
+    OrderResponse,
+    OrderStateTransitionResponse,
+    OrderStatus,
+    OrderSummaryResponse,
+)
 
 _TRANSITIONS = {
     ("PENDING", "inventory.reserved.v1"): "INVENTORY_RESERVED",
@@ -19,6 +40,10 @@ _TRANSITIONS = {
     ("PAYMENT_PENDING", "payment.succeeded.v1"): "CONFIRMED",
     ("PAYMENT_PENDING", "payment.failed.v1"): "CANCELLED",
 }
+
+
+class InvalidOrderCursor(ValueError):
+    pass
 
 
 def tracking_code() -> str:
@@ -41,6 +66,48 @@ async def order_response(db: AsyncSession, order: Order) -> OrderResponse:
     )
 
 
+def order_summary_response(order: Order) -> OrderSummaryResponse:
+    return OrderSummaryResponse(
+        id=order.id,
+        status=cast(OrderStatus, order.status),
+        tracking_code=order.tracking_code,
+        currency=order.currency,
+        total_amount=order.total_amount,
+        created_at=order.created_at,
+        updated_at=order.updated_at,
+    )
+
+
+async def admin_order_response(db: AsyncSession, order: Order) -> AdminOrderResponse:
+    response = await order_response(db, order)
+    transitions = await db.scalars(
+        select(OrderStateTransition)
+        .where(OrderStateTransition.order_id == order.id)
+        .order_by(OrderStateTransition.created_at, OrderStateTransition.id)
+    )
+    invoice = await db.scalar(select(Invoice).where(Invoice.order_id == order.id))
+    return AdminOrderResponse(
+        **response.model_dump(),
+        customer_id=order.customer_id,
+        customer_email=order.customer_email,
+        delivery_address=order.delivery_address,
+        payment_method=order.payment_method,
+        transitions=[OrderStateTransitionResponse.model_validate(row) for row in transitions],
+        invoice=(
+            InvoiceSummaryResponse(status=invoice.status, generated_at=invoice.generated_at)
+            if invoice is not None
+            else None
+        ),
+    )
+
+
+async def load_order_or_404(db: AsyncSession, order_id: UUID) -> Order:
+    order = await db.get(Order, order_id)
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order not found")
+    return order
+
+
 async def load_owned_order_or_404(db: AsyncSession, order_id: UUID, customer_id: UUID) -> Order:
     order = await db.scalar(
         select(Order).where(Order.id == order_id, Order.customer_id == customer_id)
@@ -48,6 +115,75 @@ async def load_owned_order_or_404(db: AsyncSession, order_id: UUID, customer_id:
     if order is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order not found")
     return order
+
+
+def encode_order_cursor(order: Order) -> str:
+    payload = f"{order.created_at.astimezone(UTC).isoformat()}|{order.id}".encode()
+    return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+
+
+def decode_order_cursor(cursor: str) -> tuple[datetime, UUID]:
+    try:
+        padded_cursor = cursor + "=" * (-len(cursor) % 4)
+        raw_timestamp, raw_id = (
+            base64.urlsafe_b64decode(padded_cursor).decode("utf-8").split("|", 1)
+        )
+        created_at = datetime.fromisoformat(raw_timestamp)
+        order_id = UUID(raw_id)
+    except (UnicodeDecodeError, ValueError, binascii.Error) as exc:
+        raise InvalidOrderCursor from exc
+    if created_at.tzinfo is None:
+        raise InvalidOrderCursor
+    return created_at.astimezone(UTC), order_id
+
+
+async def list_customer_orders(
+    *, db: AsyncSession, customer_id: UUID, limit: int, cursor: str | None
+) -> CustomerOrderPage:
+    rows = await _list_orders(
+        db=db,
+        filters=[Order.customer_id == customer_id],
+        limit=limit,
+        cursor=cursor,
+    )
+    return CustomerOrderPage(
+        items=[order_summary_response(order) for order in rows[:limit]],
+        next_cursor=encode_order_cursor(rows[limit - 1]) if len(rows) > limit else None,
+    )
+
+
+async def list_administrator_orders(
+    *, db: AsyncSession, status_filter: OrderStatus | None, limit: int, cursor: str | None
+) -> AdminOrderPage:
+    filters = [Order.status == status_filter] if status_filter is not None else []
+    rows = await _list_orders(db=db, filters=filters, limit=limit, cursor=cursor)
+    return AdminOrderPage(
+        items=[order_summary_response(order) for order in rows[:limit]],
+        next_cursor=encode_order_cursor(rows[limit - 1]) if len(rows) > limit else None,
+    )
+
+
+async def _list_orders(
+    *,
+    db: AsyncSession,
+    filters: list[ColumnElement[bool]],
+    limit: int,
+    cursor: str | None,
+) -> list[Order]:
+    conditions = list(filters)
+    if cursor is not None:
+        created_at, order_id = decode_order_cursor(cursor)
+        conditions.append(
+            or_(
+                Order.created_at < created_at,
+                and_(Order.created_at == created_at, Order.id < order_id),
+            )
+        )
+    statement = select(Order).order_by(Order.created_at.desc(), Order.id.desc()).limit(limit + 1)
+    if conditions:
+        statement = statement.where(*conditions)
+    rows = await db.scalars(statement)
+    return list(rows)
 
 
 def transition_order(
@@ -116,7 +252,7 @@ async def collect_checkout_snapshot(
     access_token: str,
     address_id: UUID,
     item_quantities: dict[UUID, int],
-) -> tuple[dict[str, str], str, list[dict[str, object]], str, Decimal]:
+) -> tuple[dict[str, str], str | None, list[dict[str, object]], str, Decimal]:
     headers = {"Authorization": f"Bearer {access_token}"}
     timeout = httpx.Timeout(5.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
@@ -165,13 +301,14 @@ async def collect_checkout_snapshot(
         }
         for row in rows
     ]
+    customer_email = required_customer_email(customer_response.json())
     return (
         {
             key: str(address[key])
             for key in ("recipient_name", "line1", "line2", "city", "postal_code", "country_code")
             if address.get(key) is not None
         },
-        str(customer_response.json()["email"]),
+        customer_email,
         snapshots,
         currencies.pop(),
         checkout_total(
@@ -184,13 +321,23 @@ async def collect_checkout_snapshot(
     )
 
 
+def required_customer_email(customer: dict[str, object]) -> str:
+    email = customer.get("email")
+    if not isinstance(email, str) or not email.strip():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="checkout email unavailable",
+        )
+    return email.strip()
+
+
 async def create_order(
     db: AsyncSession,
     *,
     customer_id: UUID,
     idempotency_key: str,
     delivery_address: dict[str, str],
-    customer_email: str,
+    customer_email: str | None,
     snapshots: list[dict[str, object]],
     currency: str,
     total_amount: Decimal,

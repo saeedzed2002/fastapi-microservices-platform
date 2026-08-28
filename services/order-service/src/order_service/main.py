@@ -4,21 +4,32 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from order_service.application import (
+    admin_order_response,
     collect_checkout_snapshot,
     create_order,
+    list_administrator_orders,
+    list_customer_orders,
+    load_order_or_404,
     load_owned_order_or_404,
     order_response,
 )
-from order_service.auth import bearer, current_user
+from order_service.auth import bearer, require_administrator, require_customer
 from order_service.config import get_settings
 from order_service.db import dispose_engine, get_session
-from order_service.schemas import CheckoutRequest, OrderResponse
+from order_service.schemas import (
+    AdminOrderPage,
+    AdminOrderResponse,
+    CheckoutRequest,
+    CustomerOrderPage,
+    OrderResponse,
+    OrderStatus,
+)
 from order_service.workers.kafka import consume_invoice_events, consume_saga_events, publish_outbox
 from order_service.workers.task_dispatcher import run_task_dispatcher
 from platform_auth import AuthClaims
@@ -64,10 +75,60 @@ async def readiness(db: AsyncSession = Depends(get_session)) -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/api/v1/orders/admin", response_model=AdminOrderPage)
+async def get_administrator_orders(
+    order_status: OrderStatus | None = Query(default=None, alias="status"),
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = Query(default=None, min_length=1, max_length=256),
+    _: AuthClaims = Depends(require_administrator),
+    db: AsyncSession = Depends(get_session),
+) -> AdminOrderPage:
+    try:
+        return await list_administrator_orders(
+            db=db,
+            status_filter=order_status,
+            limit=limit,
+            cursor=cursor,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid cursor"
+        ) from exc
+
+
+@app.get("/api/v1/orders/admin/{order_id}", response_model=AdminOrderResponse)
+async def get_administrator_order(
+    order_id: UUID,
+    _: AuthClaims = Depends(require_administrator),
+    db: AsyncSession = Depends(get_session),
+) -> AdminOrderResponse:
+    return await admin_order_response(db, await load_order_or_404(db, order_id))
+
+
+@app.get("/api/v1/orders", response_model=CustomerOrderPage)
+async def get_customer_orders(
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = Query(default=None, min_length=1, max_length=256),
+    claims: AuthClaims = Depends(require_customer),
+    db: AsyncSession = Depends(get_session),
+) -> CustomerOrderPage:
+    try:
+        return await list_customer_orders(
+            db=db,
+            customer_id=claims.subject,
+            limit=limit,
+            cursor=cursor,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid cursor"
+        ) from exc
+
+
 @app.get("/api/v1/orders/{order_id}", response_model=OrderResponse)
 async def get_order(
     order_id: UUID,
-    claims: AuthClaims = Depends(current_user),
+    claims: AuthClaims = Depends(require_customer),
     db: AsyncSession = Depends(get_session),
 ) -> OrderResponse:
     return await order_response(db, await load_owned_order_or_404(db, order_id, claims.subject))
@@ -77,7 +138,7 @@ async def get_order(
 async def checkout(
     payload: CheckoutRequest,
     idempotency_key: str = Header(alias="Idempotency-Key", min_length=1, max_length=128),
-    claims: AuthClaims = Depends(current_user),
+    claims: AuthClaims = Depends(require_customer),
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: AsyncSession = Depends(get_session),
 ) -> OrderResponse:

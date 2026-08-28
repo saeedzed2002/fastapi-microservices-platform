@@ -1,8 +1,8 @@
 # Customer Service
 
-Customer-service owns customer profiles and addresses keyed by the identity
-user ID. It does not own passwords, refresh sessions, identity tables, or
-catalog/order data.
+Customer-service owns customer profiles, contact email, and addresses keyed by
+the identity user ID. It does not own passwords, refresh sessions, identity
+tables, or catalog/order data.
 
 ## Endpoints
 
@@ -31,3 +31,7 @@ The consumer creates or updates one local profile from each
 phone-only `v2` payload has no email address. Reprocessing either event does
 not create a second profile because the identity user ID is the customer
 primary key.
+
+Every profile and address endpoint requires the `customer` role. The optional
+contact email is normalized locally and is not an Identity login credential.
+Order obtains it only through the authenticated checkout snapshot contract.

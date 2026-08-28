@@ -36,3 +36,24 @@ def test_local_edge_resolves_compose_service_upstreams_at_request_time() -> None
     ):
         assert f"set ${upstream} " in config
         assert f"proxy_pass http://${upstream}" in config
+
+
+def test_local_edge_routes_identity_staff_operations() -> None:
+    root = Path(__file__).resolve().parents[1]
+    config = (root / "infrastructure" / "edge" / "nginx.conf").read_text(encoding="utf-8")
+
+    assert "location ^~ /api/v1/admin/" in config
+    assert "proxy_pass http://$identity_upstream;" in config
+
+
+def test_local_edge_keeps_websocket_and_login_rate_buckets_separate() -> None:
+    root = Path(__file__).resolve().parents[1]
+    config = (root / "infrastructure" / "edge" / "nginx.conf").read_text(encoding="utf-8")
+
+    assert "zone=edge_sensitive:10m rate=5r/m;" in config
+    assert "zone=edge_websocket:10m rate=10r/m;" in config
+    websocket_location = config.split("location = /api/v1/chat/ws {", maxsplit=1)[1].split(
+        "\n        }", maxsplit=1
+    )[0]
+    assert "limit_req zone=edge_websocket burst=20 nodelay;" in websocket_location
+    assert "limit_req zone=edge_sensitive" not in websocket_location

@@ -1,7 +1,18 @@
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
-from order_service.application import checkout_total, transition_order
+import pytest
+from fastapi import HTTPException
+
+from order_service.application import (
+    InvalidOrderCursor,
+    checkout_total,
+    decode_order_cursor,
+    encode_order_cursor,
+    required_customer_email,
+    transition_order,
+)
 from order_service.models import Order, OrderItem
 from order_service.workers.invoice_tasks import render_invoice_pdf
 
@@ -60,3 +71,23 @@ def test_invoice_pdf_is_rendered_from_order_snapshot() -> None:
     pdf = render_invoice_pdf(order=order, items=[item])
 
     assert pdf.startswith(b"%PDF")
+
+
+def test_order_cursor_round_trips_and_rejects_invalid_input() -> None:
+    order = Order(status="PENDING", tracking_code="ORD-TEST", currency="USD", total_amount=1)
+    order.id = uuid4()
+    order.created_at = datetime.now(UTC)
+
+    created_at, order_id = decode_order_cursor(encode_order_cursor(order))
+
+    assert created_at == order.created_at
+    assert order_id == order.id
+    with pytest.raises(InvalidOrderCursor):
+        decode_order_cursor("not-a-valid-cursor")
+
+
+def test_checkout_requires_a_real_customer_contact_email() -> None:
+    assert required_customer_email({"email": "customer@example.com"}) == "customer@example.com"
+
+    with pytest.raises(HTTPException, match="checkout email unavailable"):
+        required_customer_email({"email": None})

@@ -83,8 +83,9 @@ remain open.
 
 ### Customer and Notification preferences
 
-Phase 6 carries a checkout-time email contact snapshot only. User-controlled
-preferences and unsubscribe policy remain open before additional channels ship.
+ADR-021 resolves customer-owned contact email and its checkout-time snapshot.
+Email verification, user-controlled preferences, and unsubscribe policy remain
+open before additional channels ship.
 
 ### Order and Shipping status
 

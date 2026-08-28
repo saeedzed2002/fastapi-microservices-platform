@@ -81,8 +81,10 @@ docker compose -f infrastructure/compose/docker-compose.yml config
   service names dynamically; validate its configuration with `nginx -t` and
   wait for the bounded resolver cache before recreating edge.
 - A `429` is an edge source-IP limit. It is expected for repeated login,
-  OTP/password-reset, upload, or WebSocket-upgrade attempts. Wait for the
-  configured window and inspect the service-owned limit separately.
+  OTP/password-reset, upload, or WebSocket-upgrade attempts. Password/OTP and
+  WebSocket upgrades use separate buckets, so exhausting one does not consume
+  the other; wait for the applicable configured window and inspect the
+  service-owned limit separately.
 - A WebSocket failure requires checking the exact `/api/v1/chat/ws` path and
   the `Upgrade` headers; the access token still belongs in the first protocol
   frame, never in the URL.

@@ -21,4 +21,5 @@ Implemented: [Kafka dead-letter inspection and replay](kafka-dlq.md),
 [checkout and invoice recovery](checkout-saga.md),
 [invoice and notification recovery](invoice-notification.md), and
 [Chat realtime delivery and attachment access](chat-realtime.md), and
-[SMS.ir customer OTP delivery](sms-otp.md).
+[SMS.ir customer OTP delivery](sms-otp.md), and
+[staff operations and order review](admin-operations.md).

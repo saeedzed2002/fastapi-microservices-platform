@@ -4,8 +4,10 @@ FastAPI Microservices Platform is a backend-only, production-oriented e-commerce
 
 ## Project status
 
-The repository is currently in **Phase 7 — Realtime Chat**, with customer
-phone-OTP authentication being completed before the later Search phase.
+The repository has completed **Phase 7 — Realtime Chat**. Before the later
+Search phase, the current hardening increment adds customer order self-service,
+read-only staff order review, staff-account operations, and customer contact
+email snapshots for invoice delivery.
 
 The current increment adds a customer OTP flow that keeps raw codes in
 Identity-owned temporary Redis state, dispatches SMS through Notification's
@@ -95,6 +97,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [CI/CD strategy](docs/development/ci-cd.md)
 - [Invoice and notification runbook](docs/runbooks/invoice-notification.md)
 - [SMS OTP runbook](docs/runbooks/sms-otp.md)
+- [Staff operations runbook](docs/runbooks/admin-operations.md)
 - [Edge gateway runbook](docs/runbooks/edge-gateway.md)
 - [Phase 0 plan](docs/development/phase-0-plan.md)
 - [Phase 1 plan](docs/development/phase-1-plan.md)

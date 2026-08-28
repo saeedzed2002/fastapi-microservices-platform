@@ -26,3 +26,17 @@ async def current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid access token"
         ) from exc
+
+
+async def require_customer(claims: AuthClaims = Depends(current_user)) -> AuthClaims:
+    if "customer" not in claims.roles:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="customer role required")
+    return claims
+
+
+async def require_administrator(claims: AuthClaims = Depends(current_user)) -> AuthClaims:
+    if "admin" not in claims.roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="administrator role required"
+        )
+    return claims

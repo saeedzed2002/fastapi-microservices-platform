@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     service_name: str = "customer-service"
-    service_version: str = "0.2.0"
+    service_version: str = "0.3.0"
     environment: str = "local"
     database_url: str = (
         "postgresql+asyncpg://customer_service:customer-local-only@localhost:5432/customer_service"

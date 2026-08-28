@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -38,3 +39,51 @@ class OrderResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     items: list[OrderItemResponse]
+
+
+OrderStatus = Literal["PENDING", "INVENTORY_RESERVED", "PAYMENT_PENDING", "CONFIRMED", "CANCELLED"]
+
+
+class OrderSummaryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: OrderStatus
+    tracking_code: str
+    currency: str
+    total_amount: Decimal
+    created_at: datetime
+    updated_at: datetime
+
+
+class CustomerOrderPage(BaseModel):
+    items: list[OrderSummaryResponse]
+    next_cursor: str | None
+
+
+class OrderStateTransitionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    from_status: OrderStatus | None
+    to_status: OrderStatus
+    reason: str
+    created_at: datetime
+
+
+class InvoiceSummaryResponse(BaseModel):
+    status: str
+    generated_at: datetime | None
+
+
+class AdminOrderResponse(OrderResponse):
+    customer_id: UUID
+    customer_email: str | None
+    delivery_address: dict[str, str]
+    payment_method: str
+    transitions: list[OrderStateTransitionResponse]
+    invoice: InvoiceSummaryResponse | None
+
+
+class AdminOrderPage(BaseModel):
+    items: list[OrderSummaryResponse]
+    next_cursor: str | None

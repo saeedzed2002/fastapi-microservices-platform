@@ -31,8 +31,32 @@
       "kind": "service-openapi",
       "owner": "identity-service",
       "status": "active",
-      "notes": "Public customer OTP and administrator password authentication endpoints. Internal OTP delivery retrieval is intentionally excluded.",
+      "notes": "Public customer OTP and staff password authentication endpoints. Internal OTP delivery retrieval is intentionally excluded.",
       "schema": "openapi/identity-auth.v1.openapi.json"
+    },
+    {
+      "name": "identity.admin.v1",
+      "kind": "service-openapi",
+      "owner": "identity-service",
+      "status": "active",
+      "notes": "Administrator-only support-agent lifecycle API. The first administrator remains an interactive CLI bootstrap operation.",
+      "schema": "openapi/identity-admin.v1.openapi.json"
+    },
+    {
+      "name": "customer.profile.v1",
+      "kind": "service-openapi",
+      "owner": "customer-service",
+      "status": "active",
+      "notes": "Customer-owned contact profile API. The contact email is not an Identity credential and is required for checkout invoice email.",
+      "schema": "openapi/customer-profile.v1.openapi.json"
+    },
+    {
+      "name": "order.query.v1",
+      "kind": "service-openapi",
+      "owner": "order-service",
+      "status": "active",
+      "notes": "Customer-owned order history and administrator-only read-only operational review APIs.",
+      "schema": "openapi/order-query.v1.openapi.json"
     },
     {
       "name": "event-envelope.v1",

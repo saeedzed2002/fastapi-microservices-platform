@@ -225,6 +225,28 @@ source for the workspace.
 - Owner: platform engineering. Next review: before enabling a production SMS
   line, adopting a provider template, or `2026-09-25`, whichever occurs first.
 
+## Staff operations and customer contact selection evidence
+
+- `email-validator` `2.3.0` remains the selected stable direct runtime
+  dependency for `EmailStr` validation. Customer-service now declares the same
+  reviewed `>=2.3,<3` constraint as Identity so its independently built image
+  can validate and normalize customer contact emails. The official PyPI release
+  history identifies `2.3.0` as the current stable release on `2026-08-28`;
+  it is a universal Python wheel, `Unlicense`-licensed, and already pinned by
+  the workspace `uv.lock`.
+- Customer profile validation uses syntax/normalization without DNS
+  deliverability lookup. A profile write must not block on a mutable DNS
+  dependency; mailbox verification and unsubscribe policy remain separate
+  product decisions.
+- No new package, broker, image, or runtime is introduced. Identity reuses its
+  reviewed `redis-py` `8.1.0` client for a namespaced, fail-closed staff-login
+  limiter, while Order query pagination and cursor encoding use the Python
+  standard library and PostgreSQL indexes.
+- Official sources: [email-validator on PyPI](https://pypi.org/project/email-validator/)
+  and [email-validator release history](https://pypi.org/project/email-validator/#history).
+  Owner: platform engineering. Next review: before `Phase 8` or `2026-09-25`,
+  whichever occurs first.
+
 
 ## Edge selection evidence
 

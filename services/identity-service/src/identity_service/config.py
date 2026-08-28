@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     service_name: str = "identity-service"
-    service_version: str = "0.2.0"
+    service_version: str = "0.3.0"
     environment: str = "local"
     database_url: str = (
         "postgresql+asyncpg://identity_service:identity-local-only@localhost:5432/identity_service"
@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     otp_max_verify_attempts: int = Field(default=5, ge=1, le=10)
     otp_phone_rate_limit: int = Field(default=5, ge=1, le=20)
     otp_phone_rate_window_seconds: int = Field(default=3600, ge=60, le=86_400)
+    staff_login_max_failures: int = Field(default=5, ge=1, le=20)
+    staff_login_failure_window_seconds: int = Field(default=900, ge=60, le=86_400)
+    staff_login_lockout_seconds: int = Field(default=900, ge=60, le=86_400)
     otp_notification_base_url: str = "http://localhost:8007"
     otp_notification_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
     internal_otp_shared_secret: str | None = Field(default=None, min_length=32)

@@ -1,0 +1,37 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Customer Profile API",
+    "version": "v1",
+    "description": "A customer controls a contact email, display name, phone display value, and avatar reference. Contact email is not an Identity credential and must be saved before checkout."
+  },
+  "paths": {
+    "/api/v1/customers/me": {
+      "get": {
+        "summary": "Get the authenticated customer profile",
+        "security": [{"bearerAuth": []}],
+        "responses": {"200": {"description": "Customer profile", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CustomerProfile"}}}}, "403": {"description": "Customer role required"}, "404": {"description": "Profile projection not ready"}}
+      },
+      "put": {
+        "summary": "Replace the authenticated customer profile",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CustomerProfileUpdate"}}}},
+        "responses": {"200": {"description": "Customer profile saved", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CustomerProfile"}}}}, "403": {"description": "Customer role required"}}
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}},
+    "schemas": {
+      "CustomerProfileUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["display_name"],
+        "properties": {"display_name": {"type": "string", "minLength": 1, "maxLength": 120}, "email": {"type": ["string", "null"], "format": "email"}, "phone": {"type": ["string", "null"], "maxLength": 32}, "avatar_media_id": {"type": ["string", "null"], "format": "uuid"}}
+      },
+      "CustomerProfile": {
+        "allOf": [{"$ref": "#/components/schemas/CustomerProfileUpdate"}, {"type": "object", "required": ["id", "created_at", "updated_at"], "properties": {"id": {"type": "string", "format": "uuid"}, "created_at": {"type": "string", "format": "date-time"}, "updated_at": {"type": "string", "format": "date-time"}}}]
+      }
+    }
+  }
+}

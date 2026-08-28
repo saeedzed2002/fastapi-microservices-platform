@@ -1,13 +1,19 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class ProfileUpsert(BaseModel):
     display_name: str = Field(min_length=1, max_length=120)
+    email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=32)
     avatar_media_id: UUID | None = None
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: EmailStr | None) -> str | None:
+        return str(value).lower() if value is not None else None
 
 
 class CustomerResponse(BaseModel):

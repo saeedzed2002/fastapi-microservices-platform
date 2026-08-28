@@ -42,6 +42,24 @@ class RefreshSession(Base):
     replaced_by_session_id: Mapped[UUID | None] = mapped_column()
 
 
+class AuthenticationAuditEvent(Base):
+    __tablename__ = "authentication_audit_events"
+    __table_args__ = (
+        Index(
+            "ix_authentication_audit_events_target_occurred",
+            "target_user_id",
+            "occurred_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    actor_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    target_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    event_type: Mapped[str] = mapped_column(String(160))
+    details: Mapped[dict[str, str]] = mapped_column(JSON, default=dict)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
 class OutboxMessage(Base):
     __tablename__ = "outbox_messages"
 

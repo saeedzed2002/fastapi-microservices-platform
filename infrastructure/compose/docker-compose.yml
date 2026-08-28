@@ -136,6 +136,9 @@ services:
       IDENTITY_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       IDENTITY_KAFKA_PUBLISHER_ENABLED: "true"
       IDENTITY_OTP_REDIS_URL: redis://redis:6379/1
+      IDENTITY_STAFF_LOGIN_MAX_FAILURES: ${IDENTITY_STAFF_LOGIN_MAX_FAILURES:-5}
+      IDENTITY_STAFF_LOGIN_FAILURE_WINDOW_SECONDS: ${IDENTITY_STAFF_LOGIN_FAILURE_WINDOW_SECONDS:-900}
+      IDENTITY_STAFF_LOGIN_LOCKOUT_SECONDS: ${IDENTITY_STAFF_LOGIN_LOCKOUT_SECONDS:-900}
       IDENTITY_OTP_NOTIFICATION_BASE_URL: http://notification-service:8000
       IDENTITY_INTERNAL_OTP_SHARED_SECRET: ${PLATFORM_INTERNAL_OTP_SHARED_SECRET:-}
     depends_on:
@@ -268,7 +271,7 @@ services:
     build:
       context: ../..
       dockerfile: services/order-service/Dockerfile
-    image: fastapi-microservices-platform-order-service:0.6.1-local
+    image: fastapi-microservices-platform-order-service:0.7.0-local
     environment:
       ORDER_ENVIRONMENT: local
       ORDER_DATABASE_URL: postgresql+asyncpg://order_service:order-local-only@postgres:5432/order_service
@@ -421,7 +424,7 @@ services:
       retries: 12
 
   order-invoice-worker:
-    image: fastapi-microservices-platform-order-service:0.6.1-local
+    image: fastapi-microservices-platform-order-service:0.7.0-local
     pull_policy: never
     command: ["celery", "-A", "order_service.workers.celery_app:celery_app", "worker", "--loglevel=INFO", "--without-mingle", "--without-gossip", "-Q", "order.invoice"]
     environment:

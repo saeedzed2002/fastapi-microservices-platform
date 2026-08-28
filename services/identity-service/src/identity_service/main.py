@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
@@ -16,7 +16,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from identity_service.application import (
     OtpDeliveryUnavailable,
     OtpNotEligible,
+    SupportAgentAlreadyExists,
+    SupportAgentNotFound,
+    list_support_agents,
+    provision_support_agent,
     request_customer_otp,
+    update_support_agent_status,
     verify_customer_otp,
 )
 from identity_service.config import get_settings
@@ -32,6 +37,9 @@ from identity_service.schemas import (
     OtpRequestResponse,
     OtpVerifyRequest,
     RefreshRequest,
+    SupportAgentCreate,
+    SupportAgentResponse,
+    SupportAgentStatusUpdate,
     TokenResponse,
     UserResponse,
 )
@@ -42,6 +50,11 @@ from identity_service.security import (
     token_hash,
     verify_password,
 )
+from identity_service.staff_login_rate_limit import (
+    StaffLoginRateLimited,
+    StaffLoginRateLimiter,
+    StaffLoginRateLimitUnavailable,
+)
 from identity_service.workers.outbox_publisher import run_outbox_publisher
 from platform_auth import AuthClaims, TokenError, decode_access_token, encode_access_token
 
@@ -50,6 +63,11 @@ logger = logging.getLogger(settings.service_name)
 bearer = HTTPBearer(auto_error=False)
 otp_state_store = OtpStateStore(settings)
 otp_notification_gateway = NotificationOtpGateway(settings)
+staff_login_rate_limiter = StaffLoginRateLimiter(settings)
+_DUMMY_PASSWORD_HASH = (
+    "$argon2id$v=19$m=65536,t=3,p=4$Qzj/JYfZ/ZC5F/LkrNMdZw$"
+    "ucEKiYXYn4tR0EYAW272goP7D0salWXWX4lr71cI1Mc"
+)
 
 
 @asynccontextmanager
@@ -66,6 +84,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await asyncio.gather(publisher_task, return_exceptions=True)
     await otp_notification_gateway.close()
     await otp_state_store.close()
+    await staff_login_rate_limiter.close()
     await dispose_engine()
     logger.info("service_stopped")
 
@@ -148,6 +167,20 @@ async def current_user(
         ) from exc
 
 
+async def current_active_administrator(
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> User:
+    if "admin" not in claims.roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="administrator role required"
+        )
+    user = await db.get(User, claims.subject)
+    if user is None or user.status != "active" or "admin" not in user.roles:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user is inactive")
+    return user
+
+
 @app.get("/health/live", tags=["health"])
 async def liveness() -> dict[str, str]:
     return {"status": "ok"}
@@ -193,16 +226,69 @@ async def register() -> None:
 
 @app.post("/api/v1/auth/login", response_model=TokenResponse)
 async def login(payload: LoginRequest, db: AsyncSession = Depends(get_session)) -> TokenResponse:
+    try:
+        await staff_login_rate_limiter.check_allowed(email=payload.email)
+    except StaffLoginRateLimited as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="staff login rate limit exceeded",
+            headers={"Retry-After": str(settings.staff_login_lockout_seconds)},
+        ) from exc
+    except StaffLoginRateLimitUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="staff login is temporarily unavailable",
+        ) from exc
+
     user = await db.scalar(select(User).where(User.email == payload.email))
+    password_valid = verify_password(
+        payload.password,
+        user.password_hash
+        if user is not None and user.password_hash is not None
+        else _DUMMY_PASSWORD_HASH,
+    )
+    staff_eligible = not (
+        user is None
+        or user.status != "active"
+        or not {"admin", "support_agent"}.intersection(user.roles)
+        or user.password_hash is None
+    )
+    if not staff_eligible or not password_valid:
+        await db.rollback()
+        try:
+            retry_after = await staff_login_rate_limiter.record_failure(email=payload.email)
+        except StaffLoginRateLimitUnavailable as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="staff login is temporarily unavailable",
+            ) from exc
+        if retry_after is not None:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="staff login rate limit exceeded",
+                headers={"Retry-After": str(retry_after)},
+            )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
+
+    if user is None:
+        raise AssertionError("eligible staff login requires a user")
+    user_id = user.id
+    await db.rollback()
+    try:
+        await staff_login_rate_limiter.record_success(email=payload.email)
+    except StaffLoginRateLimitUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="staff login is temporarily unavailable",
+        ) from exc
+    user = await db.get(User, user_id)
     if (
         user is None
         or user.status != "active"
-        or "admin" not in user.roles
+        or not {"admin", "support_agent"}.intersection(user.roles)
         or user.password_hash is None
-        or not verify_password(payload.password, user.password_hash)
     ):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
-
     refresh_token = await create_session(db, user=user)
     await db.commit()
     return TokenResponse(
@@ -211,6 +297,69 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_session)) 
         refresh_token=refresh_token,
         user=user_response(user),
     )
+
+
+@app.get("/api/v1/admin/support-agents", response_model=list[SupportAgentResponse])
+async def get_support_agents(
+    _: User = Depends(current_active_administrator),
+    limit: int = Query(default=50, ge=1, le=100),
+    db: AsyncSession = Depends(get_session),
+) -> list[SupportAgentResponse]:
+    return [
+        SupportAgentResponse.model_validate(agent)
+        for agent in await list_support_agents(db=db, limit=limit)
+    ]
+
+
+@app.post(
+    "/api/v1/admin/support-agents",
+    response_model=SupportAgentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_support_agent(
+    payload: SupportAgentCreate,
+    actor: User = Depends(current_active_administrator),
+    db: AsyncSession = Depends(get_session),
+) -> SupportAgentResponse:
+    try:
+        agent = await provision_support_agent(
+            db=db,
+            actor_user_id=actor.id,
+            email=payload.email,
+            password=payload.password,
+        )
+        await db.commit()
+    except SupportAgentAlreadyExists as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="identity account already uses this email"
+        ) from exc
+    await db.refresh(agent)
+    return SupportAgentResponse.model_validate(agent)
+
+
+@app.patch("/api/v1/admin/support-agents/{support_agent_id}", response_model=SupportAgentResponse)
+async def set_support_agent_status(
+    support_agent_id: UUID,
+    payload: SupportAgentStatusUpdate,
+    actor: User = Depends(current_active_administrator),
+    db: AsyncSession = Depends(get_session),
+) -> SupportAgentResponse:
+    try:
+        agent = await update_support_agent_status(
+            db=db,
+            actor_user_id=actor.id,
+            support_agent_id=support_agent_id,
+            status=payload.status,
+        )
+    except SupportAgentNotFound as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="support agent not found"
+        ) from exc
+    await db.commit()
+    await db.refresh(agent)
+    return SupportAgentResponse.model_validate(agent)
 
 
 @app.post(

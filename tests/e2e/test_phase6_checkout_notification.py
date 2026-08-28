@@ -52,10 +52,11 @@ def test_checkout_generates_invoice_and_sends_notification() -> None:
     sku = f"P6-{suffix}"
 
     with httpx.Client(timeout=10.0, verify=False) as client:
+        customer_email = f"phase6-{suffix}@example.com"
         client.put(
             f"{base_url}/api/v1/customers/me",
             headers=user_headers,
-            json={"display_name": "Phase Six E2E"},
+            json={"display_name": "Phase Six E2E", "email": customer_email},
         ).raise_for_status()
         address = client.post(
             f"{base_url}/api/v1/customers/me/addresses",
@@ -114,6 +115,21 @@ def test_checkout_generates_invoice_and_sends_notification() -> None:
         )
         order.raise_for_status()
         order_id = order.json()["id"]
+
+        history = client.get(f"{base_url}/api/v1/orders", headers=user_headers)
+        history.raise_for_status()
+        assert [item["id"] for item in history.json()["items"]] == [order_id]
+
+        forbidden_administrator_query = client.get(
+            f"{base_url}/api/v1/orders/admin", headers=user_headers
+        )
+        assert forbidden_administrator_query.status_code == 403
+
+        administrator_order = client.get(
+            f"{base_url}/api/v1/orders/admin/{order_id}", headers=admin_headers
+        )
+        administrator_order.raise_for_status()
+        assert administrator_order.json()["customer_email"] == customer_email
 
         def order_is_confirmed() -> bool:
             response = client.get(f"{base_url}/api/v1/orders/{order_id}", headers=user_headers)

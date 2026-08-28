@@ -8,7 +8,7 @@ from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from customer_service.application import provision_customer
-from customer_service.auth import current_user
+from customer_service.auth import require_customer
 from customer_service.config import get_settings
 from customer_service.db import dispose_engine, get_session
 from customer_service.models import Address, Customer
@@ -58,7 +58,7 @@ async def readiness(db: AsyncSession = Depends(get_session)) -> dict[str, str]:
 
 @app.get("/api/v1/customers/me", response_model=CustomerResponse)
 async def get_profile(
-    claims: AuthClaims = Depends(current_user),
+    claims: AuthClaims = Depends(require_customer),
     db: AsyncSession = Depends(get_session),
 ) -> CustomerResponse:
     customer = await db.get(Customer, claims.subject)
@@ -72,13 +72,14 @@ async def get_profile(
 @app.put("/api/v1/customers/me", response_model=CustomerResponse)
 async def upsert_profile(
     payload: ProfileUpsert,
-    claims: AuthClaims = Depends(current_user),
+    claims: AuthClaims = Depends(require_customer),
     db: AsyncSession = Depends(get_session),
 ) -> CustomerResponse:
     customer = await db.get(Customer, claims.subject)
     if customer is None:
         customer = await provision_customer(db, user_id=claims.subject, email=None)
     customer.display_name = payload.display_name
+    customer.email = payload.email
     customer.phone = payload.phone
     customer.avatar_media_id = payload.avatar_media_id
     await db.commit()
@@ -88,7 +89,7 @@ async def upsert_profile(
 
 @app.get("/api/v1/customers/me/addresses", response_model=list[AddressResponse])
 async def list_addresses(
-    claims: AuthClaims = Depends(current_user),
+    claims: AuthClaims = Depends(require_customer),
     db: AsyncSession = Depends(get_session),
 ) -> list[AddressResponse]:
     rows = await db.scalars(
@@ -104,7 +105,7 @@ async def list_addresses(
 )
 async def create_address(
     payload: AddressCreate,
-    claims: AuthClaims = Depends(current_user),
+    claims: AuthClaims = Depends(require_customer),
     db: AsyncSession = Depends(get_session),
 ) -> AddressResponse:
     if await db.get(Customer, claims.subject) is None:
@@ -126,7 +127,7 @@ async def create_address(
 async def update_address(
     address_id: str,
     payload: AddressUpdate,
-    claims: AuthClaims = Depends(current_user),
+    claims: AuthClaims = Depends(require_customer),
     db: AsyncSession = Depends(get_session),
 ) -> AddressResponse:
     from uuid import UUID
@@ -157,7 +158,7 @@ async def update_address(
 @app.delete("/api/v1/customers/me/addresses/{address_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_address(
     address_id: str,
-    claims: AuthClaims = Depends(current_user),
+    claims: AuthClaims = Depends(require_customer),
     db: AsyncSession = Depends(get_session),
 ) -> Response:
     from uuid import UUID

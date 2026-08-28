@@ -10,19 +10,21 @@ Owns accounts, credential hashes, access/refresh-token lifecycle, device/session
 
 Does not own customer profiles, addresses, preferences, carts, orders, or payment records.
 
-Customers authenticate with phone and OTP; administrators authenticate with
-email and password. Identity owns the normalized phone, code hash, verification
-attempts, cooldown, rate limit, and short-lived delivery code in its own Redis
-namespace. It asks Notification for directed SMS delivery through an
-authenticated private API, but never exposes raw OTP values in Kafka, durable
-storage, logs, or public responses. It emits only the post-verification
-`identity.user_registered.v2` domain fact.
+Customers authenticate with phone and OTP; `admin` and `support_agent` staff
+authenticate with email and password. Identity owns staff lifecycle, the
+normalized phone, code hash, verification attempts, cooldown, rate limits, and
+short-lived delivery code in its own Redis namespace. It asks Notification for
+directed SMS delivery through an authenticated private API, but never exposes
+raw OTP values in Kafka, durable storage, logs, or public responses. It emits
+only the post-verification `identity.user_registered.v2` domain fact.
 
 Primary interactions are synchronous authentication APIs, downstream token validation, asynchronous account lifecycle events, and Redis-backed short-lived security state where its failure policy is explicit.
 
 ### Customer Service
 
-Owns customer profiles, addresses, general preferences, and customer-specific business data.
+Owns customer profiles, contact email, addresses, general preferences, and
+customer-specific business data. A contact email is not an Identity credential;
+it is customer-owned profile data used by a future checkout snapshot.
 
 Does not own credentials, token rotation, authentication roles, orders, or notification delivery attempts.
 
@@ -58,7 +60,10 @@ Owns checkout acceptance, orders, immutable purchase snapshots, order items, sta
 
 Does not own catalog truth, inventory reservations, provider-facing payment truth, notification delivery, user-upload media lifecycle, or file bytes in PostgreSQL. Order does own the invoice business lifecycle, metadata, and storage key for generated invoices; the bytes live in object storage through its `ObjectStorage` adapter.
 
-It exposes checkout/history APIs, writes critical events through an outbox, consumes Inventory/Payment results, and owns invoice-generation intent after confirmation.
+It exposes customer-owned checkout/history APIs and a separate read-only
+administrator order-review API, writes critical events through an outbox,
+consumes Inventory/Payment results, and owns invoice-generation intent after
+confirmation.
 
 ### Payment Service
 

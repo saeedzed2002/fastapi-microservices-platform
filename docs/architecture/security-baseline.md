@@ -15,8 +15,8 @@ Security is enforced at every service boundary and throughout delivery; the edge
   Redis, retain the raw code only in a separate short-lived Identity delivery
   key, and fail closed when that security state is unavailable. The raw code
   must not enter PostgreSQL, Kafka, RabbitMQ, Celery payloads, logs, or traces.
-- Allow password login only for an existing administrator role. Customer
-  registration and sign-in use the phone OTP endpoints.
+- Allow password login only for an existing `admin` or `support_agent` role.
+  Customer registration and sign-in use the phone OTP endpoints.
 
 The signing algorithm, JWKS/key-distribution mechanism, claim set, and service-to-service identity model are Phase 2 design decisions.
 
@@ -31,11 +31,11 @@ The signing algorithm, JWKS/key-distribution mechanism, claim set, and service-t
 ## Abuse and request controls
 
 - Configure request, header, and body limits at both edge and service layers.
-- Apply Redis-backed rate limits to login, OTP, password reset, public search, uploads, and WebSocket connections.
+- Apply Redis-backed rate limits to staff login, OTP, password reset, public search, uploads, and WebSocket connections.
 - Document fail-open/fail-closed behavior per limit; authentication abuse controls cannot silently disappear.
 - Chat WebSocket connection limits are fail-closed if Redis is unavailable. Chat never accepts bearer tokens in its URL; the first versioned frame authenticates the connection before any Chat operation.
 - Use narrow CORS allowlists and explicit credential behavior per environment.
-- Apply appropriate security headers and TLS at the edge. Local Nginx accepts only `TLSv1.2` and `TLSv1.3`, forwards a generated request ID and trusted direct-peer address, and applies documented per-instance IP limits; these controls do not replace service-owned Redis-backed limits.
+- Apply appropriate security headers and TLS at the edge. Local Nginx accepts only `TLSv1.2` and `TLSv1.3`, forwards a generated request ID and trusted direct-peer address, and applies documented per-instance IP limits. Its password/OTP and WebSocket-upgrade buckets are separate so login abuse on a shared source IP cannot consume a connected customer's Chat-upgrade allowance; these controls do not replace service-owned Redis-backed limits.
 
 ## Upload and object security
 

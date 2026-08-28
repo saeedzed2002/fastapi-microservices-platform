@@ -568,12 +568,13 @@ wheels = [
 
 [[package]]
 name = "customer-service"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "services/customer-service" }
 dependencies = [
     { name = "aiokafka" },
     { name = "alembic" },
     { name = "asyncpg" },
+    { name = "email-validator" },
     { name = "fastapi" },
     { name = "platform-auth" },
     { name = "platform-messaging" },
@@ -588,6 +589,7 @@ requires-dist = [
     { name = "aiokafka", specifier = ">=0.14,<0.15" },
     { name = "alembic", specifier = ">=1.19.1,<2" },
     { name = "asyncpg", specifier = ">=0.31,<0.32" },
+    { name = "email-validator", specifier = ">=2.3,<3" },
     { name = "fastapi", specifier = ">=0.141.1,<0.142" },
     { name = "platform-auth", editable = "libs/platform-auth" },
     { name = "platform-messaging", editable = "libs/platform-messaging" },
@@ -783,7 +785,7 @@ wheels = [
 
 [[package]]
 name = "identity-service"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "services/identity-service" }
 dependencies = [
     { name = "aiokafka" },
@@ -1170,7 +1172,7 @@ requires-dist = [
 
 [[package]]
 name = "order-service"
-version = "0.6.0"
+version = "0.7.0"
 source = { editable = "services/order-service" }
 dependencies = [
     { name = "aiokafka" },
