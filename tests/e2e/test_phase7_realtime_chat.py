@@ -104,10 +104,9 @@ async def _send_and_receive_message(
                 }
             )
         )
-        assert (
-            (await _receive_frame_type(recipient_socket, "chat.authenticated.v1"))["type"]
-            == "chat.authenticated.v1"
-        )
+        assert (await _receive_frame_type(recipient_socket, "chat.authenticated.v1"))[
+            "type"
+        ] == "chat.authenticated.v1"
         async with connect(websocket_url, ssl=websocket_ssl) as sender_socket:
             await sender_socket.send(
                 json.dumps(
@@ -118,10 +117,9 @@ async def _send_and_receive_message(
                     }
                 )
             )
-            assert (
-                (await _receive_frame_type(sender_socket, "chat.authenticated.v1"))["type"]
-                == "chat.authenticated.v1"
-            )
+            assert (await _receive_frame_type(sender_socket, "chat.authenticated.v1"))[
+                "type"
+            ] == "chat.authenticated.v1"
             frame = {
                 "type": "chat.send_message.v1",
                 "request_id": str(request_id),
