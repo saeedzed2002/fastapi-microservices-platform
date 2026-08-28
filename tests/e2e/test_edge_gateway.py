@@ -32,7 +32,7 @@ def test_edge_routes_tls_headers_and_sensitive_rate_limit() -> None:
         internal = client.get(f"{base_url}/api/internal/v1/media/assets")
         assert internal.status_code == 404
 
-        responses = [client.post(f"{base_url}/api/v1/auth/login", json={}) for _ in range(6)]
+        responses = [client.post(f"{base_url}/api/v1/auth/login", json={}) for _ in range(12)]
         assert responses[-1].status_code == 429
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as direct_api_socket:
