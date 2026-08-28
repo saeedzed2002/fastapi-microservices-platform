@@ -100,7 +100,9 @@ def test_checkout_generates_invoice_and_sends_notification() -> None:
             headers=admin_headers,
             json={"sku": sku, "initial_quantity": 2},
         ).raise_for_status()
-        previous_messages = len(client.get(f"{mailpit_base_url}/api/v1/messages").json()["messages"])
+        previous_messages = len(
+            client.get(f"{mailpit_base_url}/api/v1/messages").json()["messages"]
+        )
         order = client.post(
             f"{base_url}/api/v1/orders",
             headers={**user_headers, "Idempotency-Key": f"phase6-{suffix}"},
