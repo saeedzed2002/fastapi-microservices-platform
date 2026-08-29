@@ -9,13 +9,7 @@ param(
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $uvPath = Join-Path $env:USERPROFILE ".local\bin\uv.exe"
-$composeFile = Join-Path $repoRoot "infrastructure\compose\docker-compose.yml"
-$composeEnvironmentFile = Join-Path $repoRoot ".env"
-$composeArguments = @("-f", $composeFile)
-
-if (Test-Path -LiteralPath $composeEnvironmentFile) {
-    $composeArguments = @("--env-file", $composeEnvironmentFile) + $composeArguments
-}
+$composeArguments = @()
 
 if (-not (Test-Path $uvPath)) {
     throw "uv was not found at $uvPath. Install the verified version documented in docs/development/toolchain.md."

@@ -2,6 +2,7 @@ import asyncio
 from datetime import UTC, datetime
 from uuid import uuid4
 
+import httpx
 import pytest
 
 from order_service.application import wait_for_payment_pending
@@ -14,6 +15,7 @@ from order_service.main import app
 from order_service.models import Order
 from order_service.payment_gateway import (
     PaymentGatewayUnavailable,
+    _payment_error_detail,
     parse_payment_redirect,
 )
 
@@ -53,6 +55,12 @@ def test_payment_redirect_requires_a_https_url_and_expiry() -> None:
         parse_payment_redirect(
             {"redirect_url": "http://sandbox.zarinpal.com/pg/StartPay/S123", "expires_at": "bad"}
         )
+
+
+def test_payment_provider_configuration_error_is_identifiable() -> None:
+    response = httpx.Response(503, json={"detail": "payment provider is not configured"})
+
+    assert _payment_error_detail(response) == "payment provider is not configured"
 
 
 def test_cart_checkout_route_is_present_in_order_openapi() -> None:

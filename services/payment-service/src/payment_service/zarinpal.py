@@ -9,7 +9,7 @@ class ZarinpalNotConfigured(RuntimeError):
 
 
 class ZarinpalUnavailable(RuntimeError):
-    pass
+    """A transport or malformed-response failure for which no authority is trusted."""
 
 
 class ZarinpalRejected(RuntimeError):
@@ -105,15 +105,15 @@ class ZarinpalClient:
             ) as client:
                 response = await client.post(f"{self._api_base_url}{path}", json=payload)
         except httpx.RequestError as exc:
-            raise ZarinpalUnavailable from exc
+            raise ZarinpalUnavailable("network_request_error") from exc
         if response.status_code >= 500:
-            raise ZarinpalUnavailable
+            raise ZarinpalUnavailable("provider_http_5xx")
         try:
             decoded = response.json()
         except ValueError as exc:
-            raise ZarinpalUnavailable from exc
+            raise ZarinpalUnavailable("provider_invalid_json") from exc
         if not isinstance(decoded, dict):
-            raise ZarinpalUnavailable
+            raise ZarinpalUnavailable("provider_invalid_response")
         if response.status_code >= 400:
             raise ZarinpalRejected(_error_code(decoded))
         return decoded

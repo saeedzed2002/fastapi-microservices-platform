@@ -137,15 +137,17 @@ listener `http://localhost` redirects to TLS. API services no longer publish hos
 MinIO `9000` and the Mailpit UI `8025` remain direct local development endpoints.
 `dev-up` first builds API images and then starts Compose; this lets
 the Invoice and Notification workers consume the same built service images.
-Use `scripts/platform.ps1` for repeatable local tasks.
+Run Docker Compose directly from the repository root. The ignored root `.env`
+sets `COMPOSE_FILE` to the canonical Compose configuration, so no `--env-file`
+or `-f` argument is needed.
 
     pwsh -File .\scripts\platform.ps1 -Task install
     pwsh -File .\scripts\platform.ps1 -Task test
     pwsh -NoProfile -File .\scripts\new_local_edge_certificate.ps1
-    pwsh -File .\scripts\platform.ps1 -Task dev-up
-    pwsh -File .\scripts\platform.ps1 -Task dev-stop
-    pwsh -File .\scripts\platform.ps1 -Task dev-start
-    pwsh -File .\scripts\platform.ps1 -Task dev-recreate
+    docker compose up -d --build
+    docker compose stop
+    docker compose start
+    docker compose up -d --force-recreate
     pwsh -File .\scripts\platform.ps1 -Task migrate-identity
     pwsh -File .\scripts\platform.ps1 -Task migrate-customer
     pwsh -File .\scripts\platform.ps1 -Task migrate-catalog
@@ -158,11 +160,11 @@ Use `scripts/platform.ps1` for repeatable local tasks.
     pwsh -File .\scripts\platform.ps1 -Task migrate-chat
     $env:RUN_E2E = "1"; uv run pytest tests/e2e/test_phase6_checkout_notification.py
 
-`platform.ps1` always resolves the ignored root `.env` from the script's
-repository location, not from the current PowerShell directory. Use
-`dev-stop` and `dev-start` for ordinary local shutdown and restart; they retain
-the existing containers and their environment. Use `dev-recreate` only after
-changing `.env` or Compose configuration. `dev-down` removes the containers.
+For ordinary local shutdown and restart, use `docker compose stop` and
+`docker compose start`; they retain the existing containers and their
+environment. After changing `.env` or Compose configuration, use
+`docker compose up -d --force-recreate`. `docker compose down` removes the
+containers. `scripts/platform.ps1` remains available as an optional task runner.
 
 ## License
 

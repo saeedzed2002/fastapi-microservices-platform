@@ -142,7 +142,15 @@ async def start_zarinpal(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="payment unavailable"
         ) from exc
-    except (ZarinpalNotConfigured, ZarinpalUnavailable) as exc:
+    except ZarinpalNotConfigured as exc:
+        logger.error("zarinpal_provider_not_configured")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="payment provider is not configured",
+        ) from exc
+    except ZarinpalUnavailable as exc:
+        cause_name = type(exc.__cause__).__name__ if exc.__cause__ is not None else "none"
+        logger.warning("zarinpal_provider_unavailable reason=%s cause=%s", str(exc), cause_name)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="payment provider unavailable"
         ) from exc
@@ -183,7 +191,15 @@ async def zarinpal_callback(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="payment not ready"
         ) from exc
-    except (ZarinpalNotConfigured, ZarinpalUnavailable) as exc:
+    except ZarinpalNotConfigured as exc:
+        logger.error("zarinpal_provider_not_configured")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="payment provider is not configured",
+        ) from exc
+    except ZarinpalUnavailable as exc:
+        cause_name = type(exc.__cause__).__name__ if exc.__cause__ is not None else "none"
+        logger.warning("zarinpal_provider_unavailable reason=%s cause=%s", str(exc), cause_name)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="payment provider unavailable"
         ) from exc

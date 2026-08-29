@@ -17,6 +17,10 @@ class PaymentProviderRejected(RuntimeError):
     pass
 
 
+class PaymentProviderNotConfigured(RuntimeError):
+    pass
+
+
 @dataclass(frozen=True)
 class PaymentRedirect:
     redirect_url: str
@@ -41,6 +45,15 @@ def parse_payment_redirect(payload: object) -> PaymentRedirect:
         raise PaymentGatewayUnavailable from exc
 
 
+def _payment_error_detail(response: httpx.Response) -> str | None:
+    try:
+        payload = response.json()
+    except ValueError:
+        return None
+    detail = payload.get("detail") if isinstance(payload, dict) else None
+    return detail if isinstance(detail, str) else None
+
+
 async def start_zarinpal_checkout(
     *, base_url: str, timeout_seconds: float, order_id: UUID, access_token: str
 ) -> PaymentRedirect:
@@ -56,6 +69,10 @@ async def start_zarinpal_checkout(
         raise PaymentNotReady
     if response.status_code == 502:
         raise PaymentProviderRejected
+    if response.status_code == 503:
+        if _payment_error_detail(response) == "payment provider is not configured":
+            raise PaymentProviderNotConfigured
+        raise PaymentGatewayUnavailable
     if response.status_code != 200:
         raise PaymentGatewayUnavailable
     try:

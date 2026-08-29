@@ -256,6 +256,10 @@ async def _prepare_zarinpal_request(
             raise PaymentNotReady
         await db.commit()
         return intent, attempt.authority
+    if intent.status in {"AWAITING_CUSTOMER", "REQUESTING"}:
+        authority = await _recover_requesting_authority(db, intent)
+        if authority is not None:
+            return intent, authority
     if intent.status in {"REQUESTING", "VERIFYING"}:
         await db.commit()
         raise PaymentRequestInProgress
@@ -265,6 +269,7 @@ async def _prepare_zarinpal_request(
     if intent.status != "AWAITING_CUSTOMER":
         await db.commit()
         raise PaymentNotReady
+    intent.status = "REQUESTING"
     db.add(
         PaymentAttempt(
             intent_id=intent.id,
@@ -278,6 +283,34 @@ async def _prepare_zarinpal_request(
     )
     await db.commit()
     return intent, None
+
+
+async def _recover_requesting_authority(db: AsyncSession, intent: PaymentIntent) -> str | None:
+    """Return a durable provider authority left before a local state transition.
+
+    An authority is enough to resume the browser redirect without making another
+    provider request. A request without an authority has an unknown provider
+    outcome, so it remains in progress instead of risking a duplicate charge.
+    """
+    attempt = await db.scalar(
+        select(PaymentAttempt)
+        .where(PaymentAttempt.intent_id == intent.id, PaymentAttempt.status == "REQUESTING")
+        .order_by(PaymentAttempt.created_at.desc())
+        .with_for_update()
+        .limit(1)
+    )
+    if attempt is None:
+        return None
+    if attempt.authority is None:
+        intent.status = "REQUESTING"
+        await db.commit()
+        return None
+
+    attempt.status = "PENDING_CUSTOMER"
+    intent.status = "PENDING_CUSTOMER"
+    intent.provider_reference = f"zarinpal:{attempt.authority}"
+    await db.commit()
+    return attempt.authority
 
 
 async def _record_zarinpal_rejection(

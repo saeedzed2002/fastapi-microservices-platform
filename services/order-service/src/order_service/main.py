@@ -34,6 +34,7 @@ from order_service.db import dispose_engine, get_session, get_session_factory
 from order_service.payment_gateway import (
     PaymentGatewayUnavailable,
     PaymentNotReady,
+    PaymentProviderNotConfigured,
     PaymentProviderRejected,
     start_zarinpal_checkout,
 )
@@ -295,6 +296,11 @@ async def checkout_cart_with_zarinpal(
     except PaymentProviderRejected as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail="payment provider rejected request"
+        ) from exc
+    except PaymentProviderNotConfigured as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="payment provider is not configured",
         ) from exc
     except PaymentGatewayUnavailable as exc:
         raise HTTPException(

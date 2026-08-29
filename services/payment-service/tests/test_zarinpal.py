@@ -1,7 +1,9 @@
 import asyncio
 import json
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import httpx
@@ -9,6 +11,7 @@ import pytest
 
 from payment_service.application import (
     PaymentRequestInProgress,
+    _prepare_zarinpal_request,
     _record_zarinpal_cancellation,
     start_zarinpal_payment,
 )
@@ -16,6 +19,7 @@ from payment_service.zarinpal import (
     ZarinpalClient,
     ZarinpalNotConfigured,
     ZarinpalRejected,
+    ZarinpalUnavailable,
 )
 
 
@@ -91,6 +95,25 @@ def test_zarinpal_requires_explicit_merchant_configuration() -> None:
     asyncio.run(exercise())
 
 
+def test_zarinpal_transport_failure_has_a_safe_reason() -> None:
+    async def handler(_: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection failed")
+
+    async def exercise() -> None:
+        client = ZarinpalClient(
+            merchant_id="merchant",
+            sandbox=True,
+            callback_url="https://localhost/callback",
+            timeout_seconds=10,
+            transport=httpx.MockTransport(handler),
+        )
+
+        with pytest.raises(ZarinpalUnavailable, match="network_request_error"):
+            await client.create_payment(amount=1, description="Order test")
+
+    asyncio.run(exercise())
+
+
 def test_missing_merchant_does_not_create_a_requesting_attempt() -> None:
     async def exercise() -> None:
         client = ZarinpalClient(
@@ -111,6 +134,72 @@ def test_missing_merchant_does_not_create_a_requesting_attempt() -> None:
 
         db.scalar.assert_not_awaited()
         db.commit.assert_not_awaited()
+
+    asyncio.run(exercise())
+
+
+def test_requesting_authority_is_recovered_without_a_second_provider_request() -> None:
+    async def exercise() -> None:
+        intent = SimpleNamespace(
+            id=uuid4(),
+            order_id=uuid4(),
+            status="AWAITING_CUSTOMER",
+            method="zarinpal",
+            currency="IRT",
+            amount=Decimal("150000"),
+            provider_reference="zarinpal-pending-test",
+            expires_at=datetime.now(UTC) + timedelta(minutes=10),
+        )
+        attempt = SimpleNamespace(status="REQUESTING", authority="S000000000")
+        db = SimpleNamespace(
+            scalar=AsyncMock(side_effect=[intent, attempt]),
+            add=Mock(),
+            commit=AsyncMock(),
+        )
+
+        recovered_intent, authority = await _prepare_zarinpal_request(
+            db,
+            order_id=intent.order_id,
+            expected_currency="IRT",
+        )
+
+        assert recovered_intent is intent
+        assert authority == "S000000000"
+        assert attempt.status == "PENDING_CUSTOMER"
+        assert intent.status == "PENDING_CUSTOMER"
+        assert intent.provider_reference == "zarinpal:S000000000"
+        db.add.assert_not_called()
+
+    asyncio.run(exercise())
+
+
+def test_new_zarinpal_request_marks_intent_requesting_before_provider_call() -> None:
+    async def exercise() -> None:
+        intent = SimpleNamespace(
+            id=uuid4(),
+            order_id=uuid4(),
+            status="AWAITING_CUSTOMER",
+            method="zarinpal",
+            currency="IRT",
+            amount=Decimal("150000"),
+            expires_at=datetime.now(UTC) + timedelta(minutes=10),
+        )
+        db = SimpleNamespace(
+            scalar=AsyncMock(side_effect=[intent, None]),
+            add=Mock(),
+            commit=AsyncMock(),
+        )
+
+        prepared_intent, authority = await _prepare_zarinpal_request(
+            db,
+            order_id=intent.order_id,
+            expected_currency="IRT",
+        )
+
+        assert prepared_intent is intent
+        assert authority is None
+        assert intent.status == "REQUESTING"
+        db.add.assert_called_once()
 
     asyncio.run(exercise())
 
