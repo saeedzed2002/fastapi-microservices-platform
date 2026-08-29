@@ -6,8 +6,11 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from catalog_service.models import Product, ProductMedia, ProductVariant
+from catalog_service.models import Category, Product, ProductMedia, ProductVariant
 from catalog_service.schemas import (
+    CategoryCreate,
+    CategoryResponse,
+    CategoryUpdate,
     CheckoutVariantResponse,
     ProductCreate,
     ProductMediaAttach,
@@ -16,6 +19,135 @@ from catalog_service.schemas import (
     VariantCreate,
     VariantResponse,
 )
+
+
+async def load_category_or_404(db: AsyncSession, category_id: UUID) -> Category:
+    category = await db.get(Category, category_id)
+    if category is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="category not found")
+    return category
+
+
+async def load_category_by_slug_or_404(db: AsyncSession, slug: str) -> Category:
+    category = await db.scalar(select(Category).where(Category.slug == slug))
+    if category is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="category not found")
+    return category
+
+
+async def _validate_category_parent(
+    db: AsyncSession, category: Category | None, parent_id: UUID | None
+) -> None:
+    if parent_id is None:
+        return
+
+    if category is not None and parent_id == category.id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="category cannot be its own parent",
+        )
+
+    parent = await load_category_or_404(db, parent_id)
+    if category is None:
+        return
+
+    visited: set[UUID] = set()
+    current = parent
+    while True:
+        if current.id == category.id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="category parent cannot be a descendant",
+            )
+        if current.id in visited:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="category hierarchy is inconsistent",
+            )
+        visited.add(current.id)
+        if current.parent_id is None:
+            return
+        current = await load_category_or_404(db, current.parent_id)
+
+
+async def category_response(category: Category) -> CategoryResponse:
+    return CategoryResponse.model_validate(category)
+
+
+async def list_categories(db: AsyncSession) -> list[CategoryResponse]:
+    categories = await db.scalars(select(Category).order_by(Category.name, Category.created_at))
+    return [await category_response(category) for category in categories]
+
+
+async def create_category(db: AsyncSession, payload: CategoryCreate) -> Category:
+    await _validate_category_parent(db, None, payload.parent_id)
+    existing = await db.scalar(select(Category.id).where(Category.slug == payload.slug))
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="category slug exists")
+
+    category = Category(**payload.model_dump())
+    db.add(category)
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="category could not be saved"
+        ) from exc
+    await db.refresh(category)
+    return category
+
+
+async def update_category(
+    db: AsyncSession, category: Category, payload: CategoryUpdate
+) -> Category:
+    updates = payload.model_dump(exclude_unset=True)
+    if "parent_id" in updates:
+        await _validate_category_parent(db, category, updates["parent_id"])
+    if "slug" in updates:
+        existing = await db.scalar(
+            select(Category.id).where(Category.slug == updates["slug"], Category.id != category.id)
+        )
+        if existing is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="category slug exists")
+
+    for field, value in updates.items():
+        setattr(category, field, value)
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="category could not be saved"
+        ) from exc
+    await db.refresh(category)
+    return category
+
+
+async def delete_category(db: AsyncSession, category: Category) -> None:
+    child_id = await db.scalar(
+        select(Category.id).where(Category.parent_id == category.id).limit(1)
+    )
+    if child_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="category has child categories"
+        )
+    product_id = await db.scalar(
+        select(Product.id).where(Product.category_id == category.id).limit(1)
+    )
+    if product_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="category is assigned to products"
+        )
+
+    await db.delete(category)
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="category is still in use"
+        ) from exc
 
 
 async def load_product_or_404(db: AsyncSession, product_id: UUID) -> Product:
@@ -52,6 +184,8 @@ async def product_response(db: AsyncSession, product: Product) -> ProductRespons
 
 
 async def create_product(db: AsyncSession, payload: ProductCreate) -> Product:
+    if payload.category_id is not None:
+        await load_category_or_404(db, payload.category_id)
     product = Product(**payload.model_dump())
     db.add(product)
     try:
@@ -66,7 +200,10 @@ async def create_product(db: AsyncSession, payload: ProductCreate) -> Product:
 
 
 async def update_product(db: AsyncSession, product: Product, payload: ProductUpdate) -> Product:
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    if updates.get("category_id") is not None:
+        await load_category_or_404(db, updates["category_id"])
+    for field, value in updates.items():
         setattr(product, field, value)
     await db.commit()
     await db.refresh(product)

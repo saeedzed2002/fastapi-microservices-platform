@@ -29,7 +29,7 @@ class Category(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(120))
     slug: Mapped[str] = mapped_column(String(140), unique=True, index=True)
-    parent_id: Mapped[UUID | None] = mapped_column(ForeignKey("categories.id"))
+    parent_id: Mapped[UUID | None] = mapped_column(ForeignKey("categories.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
@@ -42,7 +42,7 @@ class Product(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     brand_id: Mapped[UUID | None] = mapped_column(ForeignKey("brands.id"))
-    category_id: Mapped[UUID | None] = mapped_column(ForeignKey("categories.id"))
+    category_id: Mapped[UUID | None] = mapped_column(ForeignKey("categories.id"), index=True)
     price_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(String(3))
     attributes: Mapped[dict[str, str]] = mapped_column(JSON, default=dict)

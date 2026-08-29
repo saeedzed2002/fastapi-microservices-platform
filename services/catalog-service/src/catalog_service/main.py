@@ -10,12 +10,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from catalog_service.application import (
     add_variant,
     attach_media,
+    category_response,
     checkout_variants,
+    create_category,
     create_product,
+    delete_category,
+    list_categories,
     list_variants,
+    load_category_by_slug_or_404,
+    load_category_or_404,
     load_product_or_404,
     product_response,
     publish_product,
+    update_category,
     update_product,
 )
 from catalog_service.auth import current_user, require_catalog_admin
@@ -23,6 +30,9 @@ from catalog_service.config import get_settings
 from catalog_service.db import dispose_engine, get_session
 from catalog_service.models import Product
 from catalog_service.schemas import (
+    CategoryCreate,
+    CategoryResponse,
+    CategoryUpdate,
     CheckoutVariantRequest,
     CheckoutVariantResponse,
     ProductCreate,
@@ -66,6 +76,54 @@ async def list_products(db: AsyncSession = Depends(get_session)) -> list[Product
         select(Product).where(Product.status == "published").order_by(Product.published_at.desc())
     )
     return [await product_response(db, product) for product in products]
+
+
+@app.get("/api/v1/catalog/categories", response_model=list[CategoryResponse])
+async def list_categories_endpoint(
+    db: AsyncSession = Depends(get_session),
+) -> list[CategoryResponse]:
+    return await list_categories(db)
+
+
+@app.get("/api/v1/catalog/categories/{slug}", response_model=CategoryResponse)
+async def get_category(slug: str, db: AsyncSession = Depends(get_session)) -> CategoryResponse:
+    return await category_response(await load_category_by_slug_or_404(db, slug))
+
+
+@app.post(
+    "/api/v1/catalog/categories",
+    response_model=CategoryResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_category_endpoint(
+    payload: CategoryCreate,
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> CategoryResponse:
+    require_catalog_admin(claims)
+    return await category_response(await create_category(db, payload))
+
+
+@app.patch("/api/v1/catalog/categories/{category_id}", response_model=CategoryResponse)
+async def update_category_endpoint(
+    category_id: UUID,
+    payload: CategoryUpdate,
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> CategoryResponse:
+    require_catalog_admin(claims)
+    category = await load_category_or_404(db, category_id)
+    return await category_response(await update_category(db, category, payload))
+
+
+@app.delete("/api/v1/catalog/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_category_endpoint(
+    category_id: UUID,
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> None:
+    require_catalog_admin(claims)
+    await delete_category(db, await load_category_or_404(db, category_id))
 
 
 @app.get("/api/v1/catalog/products/{slug}", response_model=ProductResponse)

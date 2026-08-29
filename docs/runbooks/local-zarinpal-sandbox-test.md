@@ -59,9 +59,11 @@ $admin = Invoke-RestMethod -SkipCertificateCheck -Method Post `
 $adminHeaders = @{ Authorization = "Bearer $($admin.access_token)" }
 ```
 
-Category rows exist in the Catalog database, but this repository does not yet
-expose a category-management API. Do not insert a category directly into the
-database. `category_id` is optional, so omit it for this checkout test.
+Category management is available through the Catalog API. It is optional for
+this checkout test, so the product body below omits `category_id`. To create a
+category and use its identifier, follow the [Catalog category administration]
+(catalog-category-administration.md) runbook. Do not insert catalog records
+directly into the database.
 
 Create, publish, and stock an `IRT` product:
 

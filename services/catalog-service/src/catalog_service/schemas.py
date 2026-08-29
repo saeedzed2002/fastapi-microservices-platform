@@ -5,6 +5,28 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+class CategoryCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    slug: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=140)
+    parent_id: UUID | None = None
+
+
+class CategoryUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    slug: str | None = Field(default=None, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=140)
+    parent_id: UUID | None = None
+
+
+class CategoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    slug: str
+    parent_id: UUID | None
+    created_at: datetime
+
+
 class ProductCreate(BaseModel):
     name: str = Field(min_length=1, max_length=240)
     slug: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=260)
