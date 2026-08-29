@@ -23,4 +23,5 @@ Implemented: [Kafka dead-letter inspection and replay](kafka-dlq.md),
 [Chat realtime delivery and attachment access](chat-realtime.md), and
 [SMS.ir customer OTP delivery](sms-otp.md), and
 [staff operations and order review](admin-operations.md), and
-[Zarinpal payment recovery](zarinpal-payment.md).
+[Zarinpal payment recovery](zarinpal-payment.md), and
+[local Zarinpal sandbox checkout](local-zarinpal-sandbox-test.md).

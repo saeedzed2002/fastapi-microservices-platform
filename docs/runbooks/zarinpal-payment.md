@@ -41,6 +41,10 @@ returns the same redirect instead of charging again. For `VERIFYING`, do not
 send another charge request. Restore provider connectivity and repeat only the
 callback verification for the persisted authority. Provider verification is
 idempotent; a successful local result emits at most one payment-success fact.
+A browser return with a non-`OK` status cannot cancel an attempt already in
+`VERIFYING`; Payment returns `409` and leaves verification ownership with the
+in-flight callback. This prevents an interleaved browser request from losing a
+verified provider charge.
 
 ### `EXPIRED` or `LATE_SUCCESS`
 

@@ -83,7 +83,22 @@ async def _load_intent_for_update(db: AsyncSession, intent_id: UUID) -> PaymentI
     return cast(
         PaymentIntent | None,
         await db.scalar(
-            select(PaymentIntent).where(PaymentIntent.id == intent_id).with_for_update()
+            select(PaymentIntent)
+            .where(PaymentIntent.id == intent_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ),
+    )
+
+
+async def _load_attempt_for_update(db: AsyncSession, attempt_id: UUID) -> PaymentAttempt | None:
+    return cast(
+        PaymentAttempt | None,
+        await db.scalar(
+            select(PaymentAttempt)
+            .where(PaymentAttempt.id == attempt_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
         ),
     )
 
@@ -265,9 +280,7 @@ async def _record_zarinpal_rejection(
     db: AsyncSession, intent_id: UUID, attempt_id: UUID, code: str
 ) -> None:
     intent = await _load_intent_for_update(db, intent_id)
-    attempt = await db.scalar(
-        select(PaymentAttempt).where(PaymentAttempt.id == attempt_id).with_for_update()
-    )
+    attempt = await _load_attempt_for_update(db, attempt_id)
     if intent is not None and attempt is not None and intent.status == "REQUESTING":
         attempt.status = "REJECTED"
         attempt.failure_code = code
@@ -284,9 +297,7 @@ async def _record_zarinpal_authority(
     redirect_url: str,
 ) -> ZarinpalStart:
     intent = await _load_intent_for_update(db, intent_id)
-    attempt = await db.scalar(
-        select(PaymentAttempt).where(PaymentAttempt.id == attempt_id).with_for_update()
-    )
+    attempt = await _load_attempt_for_update(db, attempt_id)
     if intent is None or attempt is None:
         raise PaymentNotReady
     attempt.authority = authority
@@ -333,9 +344,7 @@ async def handle_zarinpal_callback(
 
 
 async def _record_zarinpal_cancellation(db: AsyncSession, attempt_id: UUID) -> ZarinpalCallback:
-    attempt = await db.scalar(
-        select(PaymentAttempt).where(PaymentAttempt.id == attempt_id).with_for_update()
-    )
+    attempt = await _load_attempt_for_update(db, attempt_id)
     if attempt is None:
         raise PaymentIntentNotFound
     intent = await _load_intent_for_update(db, attempt.intent_id)
@@ -348,19 +357,25 @@ async def _record_zarinpal_cancellation(db: AsyncSession, attempt_id: UUID) -> Z
         attempt.status = "EXPIRED"
         await db.commit()
         return ZarinpalCallback(intent.order_id, "expired", None)
-    if attempt.status in {"PENDING_CUSTOMER", "VERIFYING", "REQUESTING"}:
+    if intent.status == "VERIFYING" or attempt.status == "VERIFYING":
+        await db.commit()
+        raise PaymentRequestInProgress
+    if intent.status == "PENDING_CUSTOMER" and attempt.status == "PENDING_CUSTOMER":
         attempt.status = "CANCELLED"
         intent.status = "AWAITING_CUSTOMER"
+        await db.commit()
+        return ZarinpalCallback(intent.order_id, "cancelled", None)
+    if intent.status == "AWAITING_CUSTOMER" and attempt.status == "CANCELLED":
+        await db.commit()
+        return ZarinpalCallback(intent.order_id, "cancelled", None)
     await db.commit()
-    return ZarinpalCallback(intent.order_id, "cancelled", None)
+    raise PaymentNotReady
 
 
 async def _prepare_zarinpal_verification(
     db: AsyncSession, attempt_id: UUID
 ) -> tuple[PaymentIntent, bool]:
-    attempt = await db.scalar(
-        select(PaymentAttempt).where(PaymentAttempt.id == attempt_id).with_for_update()
-    )
+    attempt = await _load_attempt_for_update(db, attempt_id)
     if attempt is None:
         raise PaymentIntentNotFound
     intent = await _load_intent_for_update(db, attempt.intent_id)
@@ -386,9 +401,7 @@ async def _record_zarinpal_verification(
     attempt_id: UUID,
     verification: ZarinpalVerificationResult,
 ) -> ZarinpalCallback:
-    attempt = await db.scalar(
-        select(PaymentAttempt).where(PaymentAttempt.id == attempt_id).with_for_update()
-    )
+    attempt = await _load_attempt_for_update(db, attempt_id)
     if attempt is None:
         raise PaymentIntentNotFound
     intent = await _load_intent_for_update(db, attempt.intent_id)

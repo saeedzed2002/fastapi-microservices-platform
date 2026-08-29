@@ -179,7 +179,7 @@ async def zarinpal_callback(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="payment not found"
         ) from exc
-    except PaymentNotReady as exc:
+    except (PaymentNotReady, PaymentRequestInProgress) as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="payment not ready"
         ) from exc

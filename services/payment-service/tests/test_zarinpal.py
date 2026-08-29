@@ -1,9 +1,13 @@
 import asyncio
 import json
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import httpx
 import pytest
 
+from payment_service.application import PaymentRequestInProgress, _record_zarinpal_cancellation
 from payment_service.zarinpal import (
     ZarinpalClient,
     ZarinpalNotConfigured,
@@ -79,5 +83,53 @@ def test_zarinpal_requires_explicit_merchant_configuration() -> None:
         )
         with pytest.raises(ZarinpalNotConfigured):
             await client.create_payment(amount=1, description="Order test")
+
+    asyncio.run(exercise())
+
+
+def test_zarinpal_cancellation_does_not_overwrite_verification_in_progress() -> None:
+    async def exercise() -> None:
+        attempt = SimpleNamespace(id=uuid4(), intent_id=uuid4(), status="VERIFYING")
+        intent = SimpleNamespace(
+            id=attempt.intent_id,
+            order_id=uuid4(),
+            provider_reference="zarinpal:authority",
+            status="VERIFYING",
+        )
+        db = SimpleNamespace(
+            scalar=AsyncMock(side_effect=[attempt, intent]),
+            commit=AsyncMock(),
+        )
+
+        with pytest.raises(PaymentRequestInProgress):
+            await _record_zarinpal_cancellation(db, attempt.id)
+
+        assert attempt.status == "VERIFYING"
+        assert intent.status == "VERIFYING"
+        db.commit.assert_awaited_once()
+
+    asyncio.run(exercise())
+
+
+def test_zarinpal_cancellation_reopens_only_pending_customer_attempt() -> None:
+    async def exercise() -> None:
+        attempt = SimpleNamespace(id=uuid4(), intent_id=uuid4(), status="PENDING_CUSTOMER")
+        intent = SimpleNamespace(
+            id=attempt.intent_id,
+            order_id=uuid4(),
+            provider_reference="zarinpal:authority",
+            status="PENDING_CUSTOMER",
+        )
+        db = SimpleNamespace(
+            scalar=AsyncMock(side_effect=[attempt, intent]),
+            commit=AsyncMock(),
+        )
+
+        result = await _record_zarinpal_cancellation(db, attempt.id)
+
+        assert result.payment_status == "cancelled"
+        assert attempt.status == "CANCELLED"
+        assert intent.status == "AWAITING_CUSTOMER"
+        db.commit.assert_awaited_once()
 
     asyncio.run(exercise())
