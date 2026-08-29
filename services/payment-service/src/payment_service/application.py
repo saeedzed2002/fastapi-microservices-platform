@@ -178,6 +178,10 @@ async def start_zarinpal_payment(
     provider: ZarinpalClient,
     expected_currency: str,
 ) -> ZarinpalStart:
+    # Check local provider configuration before writing a REQUESTING attempt.
+    # A missing merchant ID cannot have reached Zarinpal, so it must not alter
+    # the persisted payment state or block a later properly configured request.
+    provider.ensure_configured()
     intent, existing_authority = await _prepare_zarinpal_request(
         db, order_id=order_id, expected_currency=expected_currency
     )

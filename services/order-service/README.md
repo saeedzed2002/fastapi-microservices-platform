@@ -10,6 +10,13 @@ transaction. A missing contact email rejects checkout rather than creating an
 invalid delivery recipient. The transaction persists the order and
 `order.created.v1`.
 
+`POST /api/v1/orders/cart/zarinpal` is the normal customer payment action. It
+reads the authenticated Cart, performs the same authoritative checkout
+validation, waits only a bounded interval for the internal reservation Saga,
+starts the Payment-owned Zarinpal adapter, and returns `redirect_url`. The
+frontend immediately navigates to that URL. A transient `503` must be retried
+with the same `Idempotency-Key`, not a new one.
+
 Kafka state transitions are `PENDING` -> `INVENTORY_RESERVED` ->
 `PAYMENT_PENDING` -> `CONFIRMED`. Insufficient inventory or a terminal payment
 failure ends the order in `CANCELLED`. An Inbox guard and the state machine
@@ -24,6 +31,7 @@ own email delivery.
 ## API
 
 - `POST /api/v1/orders` with `Idempotency-Key`
+- `POST /api/v1/orders/cart/zarinpal` with `Idempotency-Key`
 - `GET /api/v1/orders`
 - `GET /api/v1/orders/{order_id}`
 - `GET /api/v1/orders/admin`

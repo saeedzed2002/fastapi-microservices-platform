@@ -27,7 +27,9 @@ is recorded as `LATE_SUCCESS` and requires manual refund/reconciliation; this
 repository has no refund workflow.
 
 Configure `ZARINPAL_MERCHANT_ID`, `ZARINPAL_SANDBOX`, and the edge callback URL
-through the ignored `.env` file. Apply Payment migrations from the workspace:
+through the ignored `.env` file. Payment validates the merchant identifier
+before persisting a payment request, so a missing local configuration cannot
+leave an order in `REQUESTING`. Apply Payment migrations from the workspace:
 
     pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-payment
 

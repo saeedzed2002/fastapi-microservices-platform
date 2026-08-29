@@ -59,6 +59,14 @@
       "schema": "openapi/order-query.v1.openapi.json"
     },
     {
+      "name": "order.checkout.v1",
+      "kind": "service-openapi",
+      "owner": "order-service",
+      "status": "active",
+      "notes": "Customer checkout commands, including the Cart-backed one-step Zarinpal redirect path.",
+      "schema": "openapi/order-checkout.v1.openapi.json"
+    },
+    {
       "name": "payment.zarinpal.v1",
       "kind": "service-openapi",
       "owner": "payment-service",

@@ -55,6 +55,10 @@ class ZarinpalClient:
     def _start_pay_base_url(self) -> str:
         return "https://sandbox.zarinpal.com" if self._sandbox else "https://www.zarinpal.com"
 
+    def ensure_configured(self) -> None:
+        if not self._merchant_id:
+            raise ZarinpalNotConfigured
+
     async def create_payment(self, *, amount: int, description: str) -> ZarinpalRequestResult:
         payload = await self._post(
             "/pg/v4/payment/request.json",
@@ -92,8 +96,7 @@ class ZarinpalClient:
         )
 
     async def _post(self, path: str, payload: dict[str, object]) -> dict[str, Any]:
-        if not self._merchant_id:
-            raise ZarinpalNotConfigured
+        self.ensure_configured()
         try:
             async with httpx.AsyncClient(
                 timeout=self._timeout_seconds,

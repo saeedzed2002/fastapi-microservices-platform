@@ -17,6 +17,10 @@ class CheckoutRequest(BaseModel):
     payment_method: Literal["test_success", "test_failure", "zarinpal"]
 
 
+class CartCheckoutRequest(BaseModel):
+    address_id: UUID
+
+
 class OrderItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -39,6 +43,12 @@ class OrderResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     items: list[OrderItemResponse]
+
+
+class CartCheckoutResponse(BaseModel):
+    order: OrderResponse
+    redirect_url: str
+    expires_at: datetime
 
 
 OrderStatus = Literal["PENDING", "INVENTORY_RESERVED", "PAYMENT_PENDING", "CONFIRMED", "CANCELLED"]

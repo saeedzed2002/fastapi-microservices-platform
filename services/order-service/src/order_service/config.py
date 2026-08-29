@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     jwt_audience: str = "fastapi-platform"
     catalog_base_url: str = "http://localhost:8003"
     customer_base_url: str = "http://localhost:8002"
+    cart_base_url: str = "http://localhost:8005"
+    payment_base_url: str = "http://localhost:8006"
+    checkout_request_timeout_seconds: float = Field(default=5.0, ge=0.1, le=60.0)
+    checkout_redirect_wait_seconds: float = Field(default=10.0, ge=0.1, le=30.0)
+    checkout_redirect_poll_interval_seconds: float = Field(default=0.2, ge=0.05, le=2.0)
     kafka_bootstrap_servers: str = "localhost:29092"
     kafka_topic: str = "fastapi-platform.order.events.v1"
     kafka_dead_letter_topic: str = "fastapi-platform.dead-letter.v1"

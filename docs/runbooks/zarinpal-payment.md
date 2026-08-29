@@ -9,6 +9,10 @@ intent. Correlate only by local `order_id`, Payment intent ID, persisted
 authority, or provider reference. Never copy merchant IDs, bearer tokens, raw
 provider responses, or customer payment details into tickets or logs.
 
+The normal frontend command is `POST /api/v1/orders/cart/zarinpal`, not the
+low-level Payment start endpoint. It returns a ready provider redirect or a
+bounded `503`; retry that `503` with the same `Idempotency-Key`.
+
 ## Immediate checks
 
 1. Confirm the Payment service, its PostgreSQL connection, Kafka outbox worker,

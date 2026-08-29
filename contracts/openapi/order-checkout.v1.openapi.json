@@ -1,0 +1,119 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Order Checkout API",
+    "version": "v1",
+    "description": "Customer checkout commands. Order owns authoritative snapshots and the Saga; the cart-backed Zarinpal command returns a provider redirect without exposing reservation or payment-intent steps to the browser."
+  },
+  "paths": {
+    "/api/v1/orders": {
+      "post": {
+        "summary": "Create an order from an explicit item selection",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/IdempotencyKey"}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CheckoutRequest"}}}
+        },
+        "responses": {
+          "202": {"description": "Order accepted for asynchronous reservation and payment", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Order"}}}},
+          "401": {"description": "Authentication required or invalid"},
+          "403": {"description": "Customer role required"},
+          "409": {"description": "Authoritative checkout data is unavailable"},
+          "422": {"description": "Invalid checkout request"}
+        }
+      }
+    },
+    "/api/v1/orders/cart/zarinpal": {
+      "post": {
+        "summary": "Checkout the caller's cart and return the Zarinpal redirect",
+        "description": "The API reads the durable cart, writes the Order outbox, waits only a configured bounded time for the internal reservation/payment-ready Saga state, then invokes Payment. Retry a 503 with the same Idempotency-Key; it never creates a second order or provider authority.",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/IdempotencyKey"}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CartCheckoutRequest"}}}
+        },
+        "responses": {
+          "200": {"description": "Provider redirect is ready", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CartCheckoutResponse"}}}},
+          "401": {"description": "Authentication required or invalid"},
+          "403": {"description": "Customer role required"},
+          "409": {"description": "The cart is empty, stock reservation failed, or payment is not ready"},
+          "502": {"description": "Payment provider rejected the request"},
+          "503": {"description": "A dependency is unavailable or the bounded Saga wait elapsed; retry with the same idempotency key"},
+          "422": {"description": "Invalid address identifier"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+    },
+    "parameters": {
+      "IdempotencyKey": {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 128}}
+    },
+    "schemas": {
+      "CheckoutItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["variant_id", "quantity"],
+        "properties": {"variant_id": {"type": "string", "format": "uuid"}, "quantity": {"type": "integer", "minimum": 1, "maximum": 100}}
+      },
+      "CheckoutRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["address_id", "items", "payment_method"],
+        "properties": {
+          "address_id": {"type": "string", "format": "uuid"},
+          "items": {"type": "array", "minItems": 1, "maxItems": 100, "items": {"$ref": "#/components/schemas/CheckoutItem"}},
+          "payment_method": {"enum": ["test_success", "test_failure", "zarinpal"]}
+        }
+      },
+      "CartCheckoutRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["address_id"],
+        "properties": {"address_id": {"type": "string", "format": "uuid"}}
+      },
+      "OrderItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["variant_id", "sku", "product_name", "unit_amount", "quantity", "attributes"],
+        "properties": {
+          "variant_id": {"type": "string", "format": "uuid"},
+          "sku": {"type": "string"},
+          "product_name": {"type": "string"},
+          "unit_amount": {"type": "string"},
+          "quantity": {"type": "integer"},
+          "attributes": {"type": "object", "additionalProperties": {"type": "string"}}
+        }
+      },
+      "Order": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "tracking_code", "currency", "total_amount", "created_at", "updated_at", "items"],
+        "properties": {
+          "id": {"type": "string", "format": "uuid"},
+          "status": {"enum": ["PENDING", "INVENTORY_RESERVED", "PAYMENT_PENDING", "CONFIRMED", "CANCELLED"]},
+          "tracking_code": {"type": "string"},
+          "currency": {"type": "string"},
+          "total_amount": {"type": "string"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"},
+          "items": {"type": "array", "items": {"$ref": "#/components/schemas/OrderItem"}}
+        }
+      },
+      "CartCheckoutResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["order", "redirect_url", "expires_at"],
+        "properties": {
+          "order": {"$ref": "#/components/schemas/Order"},
+          "redirect_url": {"type": "string", "format": "uri"},
+          "expires_at": {"type": "string", "format": "date-time"}
+        }
+      }
+    }
+  }
+}

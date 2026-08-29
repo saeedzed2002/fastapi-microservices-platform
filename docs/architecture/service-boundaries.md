@@ -52,7 +52,7 @@ Owns active carts, items, selected variants, quantities, projected totals, and e
 
 Does not own authoritative price, stock reservations, order history, or payment state.
 
-PostgreSQL is authoritative. Redis may cache carts but losing Redis cannot delete them. Cart totals remain projections and are revalidated by the authoritative checkout contract.
+PostgreSQL is authoritative. Redis may cache carts but losing Redis cannot delete them. Cart totals remain projections and are revalidated by the authoritative checkout contract. Cart can conditionally consume the exact checked-out selection only after Payment has produced a provider redirect; its version guard never deletes a concurrent cart edit.
 
 ### Order Service
 

@@ -7,7 +7,11 @@ from uuid import uuid4
 import httpx
 import pytest
 
-from payment_service.application import PaymentRequestInProgress, _record_zarinpal_cancellation
+from payment_service.application import (
+    PaymentRequestInProgress,
+    _record_zarinpal_cancellation,
+    start_zarinpal_payment,
+)
 from payment_service.zarinpal import (
     ZarinpalClient,
     ZarinpalNotConfigured,
@@ -83,6 +87,30 @@ def test_zarinpal_requires_explicit_merchant_configuration() -> None:
         )
         with pytest.raises(ZarinpalNotConfigured):
             await client.create_payment(amount=1, description="Order test")
+
+    asyncio.run(exercise())
+
+
+def test_missing_merchant_does_not_create_a_requesting_attempt() -> None:
+    async def exercise() -> None:
+        client = ZarinpalClient(
+            merchant_id="",
+            sandbox=True,
+            callback_url="https://localhost/callback",
+            timeout_seconds=10,
+        )
+        db = SimpleNamespace(scalar=AsyncMock(), commit=AsyncMock())
+
+        with pytest.raises(ZarinpalNotConfigured):
+            await start_zarinpal_payment(
+                db,
+                order_id=uuid4(),
+                provider=client,
+                expected_currency="IRT",
+            )
+
+        db.scalar.assert_not_awaited()
+        db.commit.assert_not_awaited()
 
     asyncio.run(exercise())
 

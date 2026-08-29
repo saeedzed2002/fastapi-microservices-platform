@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("install", "lint", "format-check", "typecheck", "test", "migrate-identity", "migrate-customer", "migrate-catalog", "migrate-media", "migrate-inventory", "migrate-cart", "migrate-order", "migrate-payment", "migrate-notification", "migrate-chat", "provision-admin", "dev-up", "dev-down", "logs")]
+    [ValidateSet("install", "lint", "format-check", "typecheck", "test", "migrate-identity", "migrate-customer", "migrate-catalog", "migrate-media", "migrate-inventory", "migrate-cart", "migrate-order", "migrate-payment", "migrate-notification", "migrate-chat", "provision-admin", "dev-up", "dev-start", "dev-stop", "dev-recreate", "dev-down", "logs")]
     [string]$Task,
     [string]$AdminEmail
 )
@@ -49,6 +49,9 @@ try {
             & docker compose @composeArguments build
             & docker compose @composeArguments up -d
         }
+        "dev-start" { & docker compose @composeArguments start }
+        "dev-stop" { & docker compose @composeArguments stop }
+        "dev-recreate" { & docker compose @composeArguments up -d --force-recreate }
         "dev-down" { & docker compose @composeArguments down }
         "logs" { & docker compose @composeArguments logs -f }
     }

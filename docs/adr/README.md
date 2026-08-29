@@ -23,6 +23,7 @@ ADRs record decisions that materially affect service ownership, contracts, durab
 
 | ADR | Status | Decision |
 |---|---|---|
+| [ADR-023](ADR-023-cart-backed-zarinpal-checkout.md) | Accepted | Cart-backed Zarinpal checkout redirect |
 | [ADR-022](ADR-022-zarinpal-payment-adapter-and-expiry.md) | Accepted | Zarinpal payment adapter and expiry |
 | [ADR-021](ADR-021-staff-operations-and-customer-order-self-service.md) | Accepted | Staff operations, customer order self-service, and contact-email snapshots |
 | [ADR-020](ADR-020-customer-phone-otp-authentication.md) | Accepted | Customer phone OTP authentication and asynchronous SMS delivery |

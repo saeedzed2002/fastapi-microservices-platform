@@ -143,6 +143,9 @@ Use `scripts/platform.ps1` for repeatable local tasks.
     pwsh -File .\scripts\platform.ps1 -Task test
     pwsh -NoProfile -File .\scripts\new_local_edge_certificate.ps1
     pwsh -File .\scripts\platform.ps1 -Task dev-up
+    pwsh -File .\scripts\platform.ps1 -Task dev-stop
+    pwsh -File .\scripts\platform.ps1 -Task dev-start
+    pwsh -File .\scripts\platform.ps1 -Task dev-recreate
     pwsh -File .\scripts\platform.ps1 -Task migrate-identity
     pwsh -File .\scripts\platform.ps1 -Task migrate-customer
     pwsh -File .\scripts\platform.ps1 -Task migrate-catalog
@@ -154,6 +157,12 @@ Use `scripts/platform.ps1` for repeatable local tasks.
     pwsh -File .\scripts\platform.ps1 -Task migrate-notification
     pwsh -File .\scripts\platform.ps1 -Task migrate-chat
     $env:RUN_E2E = "1"; uv run pytest tests/e2e/test_phase6_checkout_notification.py
+
+`platform.ps1` always resolves the ignored root `.env` from the script's
+repository location, not from the current PowerShell directory. Use
+`dev-stop` and `dev-start` for ordinary local shutdown and restart; they retain
+the existing containers and their environment. Use `dev-recreate` only after
+changing `.env` or Compose configuration. `dev-down` removes the containers.
 
 ## License
 

@@ -7,7 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from cart_service.cache import RedisCartCache
 from cart_service.models import Cart, CartItem
-from cart_service.schemas import CartItemCreate, CartItemResponse, CartItemUpdate, CartResponse
+from cart_service.schemas import (
+    CartConsumeRequest,
+    CartItemCreate,
+    CartItemResponse,
+    CartItemUpdate,
+    CartResponse,
+)
 
 
 async def get_or_create_locked_cart(db: AsyncSession, customer_id: UUID) -> Cart:
@@ -120,6 +126,45 @@ async def clear_cart(db: AsyncSession, customer_id: UUID, cache: RedisCartCache)
     items = await db.scalars(select(CartItem).where(CartItem.cart_id == cart.id).with_for_update())
     for item in items:
         await db.delete(item)
+    cart.version += 1
+    await db.commit()
+    await db.refresh(cart)
+    response = await cart_response(db, cart)
+    await cache.invalidate(customer_id)
+    return response
+
+
+async def consume_cart_items(
+    db: AsyncSession,
+    customer_id: UUID,
+    payload: CartConsumeRequest,
+    cache: RedisCartCache,
+) -> CartResponse:
+    """Remove an accepted checkout selection without deleting concurrent cart changes."""
+    cart = await get_or_create_locked_cart(db, customer_id)
+    if cart.version != payload.expected_version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="cart changed during checkout"
+        )
+
+    requested = {item.variant_id: item.quantity for item in payload.items}
+    items = await db.scalars(
+        select(CartItem).where(CartItem.cart_id == cart.id, CartItem.variant_id.in_(requested))
+    )
+    existing = {item.variant_id: item for item in items}
+    if set(existing) != set(requested) or any(
+        existing[variant_id].quantity < quantity for variant_id, quantity in requested.items()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="cart changed during checkout"
+        )
+
+    for variant_id, quantity in requested.items():
+        item = existing[variant_id]
+        if item.quantity == quantity:
+            await db.delete(item)
+        else:
+            item.quantity -= quantity
     cart.version += 1
     await db.commit()
     await db.refresh(cart)

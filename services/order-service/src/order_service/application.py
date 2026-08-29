@@ -10,7 +10,8 @@ from uuid import UUID, uuid4
 import httpx
 from fastapi import HTTPException, status
 from sqlalchemy import and_, or_, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.sql.elements import ColumnElement
 
 from order_service.models import (
@@ -403,9 +404,56 @@ async def create_order(
         },
         causation_id=None,
     )
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        existing = cast(
+            Order | None,
+            await db.scalar(select(Order).where(Order.idempotency_key == idempotency_key)),
+        )
+        if existing is not None:
+            if existing.customer_id != customer_id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT, detail="idempotency key conflict"
+                ) from exc
+            return existing
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="order could not be created"
+        ) from exc
     await db.refresh(order)
     return order
+
+
+async def load_idempotent_order(
+    db: AsyncSession, *, customer_id: UUID, idempotency_key: str
+) -> Order | None:
+    existing = await db.scalar(select(Order).where(Order.idempotency_key == idempotency_key))
+    if existing is not None and existing.customer_id != customer_id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="idempotency key conflict")
+    return existing
+
+
+async def wait_for_payment_pending(
+    *,
+    session_factory: async_sessionmaker[AsyncSession],
+    order_id: UUID,
+    timeout_seconds: float,
+    poll_interval_seconds: float,
+) -> OrderResponse | None:
+    """Observe durable Saga state without holding a database transaction open."""
+    deadline = asyncio.get_running_loop().time() + timeout_seconds
+    while True:
+        async with session_factory() as polling_db:
+            order = await polling_db.get(Order, order_id)
+            if order is None:
+                raise RuntimeError("checkout order disappeared")
+            if order.status in {"PAYMENT_PENDING", "CANCELLED"}:
+                return await order_response(polling_db, order)
+        remaining = deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            return None
+        await asyncio.sleep(min(poll_interval_seconds, remaining))
 
 
 async def process_saga_result(db: AsyncSession, envelope: dict[str, object]) -> bool:

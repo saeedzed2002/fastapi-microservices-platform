@@ -117,9 +117,12 @@ Order confirmation or cancellation
    -> invoice and notification work after confirmation
 ```
 
-Inventory failure cancels the order before payment. For Zarinpal, Payment first
-persists a customer-payment window, then requests the provider outside its
-database transaction, and verifies a locally issued authority before success.
+Inventory failure cancels the order before payment. For Zarinpal, the normal
+customer command is the Cart-backed Order checkout: it waits only a bounded
+interval for the internal reservation state, starts Payment, and returns the
+provider redirect URL. Payment first persists a customer-payment window, then
+requests the provider outside its database transaction, and verifies a locally
+issued authority before success.
 Payment expiry emits the normal failure fact; a verified late charge never
 resurrects the Order and is reconciled manually. Duplicate events must not
 repeat reservation, payment, release, confirmation, invoice, or notification

@@ -26,18 +26,17 @@ with the stored provider message ID when investigating delivery.
 pwsh -NoProfile -File scripts/platform.ps1 -Task migrate-identity
 pwsh -NoProfile -File scripts/platform.ps1 -Task migrate-customer
 pwsh -NoProfile -File scripts/platform.ps1 -Task migrate-notification
-docker compose --env-file .env -f infrastructure/compose/docker-compose.yml up -d --build
+pwsh -NoProfile -File scripts/platform.ps1 -Task dev-up
 ```
 
 The `notification-sms-worker` must be running. A missing secret or SMS
 configuration deliberately produces `503` from the public OTP request endpoint;
 it never falls back to a fake code or an unprotected provider call.
 
-The explicit `--env-file .env` is required because the Compose file is under
-`infrastructure/compose/`, while the ignored local configuration is at the
-repository root. Omitting it makes Compose use an unrelated or missing `.env`
-next to the Compose file and leaves the OTP configuration empty inside the
-containers.
+`platform.ps1` passes the absolute root `.env` path to Compose. This prevents
+the relative-path ambiguity caused by the Compose file under
+`infrastructure/compose/`. Do not replace it with a raw `docker compose`
+command unless that command also supplies the root `.env` explicitly.
 
 ## Public flow
 

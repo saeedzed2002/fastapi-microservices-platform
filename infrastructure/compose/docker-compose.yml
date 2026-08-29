@@ -278,6 +278,8 @@ services:
       ORDER_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
       ORDER_CATALOG_BASE_URL: http://catalog-service:8000
       ORDER_CUSTOMER_BASE_URL: http://customer-service:8000
+      ORDER_CART_BASE_URL: http://cart-service:8000
+      ORDER_PAYMENT_BASE_URL: http://payment-service:8000
       ORDER_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       ORDER_KAFKA_PUBLISHER_ENABLED: "true"
       ORDER_KAFKA_CONSUMER_ENABLED: "true"
@@ -293,6 +295,8 @@ services:
       catalog-service:
         condition: service_healthy
       customer-service:
+        condition: service_healthy
+      cart-service:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
