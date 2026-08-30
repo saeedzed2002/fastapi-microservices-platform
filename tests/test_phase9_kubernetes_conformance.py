@@ -67,6 +67,18 @@ def test_conformance_dependencies_and_secrets_are_isolated_test_inputs() -> None
     assert "smtp://" not in secrets
     assert "fastapi-platform-dependencies.svc.cluster.local" in secrets
 
+    # These values use YAML flow mappings.  Kafka listener values contain
+    # commas and colons, so they must remain quoted or Kubernetes will decode
+    # their fragments as unknown fields in the Deployment schema.
+    for value in (
+        "broker,controller",
+        "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
+        "CONTROLLER://:29093,PLAINTEXT://:9092",
+        "PLAINTEXT://kafka.fastapi-platform-dependencies.svc.cluster.local:9092",
+        "1@kafka:29093",
+    ):
+        assert f'value: "{value}"' in dependencies
+
     for service in DATABASE_SERVICES:
         assert f"CREATE USER {service.replace('-', '_')}" in dependencies
 
