@@ -121,12 +121,13 @@ spec:
             - {name: KAFKA_NUM_PARTITIONS, value: "3"}
             - {name: CLUSTER_ID, value: MkU3OEVBNTcwNTJENDM2Qk}
           readinessProbe:
-            exec: {command: [sh, -c, /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null]}
-            # The command starts a JVM, so Kubernetes' default one-second
-            # probe timeout is insufficient even after Kafka is healthy.
-            periodSeconds: 10
-            timeoutSeconds: 10
-            failureThreshold: 12
+            # kafka-topics.sh starts a new JVM for every probe.  That is not a
+            # readiness check: the broker is already accepting requests while
+            # the CLI can still exceed the probe deadline.  Kubernetes can
+            # directly test the broker listener without that extra process.
+            tcpSocket: {port: kafka}
+            periodSeconds: 5
+            failureThreshold: 24
           resources: {requests: {cpu: 250m, memory: 768Mi}, limits: {cpu: "1", memory: 1536Mi}}
 ---
 apiVersion: v1
