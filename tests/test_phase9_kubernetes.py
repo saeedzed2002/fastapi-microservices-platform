@@ -71,8 +71,11 @@ def test_database_migrations_are_controlled_jobs_and_ship_their_sources() -> Non
 
     for service in DATABASE_SERVICES:
         dockerfile = (ROOT / "services" / service / "Dockerfile").read_text(encoding="utf-8")
+        alembic_ini = (ROOT / "services" / service / "alembic.ini").read_text(encoding="utf-8")
         assert f"COPY services/{service}/migrations ./migrations" in dockerfile
         assert f"COPY services/{service}/alembic.ini ./alembic.ini" in dockerfile
+        assert "script_location = %(here)s/migrations" in alembic_ini
+        assert "prepend_sys_path = %(here)s/src" in alembic_ini
 
 
 def test_runtime_config_sets_each_service_environment_explicitly() -> None:
