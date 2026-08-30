@@ -45,6 +45,14 @@ readonly WORKER_DEPLOYMENTS=(
   media-worker
   payment-expiry-worker
 )
+readonly DEPENDENCY_DEPLOYMENTS=(
+  postgres
+  kafka
+  rabbitmq
+  redis
+  minio
+  mailpit
+)
 readonly DEPENDENCY_IMAGES=(
   "postgres:18.6@sha256:1957b2ff3137e4ef7f3bc813e74fff50b1e1ffddc85c8b9d6f14ade972be8687"
   "apache/kafka:4.2.0@sha256:9516fb7634bad307d17c33b589fde9023003b0cb761374f500002b980a3149b9"
@@ -119,7 +127,9 @@ for service in "${SERVICE_IMAGES[@]}"; do
 done
 
 kubectl --context "${CONTEXT}" apply -k infrastructure/kubernetes/conformance/foundation
-kubectl --context "${CONTEXT}" -n "${DEPENDENCY_NAMESPACE}" rollout status deployment --all --timeout=10m
+for deployment in "${DEPENDENCY_DEPLOYMENTS[@]}"; do
+  kubectl --context "${CONTEXT}" -n "${DEPENDENCY_NAMESPACE}" rollout status "deployment/${deployment}" --timeout=10m
+done
 
 kubectl --context "${CONTEXT}" apply -k infrastructure/kubernetes/conformance/migrations
 kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" wait \

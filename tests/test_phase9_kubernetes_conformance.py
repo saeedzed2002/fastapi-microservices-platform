@@ -110,6 +110,9 @@ def test_kind_cluster_and_ci_script_are_pinned_and_disposable() -> None:
     assert 'for image in "${DEPENDENCY_IMAGES[@]}" "fastapi-platform/minio:conformance"' in script
     assert "CONFORMANCE_SKIP_IMAGE_BUILD:-false" in script
     assert '[[ "${SKIP_IMAGE_BUILD}" == "true" ]]' in script
+    assert "rollout status deployment --all" not in script
+    for deployment in ("postgres", "kafka", "rabbitmq", "redis", "minio", "mailpit"):
+        assert f"  {deployment}" in script
     assert "Kubernetes Kind conformance" in workflow
     assert "Install verified Kind v0.32.0" in workflow
     assert "50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54" in workflow
