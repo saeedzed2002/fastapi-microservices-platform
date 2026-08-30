@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Query, status
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +18,7 @@ from catalog_service.application import (
     delete_category,
     delete_product,
     list_categories,
+    list_published_products,
     list_variants,
     load_category_by_slug_or_404,
     load_category_or_404,
@@ -38,6 +39,7 @@ from catalog_service.schemas import (
     CheckoutVariantRequest,
     CheckoutVariantResponse,
     ProductCreate,
+    ProductListResponse,
     ProductMediaAttach,
     ProductResponse,
     ProductUpdate,
@@ -81,12 +83,17 @@ async def readiness(db: AsyncSession = Depends(get_session)) -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/api/v1/catalog/products", response_model=list[ProductResponse])
-async def list_products(db: AsyncSession = Depends(get_session)) -> list[ProductResponse]:
-    products = await db.scalars(
-        select(Product).where(Product.status == "published").order_by(Product.published_at.desc())
+@app.get("/api/v1/catalog/products", response_model=ProductListResponse)
+async def list_products(
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = Query(default=None, max_length=256),
+    db: AsyncSession = Depends(get_session),
+) -> ProductListResponse:
+    products, next_cursor = await list_published_products(db, limit=limit, cursor=cursor)
+    return ProductListResponse(
+        items=[await product_response(db, product) for product in products],
+        next_cursor=next_cursor,
     )
-    return [await product_response(db, product) for product in products]
 
 
 @app.get("/api/v1/catalog/categories", response_model=list[CategoryResponse])

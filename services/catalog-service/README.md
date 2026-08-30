@@ -6,7 +6,7 @@ It stores only opaque media asset identifiers. It never queries the Media Servic
 
 ## API
 
-- GET /api/v1/catalog/products
+- GET /api/v1/catalog/products with `limit` and an opaque `cursor`, returning `items` and `next_cursor`
 - GET /api/v1/catalog/products/{slug}
 - GET /api/v1/catalog/categories
 - GET /api/v1/catalog/categories/{slug}

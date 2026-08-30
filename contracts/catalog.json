@@ -75,6 +75,14 @@
       "schema": "openapi/search-query.v1.openapi.json"
     },
     {
+      "name": "catalog.products.v1",
+      "kind": "service-openapi",
+      "owner": "catalog-service",
+      "status": "active",
+      "notes": "Public cursor-paginated listing of canonical published Catalog products.",
+      "schema": "openapi/catalog-products.v1.openapi.json"
+    },
+    {
       "name": "event-envelope.v1",
       "kind": "event-envelope",
       "owner": "platform",

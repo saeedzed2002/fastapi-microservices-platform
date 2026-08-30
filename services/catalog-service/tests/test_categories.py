@@ -12,7 +12,9 @@ from catalog_service.application import (
     _validate_category_parent,
     create_category,
     create_product,
+    decode_product_cursor,
     delete_category,
+    encode_product_cursor,
 )
 from catalog_service.auth import require_administrator
 from catalog_service.main import app
@@ -193,3 +195,13 @@ def test_product_event_uses_a_complete_search_projection_payload() -> None:
     assert event.event_type == "product.updated.v1"
     assert event.payload["product_id"] == str(product.id)
     assert event.payload["published_at"].endswith("Z")
+
+
+def test_product_cursor_round_trip_and_invalid_input() -> None:
+    now = datetime.now(UTC)
+    product = Product(id=uuid4(), published_at=now)
+
+    assert decode_product_cursor(encode_product_cursor(product)) == (now, product.id)
+    with pytest.raises(HTTPException, match="invalid product cursor") as error:
+        decode_product_cursor("not-a-valid-cursor")
+    assert error.value.status_code == 422

@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, Numeric, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -36,6 +36,7 @@ class Category(Base):
 
 class Product(Base):
     __tablename__ = "products"
+    __table_args__ = (Index("ix_products_published_page", "status", "published_at", "id"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(240))

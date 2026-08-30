@@ -1,9 +1,12 @@
+import base64
+import binascii
+import json
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import and_, desc, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -182,6 +185,65 @@ async def product_response(db: AsyncSession, product: Product) -> ProductRespons
         updated_at=product.updated_at,
         published_at=product.published_at,
     )
+
+
+def encode_product_cursor(product: Product) -> str:
+    if product.published_at is None:
+        raise ValueError("a published product cursor requires published_at")
+    payload = {
+        "published_at": _utc_timestamp(product.published_at),
+        "product_id": str(product.id),
+    }
+    return base64.urlsafe_b64encode(json.dumps(payload).encode("utf-8")).decode("ascii").rstrip("=")
+
+
+def decode_product_cursor(cursor: str | None) -> tuple[datetime, UUID] | None:
+    if cursor is None:
+        return None
+    try:
+        padded = cursor + "=" * (-len(cursor) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")))
+        published_at = datetime.fromisoformat(str(payload["published_at"]).replace("Z", "+00:00"))
+        product_id = UUID(str(payload["product_id"]))
+    except (binascii.Error, KeyError, TypeError, UnicodeDecodeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="invalid product cursor",
+        ) from exc
+    if published_at.tzinfo is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="invalid product cursor",
+        )
+    return published_at.astimezone(UTC), product_id
+
+
+async def list_published_products(
+    db: AsyncSession, *, limit: int, cursor: str | None
+) -> tuple[list[Product], str | None]:
+    cursor_values = decode_product_cursor(cursor)
+    conditions = [Product.status == "published", Product.published_at.is_not(None)]
+    if cursor_values is not None:
+        published_at, product_id = cursor_values
+        conditions.append(
+            or_(
+                Product.published_at < published_at,
+                and_(Product.published_at == published_at, Product.id < product_id),
+            )
+        )
+    products = list(
+        await db.scalars(
+            select(Product)
+            .where(*conditions)
+            .order_by(desc(Product.published_at), desc(Product.id))
+            .limit(limit + 1)
+        )
+    )
+    has_next_page = len(products) > limit
+    if has_next_page:
+        products = products[:limit]
+    next_cursor = encode_product_cursor(products[-1]) if has_next_page else None
+    return products, next_cursor
 
 
 def _utc_timestamp(value: datetime | None) -> str | None:

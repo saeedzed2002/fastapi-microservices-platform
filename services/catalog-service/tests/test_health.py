@@ -18,3 +18,12 @@ def test_liveness() -> None:
 
 def test_product_deletion_route_is_administrator_only() -> None:
     assert "delete" in app.openapi()["paths"]["/api/v1/catalog/products/{product_id}"]
+
+
+def test_published_product_list_uses_a_cursor_response_contract() -> None:
+    operation = app.openapi()["paths"]["/api/v1/catalog/products"]["get"]
+
+    assert {parameter["name"] for parameter in operation["parameters"]} == {"cursor", "limit"}
+    assert operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/ProductListResponse"
+    )
