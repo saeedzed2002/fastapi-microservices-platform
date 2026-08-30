@@ -1,0 +1,88 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Media Catalog Attachment Internal API",
+    "version": "v1"
+  },
+  "paths": {
+    "/api/internal/v1/media/catalog-assets/{asset_id}/attachment-availability": {
+      "post": {
+        "summary": "Validate a product-image attachment candidate",
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Catalog-Access-Proof",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "owner_subject_id",
+                  "expires_at"
+                ],
+                "properties": {
+                  "owner_subject_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "expires_at": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Asset is ready, product-image scoped, and owned by the requested subject.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "asset_id"
+                  ],
+                  "properties": {
+                    "asset_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access proof is invalid or expired."
+          },
+          "409": {
+            "description": "Asset is absent, unready, deleted, not a product image, or owned by another subject."
+          }
+        }
+      }
+    }
+  }
+}

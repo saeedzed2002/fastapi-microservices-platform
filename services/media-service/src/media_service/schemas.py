@@ -62,3 +62,12 @@ class InternalChatAttachmentDownloadResponse(BaseModel):
     content_type: str
     size_bytes: int = Field(gt=0)
     download_url: str
+
+
+class InternalCatalogAttachmentRequest(BaseModel):
+    owner_subject_id: UUID
+    expires_at: int = Field(gt=0)
+
+
+class InternalCatalogAttachmentResponse(BaseModel):
+    asset_id: UUID

@@ -1,10 +1,11 @@
 import asyncio
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from media_service.config import Settings
@@ -16,6 +17,12 @@ from media_service.schemas import (
     UploadRequest,
 )
 from media_service.storage import ObjectStorage
+
+
+@dataclass(frozen=True)
+class CleanupCandidate:
+    asset_id: UUID
+    object_keys: tuple[str, ...]
 
 
 async def load_owned_asset_or_404(
@@ -183,3 +190,100 @@ async def chat_attachment_download_url(
         derivative.content_type,
         derivative.size_bytes,
     )
+
+
+async def validate_catalog_attachment(
+    db: AsyncSession, *, asset_id: UUID, owner_subject_id: UUID
+) -> MediaAsset:
+    asset = await db.scalar(
+        select(MediaAsset).where(
+            MediaAsset.id == asset_id,
+            MediaAsset.owner_subject_id == owner_subject_id,
+            MediaAsset.purpose == "product_image",
+            MediaAsset.status == "ready",
+            MediaAsset.deleted_at.is_(None),
+        )
+    )
+    if asset is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="media asset is not available for catalog attachment",
+        )
+    return asset
+
+
+async def enqueue_abandoned_upload_cleanup(
+    db: AsyncSession,
+    *,
+    now: datetime,
+    retention: timedelta,
+    retry_after: timedelta,
+    batch_size: int,
+) -> int:
+    candidates = list(
+        await db.scalars(
+            select(MediaAsset)
+            .where(
+                MediaAsset.deleted_at.is_(None),
+                or_(
+                    and_(
+                        MediaAsset.status == "pending",
+                        MediaAsset.created_at < now - retention,
+                    ),
+                    and_(
+                        MediaAsset.status == "deletion_pending",
+                        MediaAsset.updated_at < now - retry_after,
+                    ),
+                ),
+            )
+            .order_by(MediaAsset.created_at, MediaAsset.id)
+            .with_for_update(skip_locked=True)
+            .limit(batch_size)
+        )
+    )
+    for asset in candidates:
+        if asset.status == "pending":
+            asset.status = "deletion_pending"
+            asset.processing_error = "upload authorization expired before completion"
+        asset.updated_at = now
+        db.add(
+            MediaTaskIntent(
+                task_name="media.delete_asset.v1",
+                payload={"media_asset_id": str(asset.id)},
+            )
+        )
+    if candidates:
+        await db.commit()
+    return len(candidates)
+
+
+async def load_cleanup_candidate(db: AsyncSession, *, asset_id: UUID) -> CleanupCandidate | None:
+    asset = await db.scalar(
+        select(MediaAsset).where(
+            MediaAsset.id == asset_id,
+            MediaAsset.status == "deletion_pending",
+            MediaAsset.deleted_at.is_(None),
+        )
+    )
+    if asset is None:
+        return None
+    derivatives = list(
+        await db.scalars(
+            select(MediaDerivative.object_key).where(MediaDerivative.media_asset_id == asset.id)
+        )
+    )
+    return CleanupCandidate(
+        asset_id=asset.id,
+        object_keys=(asset.original_object_key, *derivatives),
+    )
+
+
+async def finalize_asset_cleanup(db: AsyncSession, *, asset_id: UUID, now: datetime) -> None:
+    asset = await db.get(MediaAsset, asset_id, with_for_update=True)
+    if asset is None or asset.status != "deletion_pending" or asset.deleted_at is not None:
+        return
+    await db.execute(delete(MediaDerivative).where(MediaDerivative.media_asset_id == asset.id))
+    asset.status = "deleted"
+    asset.deleted_at = now
+    asset.processing_error = None
+    await db.commit()

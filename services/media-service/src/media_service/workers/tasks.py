@@ -2,13 +2,19 @@
 
 import asyncio
 import hashlib
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from io import BytesIO
 from uuid import UUID
 
+from botocore.exceptions import BotoCoreError  # type: ignore[import-untyped]
 from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import select
 
+from media_service.application import (
+    enqueue_abandoned_upload_cleanup,
+    finalize_asset_cleanup,
+    load_cleanup_candidate,
+)
 from media_service.config import get_settings
 from media_service.db import dispose_engine, get_session_factory
 from media_service.models import MediaAsset, MediaDerivative, OutboxMessage
@@ -114,3 +120,60 @@ async def _process_and_dispose(media_asset_id: UUID) -> None:
 )
 def process_asset_task(self: object, *, media_asset_id: str) -> None:
     asyncio.run(_process_and_dispose(UUID(media_asset_id)))
+
+
+async def delete_media_asset(media_asset_id: UUID) -> None:
+    settings = get_settings()
+    storage = S3ObjectStorage(settings)
+    async with get_session_factory()() as db:
+        candidate = await load_cleanup_candidate(db, asset_id=media_asset_id)
+    if candidate is None:
+        return
+    await asyncio.to_thread(storage.delete_objects, object_keys=candidate.object_keys)
+    async with get_session_factory()() as db:
+        await finalize_asset_cleanup(db, asset_id=candidate.asset_id, now=datetime.now(UTC))
+
+
+async def _delete_and_dispose(media_asset_id: UUID) -> None:
+    try:
+        await delete_media_asset(media_asset_id)
+    finally:
+        await dispose_engine()
+
+
+@celery_app.task(
+    name="media_service.delete_asset",
+    bind=True,
+    autoretry_for=(BotoCoreError, ConnectionError),
+    retry_backoff=True,
+    retry_jitter=True,
+    retry_kwargs={"max_retries": 5},
+)
+def delete_asset_task(self: object, *, media_asset_id: str) -> None:
+    asyncio.run(_delete_and_dispose(UUID(media_asset_id)))
+
+
+async def reap_abandoned_uploads() -> int:
+    settings = get_settings()
+    if not settings.abandoned_upload_cleanup_enabled:
+        return 0
+    async with get_session_factory()() as db:
+        return await enqueue_abandoned_upload_cleanup(
+            db,
+            now=datetime.now(UTC),
+            retention=timedelta(seconds=settings.abandoned_upload_retention_seconds),
+            retry_after=timedelta(seconds=settings.abandoned_upload_reap_interval_seconds),
+            batch_size=settings.abandoned_upload_cleanup_batch_size,
+        )
+
+
+async def _reap_and_dispose() -> int:
+    try:
+        return await reap_abandoned_uploads()
+    finally:
+        await dispose_engine()
+
+
+@celery_app.task(name="media_service.reap_abandoned_uploads")
+def reap_abandoned_uploads_task() -> int:
+    return asyncio.run(_reap_and_dispose())

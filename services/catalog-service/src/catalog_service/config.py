@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     kafka_publisher_enabled: bool = False
     outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1)
     outbox_claim_lease_seconds: float = Field(default=60.0, ge=1.0, le=900.0)
+    media_base_url: str = "http://localhost:8004"
+    media_internal_access_secret: str = Field(
+        default="local-development-catalog-media-access-secret-change-me-32-bytes",
+        min_length=32,
+    )
+    media_access_proof_ttl_seconds: int = Field(default=60, ge=1, le=300)
+    media_timeout_seconds: float = Field(default=3.0, gt=0, le=30)
     log_level: str = "INFO"
 
     model_config = SettingsConfigDict(env_prefix="CATALOG_", extra="ignore")

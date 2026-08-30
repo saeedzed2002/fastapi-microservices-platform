@@ -26,7 +26,7 @@ Define JWT issuer/audience, signing algorithm, key distribution and rotation, do
 
 ### Media event consumers
 
-Before Phase 3 activates `media.ready.v1`, define which bounded contexts consume it, whether they need a projection or synchronous readiness query, and how ownership/deletion races are handled.
+Resolved by ADR-026: Catalog uses a synchronous, short-lived HMAC-authenticated Media readiness check before persisting a product-image reference; Media reaps only pending, unreferenced-by-construction upload authorizations through durable task intents. Other future Media consumers must define their own ownership and lifecycle boundary before activation.
 
 ### Redis degradation policy
 

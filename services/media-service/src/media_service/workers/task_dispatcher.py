@@ -33,12 +33,19 @@ async def _claim_intent() -> MediaTaskIntent | None:
         return intent
 
 
-async def _dispatch_asset(*, media_asset_id: str, timeout_seconds: float) -> None:
+async def _dispatch_intent(intent: MediaTaskIntent, *, timeout_seconds: float) -> None:
+    targets = {
+        "media.process_asset.v1": "media_service.process_asset",
+        "media.delete_asset.v1": "media_service.delete_asset",
+    }
+    task_name = targets.get(intent.task_name)
+    if task_name is None:
+        raise ValueError(f"unsupported media task intent: {intent.task_name}")
     await asyncio.wait_for(
         asyncio.to_thread(
             celery_app.send_task,
-            "media_service.process_asset",
-            kwargs={"media_asset_id": media_asset_id},
+            task_name,
+            kwargs=intent.payload,
             queue="media.processing",
         ),
         timeout=timeout_seconds,
@@ -63,8 +70,8 @@ async def run_task_dispatcher(settings: Settings, stop: asyncio.Event) -> None:
             await _wait(stop, settings.task_dispatcher_poll_interval_seconds)
             continue
         try:
-            await _dispatch_asset(
-                media_asset_id=intent.payload["media_asset_id"],
+            await _dispatch_intent(
+                intent,
                 timeout_seconds=settings.task_dispatcher_publish_timeout_seconds,
             )
             await _mark(intent.id, status="dispatched")

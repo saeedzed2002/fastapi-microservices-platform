@@ -20,6 +20,10 @@ def test_product_deletion_route_is_administrator_only() -> None:
     assert "delete" in app.openapi()["paths"]["/api/v1/catalog/products/{product_id}"]
 
 
+def test_product_media_attachment_route_is_exposed() -> None:
+    assert "post" in app.openapi()["paths"]["/api/v1/catalog/products/{product_id}/media"]
+
+
 def test_published_product_list_uses_a_cursor_response_contract() -> None:
     operation = app.openapi()["paths"]["/api/v1/catalog/products"]["get"]
 

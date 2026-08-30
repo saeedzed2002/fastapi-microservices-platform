@@ -1,7 +1,16 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -15,6 +24,7 @@ class Base(DeclarativeBase):
 
 class MediaAsset(Base):
     __tablename__ = "media_assets"
+    __table_args__ = (Index("ix_media_assets_cleanup_candidates", "status", "created_at"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     owner_subject_id: Mapped[UUID] = mapped_column(index=True)

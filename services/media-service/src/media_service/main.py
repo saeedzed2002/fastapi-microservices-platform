@@ -14,12 +14,16 @@ from media_service.application import (
     chat_attachment_download_url,
     complete_upload,
     load_owned_asset_or_404,
+    validate_catalog_attachment,
 )
 from media_service.auth import current_user
+from media_service.catalog_access import verify_catalog_access_proof
 from media_service.chat_access import verify_chat_access_proof
 from media_service.config import get_settings
 from media_service.db import dispose_engine, get_session
 from media_service.schemas import (
+    InternalCatalogAttachmentRequest,
+    InternalCatalogAttachmentResponse,
     InternalChatAttachmentDownloadRequest,
     InternalChatAttachmentDownloadResponse,
     MediaAssetResponse,
@@ -133,6 +137,31 @@ async def create_chat_attachment_download_url(
         size_bytes=size_bytes,
         download_url=download_url,
     )
+
+
+@app.post(
+    "/api/internal/v1/media/catalog-assets/{asset_id}/attachment-availability",
+    response_model=InternalCatalogAttachmentResponse,
+)
+async def validate_catalog_asset_attachment(
+    asset_id: UUID,
+    payload: InternalCatalogAttachmentRequest,
+    catalog_access_proof: str = Header(alias="X-Catalog-Access-Proof"),
+    db: AsyncSession = Depends(get_session),
+) -> InternalCatalogAttachmentResponse:
+    verify_catalog_access_proof(
+        settings=settings,
+        provided_proof=catalog_access_proof,
+        subject_id=payload.owner_subject_id,
+        asset_id=asset_id,
+        expires_at=payload.expires_at,
+    )
+    asset = await validate_catalog_attachment(
+        db,
+        asset_id=asset_id,
+        owner_subject_id=payload.owner_subject_id,
+    )
+    return InternalCatalogAttachmentResponse(asset_id=asset.id)
 
 
 @app.get("/metrics", tags=["observability"])

@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     )
     chat_access_previous_secret: str | None = None
     chat_access_proof_max_ttl_seconds: int = Field(default=60, ge=1, le=300)
+    catalog_access_secret: str = Field(
+        default="local-development-catalog-media-access-secret-change-me-32-bytes",
+        min_length=32,
+    )
+    catalog_access_previous_secret: str | None = None
+    catalog_access_proof_max_ttl_seconds: int = Field(default=60, ge=1, le=300)
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
     rabbitmq_url: str = "amqp://platform:platform-local-only@localhost:5672//"
     task_dispatcher_enabled: bool = False
@@ -39,6 +45,10 @@ class Settings(BaseSettings):
     kafka_publisher_enabled: bool = False
     outbox_poll_interval_seconds: float = Field(default=1.0, ge=0.1)
     outbox_claim_lease_seconds: float = Field(default=60.0, ge=1.0, le=900.0)
+    abandoned_upload_cleanup_enabled: bool = False
+    abandoned_upload_retention_seconds: int = Field(default=86_400, ge=600, le=604_800)
+    abandoned_upload_reap_interval_seconds: int = Field(default=3_600, ge=60, le=86_400)
+    abandoned_upload_cleanup_batch_size: int = Field(default=100, ge=1, le=1_000)
 
     model_config = SettingsConfigDict(env_prefix="MEDIA_", extra="ignore")
 

@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -20,6 +21,7 @@ class ObjectStorage(Protocol):
     def head(self, *, object_key: str) -> ObjectHead: ...
     def get_bytes(self, *, object_key: str) -> bytes: ...
     def put_bytes(self, *, object_key: str, content_type: str, data: bytes) -> None: ...
+    def delete_objects(self, *, object_keys: Sequence[str]) -> None: ...
 
 
 class S3ObjectStorage:
@@ -75,3 +77,7 @@ class S3ObjectStorage:
         self._internal.put_object(
             Bucket=self._bucket, Key=object_key, Body=data, ContentType=content_type
         )
+
+    def delete_objects(self, *, object_keys: Sequence[str]) -> None:
+        for object_key in object_keys:
+            self._internal.delete_object(Bucket=self._bucket, Key=object_key)

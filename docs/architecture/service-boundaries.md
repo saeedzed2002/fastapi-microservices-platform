@@ -94,7 +94,7 @@ Owns upload authorization, media metadata, presigned URLs, completion verificati
 
 Does not own product, customer, chat, or invoice business relationships. It does not store binary objects in PostgreSQL.
 
-Clients transfer bytes directly to object storage. Media workers validate and transform files, then publish lifecycle facts such as `media.ready.v1`.
+Clients transfer bytes directly to object storage. Media workers validate and transform files, then publish lifecycle facts such as `media.ready.v1`. Media also reaps abandoned pending uploads through durable task intents and exposes a short-lived, HMAC-authenticated internal readiness check so Catalog can persist only owner-scoped ready product-image references without reading Media's database.
 
 ### Chat Service
 

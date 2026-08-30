@@ -31,6 +31,7 @@ from catalog_service.application import (
 from catalog_service.auth import current_user, require_administrator
 from catalog_service.config import get_settings
 from catalog_service.db import dispose_engine, get_session
+from catalog_service.media import HttpMediaCatalogGateway
 from catalog_service.models import Product
 from catalog_service.schemas import (
     CategoryCreate,
@@ -51,6 +52,7 @@ from platform_auth import AuthClaims
 
 settings = get_settings()
 logger = logging.getLogger(settings.service_name)
+media_gateway = HttpMediaCatalogGateway(settings)
 
 
 @asynccontextmanager
@@ -65,6 +67,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     if task is not None:
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
+    await media_gateway.close()
     await dispose_engine()
     logger.info("service_stopped")
 
@@ -212,6 +215,10 @@ async def attach_media_endpoint(
     db: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
     require_administrator(claims)
+    await media_gateway.validate_product_image(
+        asset_id=payload.media_asset_id,
+        owner_subject_id=claims.subject,
+    )
     product = await load_product_or_404(db, product_id)
     relation = await attach_media(db, product, payload)
     return {"product_media_id": str(relation.id)}

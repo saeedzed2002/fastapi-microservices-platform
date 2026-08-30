@@ -185,12 +185,16 @@ services:
       CATALOG_ENVIRONMENT: local
       CATALOG_DATABASE_URL: postgresql+asyncpg://catalog_service:catalog-local-only@postgres:5432/catalog_service
       CATALOG_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
+      CATALOG_MEDIA_BASE_URL: http://media-service:8000
+      CATALOG_MEDIA_INTERNAL_ACCESS_SECRET: local-development-catalog-media-access-secret-change-me-32-bytes
       CATALOG_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       CATALOG_KAFKA_PUBLISHER_ENABLED: "true"
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      media-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
@@ -232,12 +236,16 @@ services:
       MEDIA_DATABASE_URL: postgresql+asyncpg://media_service:media-local-only@postgres:5432/media_service
       MEDIA_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
       MEDIA_CHAT_ACCESS_SECRET: local-development-chat-media-access-secret-change-me-32-bytes
+      MEDIA_CATALOG_ACCESS_SECRET: local-development-catalog-media-access-secret-change-me-32-bytes
       MEDIA_S3_ENDPOINT_URL: http://minio:9000
       MEDIA_S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
       MEDIA_RABBITMQ_URL: amqp://platform:platform-local-only@rabbitmq:5672//
       MEDIA_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       MEDIA_TASK_DISPATCHER_ENABLED: "true"
       MEDIA_KAFKA_PUBLISHER_ENABLED: "true"
+      MEDIA_ABANDONED_UPLOAD_CLEANUP_ENABLED: "true"
+      MEDIA_ABANDONED_UPLOAD_RETENTION_SECONDS: "86400"
+      MEDIA_ABANDONED_UPLOAD_REAP_INTERVAL_SECONDS: "3600"
     depends_on:
       postgres:
         condition: service_healthy
@@ -536,14 +544,35 @@ services:
       MEDIA_DATABASE_URL: postgresql+asyncpg://media_service:media-local-only@postgres:5432/media_service
       MEDIA_S3_ENDPOINT_URL: http://minio:9000
       MEDIA_S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
+      MEDIA_CATALOG_ACCESS_SECRET: local-development-catalog-media-access-secret-change-me-32-bytes
       MEDIA_RABBITMQ_URL: amqp://platform:platform-local-only@rabbitmq:5672//
       MEDIA_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MEDIA_ABANDONED_UPLOAD_CLEANUP_ENABLED: "true"
+      MEDIA_ABANDONED_UPLOAD_RETENTION_SECONDS: "86400"
+      MEDIA_ABANDONED_UPLOAD_REAP_INTERVAL_SECONDS: "3600"
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
       minio:
+        condition: service_healthy
+
+  media-beat:
+    image: fastapi-microservices-platform-media-service:0.4.0-local
+    pull_policy: never
+    command: ["celery", "-A", "media_service.workers.celery_app:celery_app", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
+    environment:
+      MEDIA_ENVIRONMENT: local
+      MEDIA_DATABASE_URL: postgresql+asyncpg://media_service:media-local-only@postgres:5432/media_service
+      MEDIA_RABBITMQ_URL: amqp://platform:platform-local-only@rabbitmq:5672//
+      MEDIA_ABANDONED_UPLOAD_CLEANUP_ENABLED: "true"
+      MEDIA_ABANDONED_UPLOAD_RETENTION_SECONDS: "86400"
+      MEDIA_ABANDONED_UPLOAD_REAP_INTERVAL_SECONDS: "3600"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
 
 volumes:

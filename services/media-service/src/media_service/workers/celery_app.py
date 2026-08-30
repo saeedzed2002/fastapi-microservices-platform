@@ -22,3 +22,12 @@ celery_app.conf.update(
     task_publish_retry_policy={"max_retries": 3, "interval_start": 0, "interval_step": 1},
     broker_transport_options={"confirm_publish": True},
 )
+
+if settings.abandoned_upload_cleanup_enabled:
+    celery_app.conf.beat_schedule = {
+        "reap-abandoned-media-uploads": {
+            "task": "media_service.reap_abandoned_uploads",
+            "schedule": settings.abandoned_upload_reap_interval_seconds,
+            "options": {"queue": "media.processing"},
+        }
+    }

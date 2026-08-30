@@ -1,0 +1,42 @@
+import hashlib
+import hmac
+import time
+from uuid import UUID
+
+from fastapi import HTTPException, status
+
+from media_service.config import Settings
+
+
+def _canonical_access_proof(*, subject_id: UUID, asset_id: UUID, expires_at: int) -> bytes:
+    return "\n".join((str(subject_id), str(asset_id), str(expires_at))).encode()
+
+
+def verify_catalog_access_proof(
+    *,
+    settings: Settings,
+    provided_proof: str,
+    subject_id: UUID,
+    asset_id: UUID,
+    expires_at: int,
+) -> None:
+    now = int(time.time())
+    if expires_at <= now or expires_at > now + settings.catalog_access_proof_max_ttl_seconds:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="invalid catalog access proof"
+        )
+    canonical = _canonical_access_proof(
+        subject_id=subject_id,
+        asset_id=asset_id,
+        expires_at=expires_at,
+    )
+    secrets = [settings.catalog_access_secret]
+    if settings.catalog_access_previous_secret is not None:
+        secrets.append(settings.catalog_access_previous_secret)
+    for secret in secrets:
+        expected_proof = hmac.new(secret.encode(), canonical, hashlib.sha256).hexdigest()
+        if hmac.compare_digest(expected_proof, provided_proof):
+            return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail="invalid catalog access proof"
+    )
