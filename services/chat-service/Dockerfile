@@ -20,6 +20,8 @@ WORKDIR /app
 
 COPY --from=builder /app/.venv ./.venv
 COPY services/chat-service/src ./src
+COPY services/chat-service/migrations ./migrations
+COPY services/chat-service/alembic.ini ./alembic.ini
 COPY libs/platform-auth/src/platform_auth ./src/platform_auth
 RUN useradd --create-home --uid 10001 appuser
 

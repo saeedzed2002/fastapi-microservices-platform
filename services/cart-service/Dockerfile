@@ -4,6 +4,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app/src
 WORKDIR /app
 
 COPY services/cart-service/src ./src
+COPY services/cart-service/migrations ./migrations
+COPY services/cart-service/alembic.ini ./alembic.ini
 COPY libs/platform-auth/src/platform_auth ./src/platform_auth
 RUN pip install --no-cache-dir --disable-pip-version-check \
     "alembic==1.19.1" "asyncpg==0.31.0" "fastapi==0.141.1" \

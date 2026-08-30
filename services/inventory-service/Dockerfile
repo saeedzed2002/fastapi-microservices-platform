@@ -4,6 +4,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app/src
 WORKDIR /app
 
 COPY services/inventory-service/src ./src
+COPY services/inventory-service/migrations ./migrations
+COPY services/inventory-service/alembic.ini ./alembic.ini
 COPY libs/platform-auth/src/platform_auth ./src/platform_auth
 COPY libs/platform-messaging/src/platform_messaging ./src/platform_messaging
 RUN pip install --no-cache-dir --disable-pip-version-check \

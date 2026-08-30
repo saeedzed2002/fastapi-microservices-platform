@@ -25,6 +25,19 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install verified kubectl v1.37.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=v1.37.0
+          curl --fail --location --retry 3 --output kubectl "https://dl.k8s.io/release/${version}/bin/linux/amd64/kubectl"
+          curl --fail --location --retry 3 --output kubectl.sha256 "https://dl.k8s.io/release/${version}/bin/linux/amd64/kubectl.sha256"
+          echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+          mkdir --parents "$HOME/.local/bin"
+          install --mode=0755 kubectl "$HOME/.local/bin/kubectl"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          kubectl version --client
+
       - name: Set up CPython 3.14.7
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
@@ -42,6 +55,14 @@ jobs:
       - name: Validate repository architecture and contracts
         shell: pwsh
         run: ./scripts/validate_phase0.ps1
+
+      - name: Render Kubernetes resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl kustomize infrastructure/kubernetes/foundation >/dev/null
+          kubectl kustomize infrastructure/kubernetes/migrations >/dev/null
+          kubectl kustomize infrastructure/kubernetes/workloads >/dev/null
 
       - name: Validate lock, formatting, linting, typing, and unit tests
         run: |

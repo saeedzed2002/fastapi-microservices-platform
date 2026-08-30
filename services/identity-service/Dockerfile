@@ -6,7 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app/src
 
 COPY services/identity-service/src ./src
+COPY services/identity-service/migrations ./migrations
 COPY services/identity-service/pyproject.toml ./
+COPY services/identity-service/alembic.ini ./alembic.ini
 COPY libs/platform-auth/src/platform_auth ./src/platform_auth
 
 RUN pip install --no-cache-dir --disable-pip-version-check \

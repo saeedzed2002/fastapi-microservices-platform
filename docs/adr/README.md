@@ -23,6 +23,7 @@ ADRs record decisions that materially affect service ownership, contracts, durab
 
 | ADR | Status | Decision |
 |---|---|---|
+| [ADR-027](ADR-027-raw-kubernetes-delivery-baseline.md) | Accepted | Raw Kubernetes delivery baseline |
 | [ADR-026](ADR-026-media-upload-lifecycle-cleanup.md) | Accepted | Media upload cleanup and Catalog attachment validation |
 | [ADR-025](ADR-025-catalog-search-projection.md) | Accepted | Rebuildable Catalog search projection |
 | [ADR-024](ADR-024-two-role-order-administration.md) | Accepted | Two-role model and paid-order administration |

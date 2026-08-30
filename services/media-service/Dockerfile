@@ -19,6 +19,8 @@ WORKDIR /app
 
 COPY --from=builder /app/.venv ./.venv
 COPY services/media-service/src ./src
+COPY services/media-service/migrations ./migrations
+COPY services/media-service/alembic.ini ./alembic.ini
 COPY libs/platform-auth/src/platform_auth ./src/platform_auth
 RUN useradd --create-home --uid 10001 appuser
 

@@ -9,9 +9,10 @@ pull request, every push to `main`, and manual validation. It intentionally has
 no path filters because root dependencies, contracts, shared technical
 libraries, workflows, and infrastructure affect multiple bounded contexts.
 
-The `quality` job validates architecture artifacts, JSON contracts, the lock,
-formatting, linting, typing, unit tests, the Compose model, and locked Python
-dependency vulnerabilities. Editable workspace packages are not published
+The `quality` job validates architecture artifacts, JSON contracts, raw
+Kubernetes rendering with a checksum-verified `kubectl`, the lock, formatting,
+linting, typing, unit tests, the Compose model, and locked Python dependency
+vulnerabilities. Editable workspace packages are not published
 third-party distributions, so `pip-audit` excludes them and audits their locked
 external dependencies. The `migration-heads` job requires one Alembic
 head per executable service. Pull requests build each service image
@@ -87,9 +88,9 @@ approval rather than rebuilding it per environment.
 
 CD is introduced only after Kubernetes deployment exists and its raw resources are stable. It is not an uncontrolled `kubectl apply` command. Environments, approvals, credentials, migration gates, readiness, smoke scope, rollback triggers, and audit history must be defined first.
 
-The current delivery boundary is the verified immutable `GHCR` digest, not a
-runtime deployment. Kubernetes and Helm are Phases 9 and 10, so there is no
-deployment workflow yet. Their later promotion workflow must consume a
+The current delivery boundary remains the verified immutable `GHCR` digest,
+not an automatic runtime deployment. Phase 9 supplies the raw Kubernetes
+resources and migration gates; a later promotion workflow must consume a
 previously published digest, require explicit environment approval, execute a
 controlled service-owned migration Job, validate rollout/readiness and bounded
 smoke tests, and permit rollback only when the schema remains compatible.

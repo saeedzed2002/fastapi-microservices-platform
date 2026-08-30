@@ -4,16 +4,11 @@ FastAPI Microservices Platform is a backend-only, production-oriented e-commerce
 
 ## Project status
 
-The repository has completed **Phase 7 — Realtime Chat**. Before the later
-Search phase, the current hardening increment adds customer order self-service,
-read-only staff order review, staff-account operations, and customer contact
-email snapshots for invoice delivery.
-
-The current increment adds a customer OTP flow that keeps raw codes in
-Identity-owned temporary Redis state, dispatches SMS through Notification's
-durable task intent and Celery worker, and keeps administrator email/password
-authentication separate. It uses the configured `SMS.ir` Bulk adapter only
-after a local secret configuration is supplied.
+The repository has completed **Phase 9 — Kubernetes**. Raw `Kustomize`
+resources now provide the workload baseline; a real target environment still
+must provide pinned release images, secrets, ingress/TLS, external durable
+services, and environment-specific egress policy before public deployment.
+Helm remains deliberately deferred to Phase 10.
 
 ## Architecture at a glance
 
@@ -100,6 +95,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Staff operations runbook](docs/runbooks/admin-operations.md)
 - [Search projection runbook](docs/runbooks/search-projection.md)
 - [Edge gateway runbook](docs/runbooks/edge-gateway.md)
+- [Kubernetes deployment runbook](docs/runbooks/kubernetes-deployment.md)
 - [Phase 0 plan](docs/development/phase-0-plan.md)
 - [Phase 1 plan](docs/development/phase-1-plan.md)
 - [Phase 2 plan](docs/development/phase-2-plan.md)
@@ -108,6 +104,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Phase 6 plan](docs/development/phase-6-plan.md)
 - [Phase 7 plan](docs/development/phase-7-plan.md)
 - [Phase 8 plan](docs/development/phase-8-plan.md)
+- [Phase 9 plan](docs/development/phase-9-plan.md)
 
 ## Roadmap
 

@@ -1,0 +1,202 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-invoice-worker
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: order-invoice-worker, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: order-invoice-worker}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: order-invoice-worker
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: worker
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      terminationGracePeriodSeconds: 90
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: order-invoice-worker
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/order-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command: [celery, -A, order_service.workers.celery_app:celery_app, worker, --loglevel=INFO, --without-mingle, --without-gossip, -Q, order.invoice]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 768Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-email-worker
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: notification-email-worker, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: notification-email-worker}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notification-email-worker
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: worker
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      terminationGracePeriodSeconds: 90
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: notification-email-worker
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/notification-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command: [celery, -A, notification_service.workers.celery_app:celery_app, worker, --loglevel=INFO, --without-mingle, --without-gossip, -Q, notification.email]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-sms-worker
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: notification-sms-worker, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: notification-sms-worker}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notification-sms-worker
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: worker
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      terminationGracePeriodSeconds: 90
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: notification-sms-worker
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/notification-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command: [celery, -A, notification_service.workers.celery_app:celery_app, worker, --loglevel=INFO, --without-mingle, --without-gossip, -Q, notification.sms]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: media-worker
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: media-worker, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: media-worker}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: media-worker
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: worker
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      terminationGracePeriodSeconds: 90
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: media-worker
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/media-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command: [celery, -A, media_service.workers.celery_app:celery_app, worker, --loglevel=INFO, --without-mingle, --without-gossip]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 150m, memory: 384Mi}, limits: {cpu: "1", memory: 1Gi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-expiry-worker
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: payment-expiry-worker, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: payment-expiry-worker}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: payment-expiry-worker
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: worker
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      terminationGracePeriodSeconds: 30
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: payment-expiry-worker
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/payment-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command: [python, -m, payment_service.workers.expiry_main]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {cpu: 500m, memory: 256Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: media-upload-reaper
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: media-upload-reaper, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  schedule: "0 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: media-upload-reaper
+            app.kubernetes.io/part-of: fastapi-microservices-platform
+            platform.fastapi.io/workload: scheduled-job
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: platform-runtime
+          automountServiceAccountToken: false
+          imagePullSecrets: [{name: ghcr-pull}]
+          securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+          containers:
+            - name: media-upload-reaper
+              image: ghcr.io/saeedzed2002/fastapi-microservices-platform/media-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              command: [celery, -A, media_service.workers.celery_app:celery_app, call, media_service.reap_abandoned_uploads]
+              envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+              securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+              volumeMounts: [{name: tmp, mountPath: /tmp}]
+              resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {cpu: 500m, memory: 256Mi}}
+          volumes: [{name: tmp, emptyDir: {}}]

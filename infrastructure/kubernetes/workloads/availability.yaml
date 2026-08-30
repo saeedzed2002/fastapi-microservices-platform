@@ -1,0 +1,59 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: reference-service, namespace: fastapi-platform}
+spec: {minAvailable: 1, selector: {matchLabels: {app.kubernetes.io/name: reference-service}}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: identity-service, namespace: fastapi-platform}
+spec: {minAvailable: 1, selector: {matchLabels: {app.kubernetes.io/name: identity-service}}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: customer-service, namespace: fastapi-platform}
+spec: {minAvailable: 1, selector: {matchLabels: {app.kubernetes.io/name: customer-service}}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: catalog-service, namespace: fastapi-platform}
+spec: {minAvailable: 1, selector: {matchLabels: {app.kubernetes.io/name: catalog-service}}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: search-service, namespace: fastapi-platform}
+spec: {minAvailable: 1, selector: {matchLabels: {app.kubernetes.io/name: search-service}}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: media-service, namespace: fastapi-platform}
+spec: {minAvailable: 1, selector: {matchLabels: {app.kubernetes.io/name: media-service}}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: inventory-service, namespace: fastapi-platform}
+spec: {minAvailable: 1, selector: {matchLabels: {app.kubernetes.io/name: inventory-service}}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: cart-service, namespace: fastapi-platform}
+spec: {minAvailable: 1, selector: {matchLabels: {app.kubernetes.io/name: cart-service}}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: order-service, namespace: fastapi-platform}
+spec: {minAvailable: 1, selector: {matchLabels: {app.kubernetes.io/name: order-service}}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: payment-service, namespace: fastapi-platform}
+spec: {minAvailable: 1, selector: {matchLabels: {app.kubernetes.io/name: payment-service}}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: notification-service, namespace: fastapi-platform}
+spec: {minAvailable: 1, selector: {matchLabels: {app.kubernetes.io/name: notification-service}}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: chat-service, namespace: fastapi-platform}
+spec: {minAvailable: 1, selector: {matchLabels: {app.kubernetes.io/name: chat-service}}}

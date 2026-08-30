@@ -6,7 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app/src
 
 COPY services/catalog-service/src ./src
+COPY services/catalog-service/migrations ./migrations
 COPY services/catalog-service/pyproject.toml ./
+COPY services/catalog-service/alembic.ini ./alembic.ini
 COPY libs/platform-auth/src/platform_auth ./src/platform_auth
 COPY libs/platform-messaging/src/platform_messaging ./src/platform_messaging
 

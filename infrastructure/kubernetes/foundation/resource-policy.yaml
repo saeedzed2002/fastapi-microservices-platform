@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: platform-container-defaults
+  namespace: fastapi-platform
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 50m
+        memory: 128Mi
+      default:
+        cpu: 500m
+        memory: 512Mi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: platform-workload-budget
+  namespace: fastapi-platform
+spec:
+  hard:
+    # Covers the normal workload set plus all API rolling-update surge Pods.
+    # Cluster capacity remains the scheduler's responsibility; this namespace
+    # budget must not deadlock a maxUnavailable=0 rollout.
+    pods: "50"
+    requests.cpu: "6"
+    requests.memory: 12Gi
+    limits.cpu: "48"
+    limits.memory: 24Gi

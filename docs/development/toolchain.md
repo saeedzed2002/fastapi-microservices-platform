@@ -43,8 +43,8 @@ Phase 1 selects the minimum executable platform profile. Direct package constrai
 | Grafana | 1/11 | Not selected | Datasource/dashboard compatibility, image digest and security review |
 | Loki | 1/11 | Not selected | Collector/export path, storage model, image digest and security review |
 | Tempo | 1/11 | Not selected | OTLP/Collector compatibility, storage model and image digest |
-| Kubernetes | 9 | Not selected | Supported release, version-skew policy, API lifecycle and cluster compatibility |
-| `kubectl` | 9 | Not selected | Cluster version-skew compatibility and reproducible distribution |
+| Kubernetes | 9 | `v1.37.0` control-plane target; reviewed `2026-08-30` | Active stable release branch, API lifecycle, target-cluster compatibility, and managed-provider support |
+| `kubectl` | 9 | `v1.37.0` CI/release client target; SHA-256 verified download | Kubernetes client-version skew policy, reproducible official distribution, and target-cluster compatibility |
 | Helm | 10 | Not selected | Supported release, Kubernetes compatibility and chart API behavior |
 
 ## Phase 0 evidence
@@ -298,3 +298,35 @@ source for the workspace.
   and [WebSocket proxying](https://nginx.org/en/docs/http/websocket.html).
 - Owner: platform engineering. Next review: before `Phase 8` or `2026-09-25`,
   whichever occurs first.
+
+## Phase 9 Kubernetes selection evidence
+
+- Kubernetes `v1.37.0` was the newest stable upstream release line when
+  reviewed on `2026-08-30`. The active release branches listed by the
+  Kubernetes project were `1.37`, `1.36`, and `1.35`; `1.37` is selected for
+  the Phase 9 target. A managed Kubernetes provider or self-managed cluster
+  must still prove that it supports the selected version before environment
+  adoption.
+- The CI/release client target is the official `kubectl` `v1.37.0` binary
+  fetched from `dl.k8s.io` together with its official SHA-256 file and
+  verified before installation. Kubernetes documents that `kubectl` is
+  supported within one minor version of the control plane, so an exact target
+  client removes an avoidable deployment discrepancy.
+- The repository uses the Kustomize functionality integrated into `kubectl`
+  rather than adding a separate templating runtime. Kubernetes documents its
+  support in `kubectl` and this phase only needs raw-resource rendering. Helm
+  remains intentionally unselected until Phase 10.
+- Security and compatibility: manifests use stable `apps/v1`, `batch/v1`,
+  `policy/v1`, `networking.k8s.io/v1`, and `v1` APIs; the target cluster must
+  enforce the reviewed restricted Pod Security Standard and provide its own
+  ingress/TLS and external-state compatibility evidence. No mutable cluster
+  image or `latest` dependency is selected.
+- Official sources reviewed: [Kubernetes releases](https://kubernetes.io/releases/),
+  [kubectl overview and version skew](https://kubernetes.io/docs/concepts/overview/kubectl/),
+  [Kustomize with kubectl](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/),
+  [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/),
+  [NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/),
+  [probes](https://kubernetes.io/docs/concepts/workloads/pods/probes/), and
+  [Jobs](https://kubernetes.io/docs/concepts/workloads/controllers/job/).
+  Owner: platform engineering. Next review: before selecting a target cluster,
+  before Phase 10, or `2026-09-30`, whichever occurs first.

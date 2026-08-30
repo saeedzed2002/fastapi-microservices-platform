@@ -1,0 +1,56 @@
+# The selected ingress controller must provide TLS, trusted-proxy handling,
+# request limits, WebSocket upgrades, and the response-header policy documented
+# in the Kubernetes runbook.  Controller-specific annotations are intentionally
+# kept out of this raw, portable resource.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: platform-public-api
+  namespace: fastapi-platform
+  labels:
+    app.kubernetes.io/part-of: fastapi-microservices-platform
+spec:
+  ingressClassName: replace-with-ingress-class
+  tls:
+    - hosts: [api.replace-with-public-host.example]
+      secretName: platform-public-tls
+  rules:
+    - host: api.replace-with-public-host.example
+      http:
+        paths:
+          - path: /api/v1/auth
+            pathType: Prefix
+            backend: {service: {name: identity-service, port: {name: http}}}
+          - path: /api/v1/admin
+            pathType: Prefix
+            backend: {service: {name: identity-service, port: {name: http}}}
+          - path: /api/v1/customers
+            pathType: Prefix
+            backend: {service: {name: customer-service, port: {name: http}}}
+          - path: /api/v1/catalog
+            pathType: Prefix
+            backend: {service: {name: catalog-service, port: {name: http}}}
+          - path: /api/v1/search
+            pathType: Prefix
+            backend: {service: {name: search-service, port: {name: http}}}
+          - path: /api/v1/media
+            pathType: Prefix
+            backend: {service: {name: media-service, port: {name: http}}}
+          - path: /api/v1/inventory
+            pathType: Prefix
+            backend: {service: {name: inventory-service, port: {name: http}}}
+          - path: /api/v1/carts
+            pathType: Prefix
+            backend: {service: {name: cart-service, port: {name: http}}}
+          - path: /api/v1/orders
+            pathType: Prefix
+            backend: {service: {name: order-service, port: {name: http}}}
+          - path: /api/v1/payments
+            pathType: Prefix
+            backend: {service: {name: payment-service, port: {name: http}}}
+          - path: /api/v1/chat
+            pathType: Prefix
+            backend: {service: {name: chat-service, port: {name: http}}}
+          - path: /api/v1/reference
+            pathType: Exact
+            backend: {service: {name: reference-service, port: {name: http}}}

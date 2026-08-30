@@ -1,0 +1,321 @@
+# Jobs have fixed names so Kustomize can render them. Before a new delivery,
+# delete completed Jobs, apply this directory with the release's immutable
+# image digests, wait for completion, then apply API and worker workloads.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: identity-migrate
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: identity-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: identity-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: migrate
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/identity-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          command: [alembic, -c, /app/alembic.ini, upgrade, head]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: payment-migrate
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: payment-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: payment-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: migrate
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/payment-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          command: [alembic, -c, /app/alembic.ini, upgrade, head]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: notification-migrate
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: notification-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: notification-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: migrate
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/notification-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          command: [alembic, -c, /app/alembic.ini, upgrade, head]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: chat-migrate
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: chat-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: chat-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: migrate
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/chat-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          command: [alembic, -c, /app/alembic.ini, upgrade, head]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: media-migrate
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: media-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: media-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: migrate
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/media-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          command: [alembic, -c, /app/alembic.ini, upgrade, head]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: inventory-migrate
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: inventory-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: inventory-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: migrate
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/inventory-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          command: [alembic, -c, /app/alembic.ini, upgrade, head]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cart-migrate
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: cart-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: cart-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: migrate
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/cart-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          command: [alembic, -c, /app/alembic.ini, upgrade, head]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: order-migrate
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: order-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: order-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: migrate
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/order-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          command: [alembic, -c, /app/alembic.ini, upgrade, head]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 768Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: customer-migrate
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: customer-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: customer-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: migrate
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/customer-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          command: [alembic, -c, /app/alembic.ini, upgrade, head]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: catalog-migrate
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: catalog-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: catalog-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: migrate
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/catalog-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          command: [alembic, -c, /app/alembic.ini, upgrade, head]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: search-migrate
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: search-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: search-migration, app.kubernetes.io/part-of: fastapi-microservices-platform, platform.fastapi.io/workload: migration}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: migrate
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/search-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          command: [alembic, -c, /app/alembic.ini, upgrade, head]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
