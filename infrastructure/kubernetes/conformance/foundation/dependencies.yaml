@@ -122,8 +122,11 @@ spec:
             - {name: CLUSTER_ID, value: MkU3OEVBNTcwNTJENDM2Qk}
           readinessProbe:
             exec: {command: [sh, -c, /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null]}
-            periodSeconds: 5
-            failureThreshold: 24
+            # The command starts a JVM, so Kubernetes' default one-second
+            # probe timeout is insufficient even after Kafka is healthy.
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 12
           resources: {requests: {cpu: 250m, memory: 768Mi}, limits: {cpu: "1", memory: 1536Mi}}
 ---
 apiVersion: v1
@@ -148,6 +151,14 @@ spec:
     metadata:
       labels: {app.kubernetes.io/name: rabbitmq, app.kubernetes.io/part-of: fastapi-microservices-platform}
     spec:
+      # The official image supports execution with --user.  Running directly
+      # as its rabbitmq account prevents the Erlang cookie from being created
+      # by root and then becoming unreadable after the entrypoint drops UID.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
       containers:
         - name: rabbitmq
           image: rabbitmq:4.3.5-management@sha256:06fb591136a49e861e01aaaf9ce45085839ca23c35913d45a1e83519bb9778ca

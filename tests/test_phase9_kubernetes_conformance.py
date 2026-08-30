@@ -84,6 +84,11 @@ def test_conformance_dependencies_and_secrets_are_isolated_test_inputs() -> None
 
     assert "mountPath: /var/lib/postgresql}" in dependencies
     assert "mountPath: /var/lib/postgresql/data}" not in dependencies
+    assert "timeoutSeconds: 10" in dependencies
+    assert "failureThreshold: 12" in dependencies
+    assert "runAsUser: 999" in dependencies
+    assert "runAsGroup: 999" in dependencies
+    assert "fsGroup: 999" in dependencies
 
 
 def test_smoke_job_checks_every_api_readiness_endpoint() -> None:
