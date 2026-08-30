@@ -20,10 +20,10 @@ limiting, and Media's REST APIs.
 - `POST /api/v1/chat/support/conversations` creates or reuses the caller's
   active customer-support request. The customer does not submit an agent ID.
 - `GET /api/v1/chat/support/queue` returns metadata-only queued requests to an
-  `admin` or `support_agent`.
+  `admin`.
 - `POST /api/v1/chat/support/conversations/{conversation_id}/claim` atomically
-  makes one eligible agent the only assigned agent participant. `release`
-  returns the request to the queue and removes that agent's membership; `close`
+  makes one eligible `admin` the only assigned administrator participant. `release`
+  returns the request to the queue and removes that administrator's membership; `close`
   preserves history and blocks new messages.
 - `GET /api/v1/chat/conversations` lists the caller's conversations.
 - `GET /api/v1/chat/conversations/{conversation_id}/messages` returns stable

@@ -93,6 +93,9 @@ def test_payment_ready_wait_reads_durable_state_without_sleeping() -> None:
         async def scalars(self, _: object) -> list[object]:
             return []
 
+        async def scalar(self, _: object) -> None:
+            return None
+
     class SessionFactory:
         def __call__(self) -> Session:
             return Session()

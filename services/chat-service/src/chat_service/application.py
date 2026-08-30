@@ -35,7 +35,7 @@ from chat_service.schemas import (
 )
 from platform_auth import AuthClaims
 
-SUPPORT_AGENT_ROLES = frozenset({"admin", "support_agent"})
+SUPPORT_QUEUE_ADMIN_ROLES = frozenset({"admin"})
 ACTIVE_SUPPORT_STATUSES = ("queued", "claimed")
 
 
@@ -106,10 +106,10 @@ def _require_customer(claims: AuthClaims) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="customer role required")
 
 
-def _require_support_agent(claims: AuthClaims) -> None:
-    if not SUPPORT_AGENT_ROLES.intersection(claims.roles):
+def _require_support_queue_administrator(claims: AuthClaims) -> None:
+    if not SUPPORT_QUEUE_ADMIN_ROLES.intersection(claims.roles):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="support agent role required"
+            status_code=status.HTTP_403_FORBIDDEN, detail="administrator role required"
         )
 
 
@@ -249,7 +249,7 @@ async def create_support_conversation(
 async def list_support_queue(
     db: AsyncSession, *, claims: AuthClaims, limit: int
 ) -> SupportQueuePage:
-    _require_support_agent(claims)
+    _require_support_queue_administrator(claims)
     rows = list(
         await db.execute(
             select(SupportConversation, Conversation)
@@ -278,7 +278,7 @@ async def list_support_queue(
 async def claim_support_conversation(
     db: AsyncSession, *, conversation_id: UUID, claims: AuthClaims
 ) -> ConversationResponse:
-    _require_support_agent(claims)
+    _require_support_queue_administrator(claims)
     async with db.begin():
         support = await db.scalar(
             select(SupportConversation)
@@ -312,7 +312,7 @@ async def claim_support_conversation(
 async def release_support_conversation(
     db: AsyncSession, *, conversation_id: UUID, claims: AuthClaims
 ) -> None:
-    _require_support_agent(claims)
+    _require_support_queue_administrator(claims)
     async with db.begin():
         support = await db.scalar(
             select(SupportConversation)
@@ -339,7 +339,7 @@ async def release_support_conversation(
 async def close_support_conversation(
     db: AsyncSession, *, conversation_id: UUID, claims: AuthClaims
 ) -> ConversationResponse:
-    _require_support_agent(claims)
+    _require_support_queue_administrator(claims)
     async with db.begin():
         support = await db.scalar(
             select(SupportConversation)

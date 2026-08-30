@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CheckoutItem(BaseModel):
@@ -32,6 +32,14 @@ class OrderItemResponse(BaseModel):
     attributes: dict[str, str]
 
 
+class FulfillmentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    carrier: str | None
+    tracking_number: str | None
+    updated_at: datetime
+
+
 class OrderResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -43,6 +51,7 @@ class OrderResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     items: list[OrderItemResponse]
+    fulfillment: FulfillmentResponse | None
 
 
 class CartCheckoutResponse(BaseModel):
@@ -51,7 +60,37 @@ class CartCheckoutResponse(BaseModel):
     expires_at: datetime
 
 
-OrderStatus = Literal["PENDING", "INVENTORY_RESERVED", "PAYMENT_PENDING", "CONFIRMED", "CANCELLED"]
+OrderStatus = Literal[
+    "PENDING",
+    "INVENTORY_RESERVED",
+    "PAYMENT_PENDING",
+    "CONFIRMED",
+    "PROCESSING",
+    "SHIPPED",
+    "DELIVERED",
+    "REFUND_PENDING",
+    "REFUNDED",
+    "CANCELLED",
+]
+FulfillmentStatus = Literal["PROCESSING", "SHIPPED", "DELIVERED"]
+
+
+class FulfillmentUpdateRequest(BaseModel):
+    status: FulfillmentStatus
+    carrier: str | None = Field(default=None, min_length=1, max_length=120)
+    tracking_number: str | None = Field(default=None, min_length=1, max_length=160)
+
+    @model_validator(mode="after")
+    def require_tracking_for_shipment(self) -> FulfillmentUpdateRequest:
+        if self.status == "SHIPPED" and (self.carrier is None or self.tracking_number is None):
+            raise ValueError("carrier and tracking_number are required when shipping an order")
+        return self
+
+
+class RefundRequestResponse(BaseModel):
+    order_id: UUID
+    refund_request_id: UUID
+    status: Literal["REFUND_PENDING"]
 
 
 class OrderSummaryResponse(BaseModel):
@@ -92,6 +131,7 @@ class AdminOrderResponse(OrderResponse):
     payment_method: str
     transitions: list[OrderStateTransitionResponse]
     invoice: InvoiceSummaryResponse | None
+    refund_request_id: UUID | None
 
 
 class AdminOrderPage(BaseModel):

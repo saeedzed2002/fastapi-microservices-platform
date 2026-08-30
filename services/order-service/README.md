@@ -19,7 +19,9 @@ with the same `Idempotency-Key`, not a new one.
 
 Kafka state transitions are `PENDING` -> `INVENTORY_RESERVED` ->
 `PAYMENT_PENDING` -> `CONFIRMED`. Insufficient inventory or a terminal payment
-failure ends the order in `CANCELLED`. An Inbox guard and the state machine
+failure ends the order in `CANCELLED`. A Zarinpal refund request transitions
+`CONFIRMED` to `REFUND_PENDING`, then to `REFUNDED` or back to `CONFIRMED`.
+An Inbox guard and the state machine
 prevent duplicate or late facts from repeating effects or resurrecting a
 terminal order.
 
@@ -36,5 +38,7 @@ own email delivery.
 - `GET /api/v1/orders/{order_id}`
 - `GET /api/v1/orders/admin`
 - `GET /api/v1/orders/admin/{order_id}`
+- `PATCH /api/v1/orders/admin/{order_id}/fulfillment`
+- `POST /api/v1/orders/admin/{order_id}/refund` with `Idempotency-Key`
 - `GET /health/live`
 - `GET /health/ready`

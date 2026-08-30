@@ -63,6 +63,33 @@ def test_zarinpal_sandbox_request_and_verify_use_v4_contract() -> None:
     }
 
 
+def test_zarinpal_reverse_uses_the_documented_v4_endpoint() -> None:
+    requests: list[httpx.Request] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"data": {"code": 100}})
+
+    async def exercise() -> None:
+        client = ZarinpalClient(
+            merchant_id="00000000-0000-0000-0000-000000000000",
+            sandbox=True,
+            callback_url="https://localhost/api/v1/payments/zarinpal/callback",
+            timeout_seconds=10,
+            transport=httpx.MockTransport(handler),
+        )
+        result = await client.reverse_payment(authority="S000000000")
+        assert result.code == "100"
+
+    asyncio.run(exercise())
+
+    assert requests[0].url.path == "/pg/v4/payment/reverse.json"
+    assert json.loads(requests[0].content) == {
+        "merchant_id": "00000000-0000-0000-0000-000000000000",
+        "authority": "S000000000",
+    }
+
+
 def test_zarinpal_rejection_does_not_become_a_success() -> None:
     async def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"data": {"code": -9}})

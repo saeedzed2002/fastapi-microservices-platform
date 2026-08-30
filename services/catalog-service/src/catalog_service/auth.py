@@ -28,6 +28,8 @@ async def current_user(
         ) from exc
 
 
-def require_catalog_admin(claims: AuthClaims) -> None:
-    if not ({"admin", "catalog_admin"} & set(claims.roles)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="catalog admin required")
+def require_administrator(claims: AuthClaims) -> None:
+    if "admin" not in claims.roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="administrator role required"
+        )

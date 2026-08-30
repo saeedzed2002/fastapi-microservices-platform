@@ -146,10 +146,10 @@ Redis failure may interrupt cross-pod realtime delivery but cannot lose committe
 
 A customer creates a support conversation without selecting an administrator.
 Chat persists it in the support queue with only the customer as a participant.
-Eligible agents can inspect queue metadata, but not message content. Claiming uses
-a Chat PostgreSQL row lock and adds one agent participant in the same transaction;
-the claimed conversation disappears from the queue and all other agents fail the
-normal Chat membership checks. The assigned agent can release it back to the
+Eligible administrators can inspect queue metadata, but not message content. Claiming uses
+a Chat PostgreSQL row lock and adds one administrator participant in the same transaction;
+the claimed conversation disappears from the queue and all other administrators fail the
+normal Chat membership checks. The assigned administrator can release it back to the
 queue or close it. This authorization state is durable and is never stored only
 in Redis.
 

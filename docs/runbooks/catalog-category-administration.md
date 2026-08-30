@@ -3,7 +3,7 @@
 ## Purpose
 
 Catalog owns categories and their parent/child hierarchy. Categories are read
-publicly; only an authenticated `admin` or `catalog_admin` may create, update,
+publicly; only an authenticated `admin` may create, update,
 or delete them.
 
 ## Prerequisites

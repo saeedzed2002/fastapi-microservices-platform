@@ -9,10 +9,11 @@ from uuid import UUID, uuid4
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer  # type: ignore[import-untyped]
 from sqlalchemy import or_, select
 
-from payment_service.application import process_reservation_event
+from payment_service.application import process_reservation_event, process_zarinpal_refund_request
 from payment_service.config import Settings
 from payment_service.db import get_session_factory
 from payment_service.models import OutboxMessage
+from payment_service.zarinpal import ZarinpalClient
 from platform_messaging import KafkaDlqPolicy, process_record_with_dead_letter
 
 logger = logging.getLogger(__name__)
@@ -125,6 +126,7 @@ async def publish_outbox(settings: Settings, stop: asyncio.Event) -> None:
 async def consume_reservation_events(settings: Settings, stop: asyncio.Event) -> None:
     consumer = AIOKafkaConsumer(
         settings.kafka_reservation_topic,
+        "fastapi-platform.order.events.v1",
         bootstrap_servers=settings.kafka_bootstrap_servers,
         group_id="payment-service",
         enable_auto_commit=False,
@@ -139,11 +141,23 @@ async def consume_reservation_events(settings: Settings, stop: asyncio.Event) ->
         async for message in consumer:
 
             async def handle(current_message: Any = message) -> None:
-                payload = json.loads(current_message.value)
-                if payload.get("event_type") == "inventory.reserved.v1":
+                envelope = json.loads(current_message.value)
+                if envelope.get("event_type") == "inventory.reserved.v1":
                     async with get_session_factory()() as db:
                         await process_reservation_event(
-                            db, payload, reservation_minutes=settings.reservation_minutes
+                            db, envelope, reservation_minutes=settings.reservation_minutes
+                        )
+                elif envelope.get("event_type") == "order.refund_requested.v1":
+                    async with get_session_factory()() as db:
+                        await process_zarinpal_refund_request(
+                            db,
+                            envelope,
+                            provider=ZarinpalClient(
+                                merchant_id=settings.zarinpal_merchant_id,
+                                sandbox=settings.zarinpal_sandbox,
+                                callback_url=settings.zarinpal_callback_url,
+                                timeout_seconds=settings.zarinpal_request_timeout_seconds,
+                            ),
                         )
 
             await process_record_with_dead_letter(
@@ -151,7 +165,7 @@ async def consume_reservation_events(settings: Settings, stop: asyncio.Event) ->
                 producer=producer,
                 record=message,
                 policy=KafkaDlqPolicy(
-                    consumer_name="payment-service.reservation",
+                    consumer_name="payment-service.saga",
                     dead_letter_topic=settings.kafka_dead_letter_topic,
                     max_attempts=settings.kafka_consumer_max_attempts,
                     retry_backoff_seconds=settings.kafka_consumer_retry_backoff_seconds,

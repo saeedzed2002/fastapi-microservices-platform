@@ -233,6 +233,7 @@ services:
       INVENTORY_ENVIRONMENT: local
       INVENTORY_DATABASE_URL: postgresql+asyncpg://inventory_service:inventory-local-only@postgres:5432/inventory_service
       INVENTORY_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
+      INVENTORY_ORDER_BASE_URL: http://order-service:8000
       INVENTORY_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       INVENTORY_KAFKA_PUBLISHER_ENABLED: "true"
       INVENTORY_KAFKA_CONSUMER_ENABLED: "true"

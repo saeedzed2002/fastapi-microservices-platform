@@ -45,6 +45,23 @@ class PaymentAttempt(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
+class PaymentReversal(Base):
+    __tablename__ = "payment_reversals"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    intent_id: Mapped[UUID] = mapped_column(unique=True, index=True)
+    attempt_id: Mapped[UUID] = mapped_column(unique=True, index=True)
+    refund_request_id: Mapped[UUID] = mapped_column(unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(128), unique=True)
+    requested_by: Mapped[UUID] = mapped_column(index=True)
+    provider_code: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
 class InboxMessage(Base):
     __tablename__ = "inbox_messages"
 

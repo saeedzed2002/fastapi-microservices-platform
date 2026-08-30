@@ -25,6 +25,6 @@ def test_order_role_gates_keep_customer_and_administrator_capabilities_separate(
     assert asyncio.run(require_administrator(_claims("admin"))).roles == ("admin",)
 
     with pytest.raises(HTTPException, match="customer role required"):
-        asyncio.run(require_customer(_claims("support_agent")))
+        asyncio.run(require_customer(_claims("admin")))
     with pytest.raises(HTTPException, match="administrator role required"):
-        asyncio.run(require_administrator(_claims("support_agent")))
+        asyncio.run(require_administrator(_claims("customer")))

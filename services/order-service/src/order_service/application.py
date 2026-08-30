@@ -18,7 +18,9 @@ from order_service.models import (
     InboxMessage,
     Invoice,
     Order,
+    OrderFulfillment,
     OrderItem,
+    OrderRefundRequest,
     OrderStateTransition,
     OutboxMessage,
 )
@@ -26,12 +28,15 @@ from order_service.schemas import (
     AdminOrderPage,
     AdminOrderResponse,
     CustomerOrderPage,
+    FulfillmentResponse,
+    FulfillmentUpdateRequest,
     InvoiceSummaryResponse,
     OrderItemResponse,
     OrderResponse,
     OrderStateTransitionResponse,
     OrderStatus,
     OrderSummaryResponse,
+    RefundRequestResponse,
 )
 
 _TRANSITIONS = {
@@ -40,6 +45,15 @@ _TRANSITIONS = {
     ("INVENTORY_RESERVED", "payment.processing.v1"): "PAYMENT_PENDING",
     ("PAYMENT_PENDING", "payment.succeeded.v1"): "CONFIRMED",
     ("PAYMENT_PENDING", "payment.failed.v1"): "CANCELLED",
+    ("REFUND_PENDING", "payment.refunded.v1"): "REFUNDED",
+    ("REFUND_PENDING", "payment.refund_failed.v1"): "CONFIRMED",
+}
+
+_FULFILLMENT_TRANSITIONS = {
+    ("CONFIRMED", "PROCESSING"),
+    ("CONFIRMED", "SHIPPED"),
+    ("PROCESSING", "SHIPPED"),
+    ("SHIPPED", "DELIVERED"),
 }
 
 
@@ -70,6 +84,9 @@ async def order_response(db: AsyncSession, order: Order) -> OrderResponse:
     items = await db.scalars(
         select(OrderItem).where(OrderItem.order_id == order.id).order_by(OrderItem.id)
     )
+    fulfillment = await db.scalar(
+        select(OrderFulfillment).where(OrderFulfillment.order_id == order.id)
+    )
     return OrderResponse(
         id=order.id,
         status=order.status,
@@ -79,6 +96,9 @@ async def order_response(db: AsyncSession, order: Order) -> OrderResponse:
         created_at=order.created_at,
         updated_at=order.updated_at,
         items=[OrderItemResponse.model_validate(item) for item in items],
+        fulfillment=(
+            FulfillmentResponse.model_validate(fulfillment) if fulfillment is not None else None
+        ),
     )
 
 
@@ -102,6 +122,9 @@ async def admin_order_response(db: AsyncSession, order: Order) -> AdminOrderResp
         .order_by(OrderStateTransition.created_at, OrderStateTransition.id)
     )
     invoice = await db.scalar(select(Invoice).where(Invoice.order_id == order.id))
+    refund_request = await db.scalar(
+        select(OrderRefundRequest).where(OrderRefundRequest.order_id == order.id)
+    )
     return AdminOrderResponse(
         **response.model_dump(),
         customer_id=order.customer_id,
@@ -114,6 +137,7 @@ async def admin_order_response(db: AsyncSession, order: Order) -> AdminOrderResp
             if invoice is not None
             else None
         ),
+        refund_request_id=refund_request.id if refund_request is not None else None,
     )
 
 
@@ -131,6 +155,162 @@ async def load_owned_order_or_404(db: AsyncSession, order_id: UUID, customer_id:
     if order is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order not found")
     return order
+
+
+async def update_order_fulfillment(
+    db: AsyncSession,
+    *,
+    order_id: UUID,
+    updated_by: UUID,
+    payload: FulfillmentUpdateRequest,
+) -> Order:
+    order = await db.scalar(select(Order).where(Order.id == order_id).with_for_update())
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order not found")
+    fulfillment = await db.scalar(
+        select(OrderFulfillment).where(OrderFulfillment.order_id == order.id).with_for_update()
+    )
+    carrier = (
+        payload.carrier
+        if payload.carrier is not None
+        else (fulfillment.carrier if fulfillment is not None else None)
+    )
+    tracking_number = (
+        payload.tracking_number
+        if payload.tracking_number is not None
+        else (fulfillment.tracking_number if fulfillment is not None else None)
+    )
+    if payload.status == "SHIPPED" and (carrier is None or tracking_number is None):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="carrier and tracking number are required when shipping an order",
+        )
+    if (
+        order.status != payload.status
+        and (order.status, payload.status) not in _FULFILLMENT_TRANSITIONS
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="invalid fulfillment transition"
+        )
+    if fulfillment is None:
+        fulfillment = OrderFulfillment(
+            order_id=order.id,
+            carrier=carrier,
+            tracking_number=tracking_number,
+            updated_by=updated_by,
+        )
+        db.add(fulfillment)
+    else:
+        fulfillment.carrier = carrier
+        fulfillment.tracking_number = tracking_number
+        fulfillment.updated_by = updated_by
+    previous = order.status
+    order.status = payload.status
+    if previous != order.status:
+        add_transition(
+            db,
+            order=order,
+            previous=previous,
+            target=order.status,
+            event_id=None,
+            reason="Administrator fulfillment update",
+        )
+    add_outbox(
+        db,
+        event_type="order.fulfillment_updated.v1",
+        order_id=order.id,
+        payload={"order_id": str(order.id), "status": order.status},
+        causation_id=None,
+    )
+    await db.commit()
+    return order
+
+
+async def request_order_refund(
+    db: AsyncSession,
+    *,
+    order_id: UUID,
+    requested_by: UUID,
+    idempotency_key: str,
+) -> RefundRequestResponse:
+    order = await db.scalar(select(Order).where(Order.id == order_id).with_for_update())
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order not found")
+    refund_request = await db.scalar(
+        select(OrderRefundRequest).where(OrderRefundRequest.order_id == order.id).with_for_update()
+    )
+    if refund_request is not None:
+        await db.commit()
+        if refund_request.idempotency_key != idempotency_key:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="refund request already exists"
+            )
+        return RefundRequestResponse(
+            order_id=order.id,
+            refund_request_id=refund_request.id,
+            status="REFUND_PENDING",
+        )
+    key_owner = await db.scalar(
+        select(OrderRefundRequest).where(OrderRefundRequest.idempotency_key == idempotency_key)
+    )
+    if key_owner is not None:
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="idempotency key conflict")
+    if order.status != "CONFIRMED" or order.payment_method != "zarinpal":
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="order is not refundable")
+    refund_request = OrderRefundRequest(
+        order_id=order.id,
+        idempotency_key=idempotency_key,
+        requested_by=requested_by,
+    )
+    db.add(refund_request)
+    previous = order.status
+    order.status = "REFUND_PENDING"
+    add_transition(
+        db,
+        order=order,
+        previous=previous,
+        target=order.status,
+        event_id=None,
+        reason="Administrator refund request",
+    )
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        # Different orders can arrive concurrently with the same key. The
+        # database constraint is authoritative; reload after rollback so a
+        # same-order retry stays idempotent and a cross-order reuse is a 409.
+        await db.rollback()
+        key_owner = await db.scalar(
+            select(OrderRefundRequest).where(OrderRefundRequest.idempotency_key == idempotency_key)
+        )
+        if key_owner is not None and key_owner.order_id == order_id:
+            return RefundRequestResponse(
+                order_id=order_id,
+                refund_request_id=key_owner.id,
+                status="REFUND_PENDING",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="idempotency key conflict"
+        ) from exc
+    add_outbox(
+        db,
+        event_type="order.refund_requested.v1",
+        order_id=order.id,
+        payload={
+            "order_id": str(order.id),
+            "refund_request_id": str(refund_request.id),
+            "requested_by": str(requested_by),
+        },
+        causation_id=None,
+    )
+    await db.commit()
+    return RefundRequestResponse(
+        order_id=order.id,
+        refund_request_id=refund_request.id,
+        status="REFUND_PENDING",
+    )
 
 
 def encode_order_cursor(order: Order) -> str:
@@ -482,7 +662,7 @@ async def process_saga_result(db: AsyncSession, envelope: dict[str, object]) -> 
         event_id=event_id,
         reason="Kafka Saga event",
     )
-    if order.status == "CONFIRMED":
+    if str(envelope["event_type"]) == "payment.succeeded.v1" and order.status == "CONFIRMED":
         add_outbox(
             db,
             event_type="order.confirmed.v1",

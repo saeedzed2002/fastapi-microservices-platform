@@ -23,8 +23,15 @@ always verifies an `OK` return with Zarinpal before writing
 
 Payment expires incomplete intents with a replica-safe worker and emits
 `payment.failed.v1` in the same transaction. A verified success after expiry
-is recorded as `LATE_SUCCESS` and requires manual refund/reconciliation; this
-repository has no refund workflow.
+is recorded as `LATE_SUCCESS` and requires manual refund/reconciliation.
+
+An administrator starts a refund through Order's durable
+`POST /api/v1/orders/admin/{order_id}/refund` command. Payment consumes
+`order.refund_requested.v1`, persists a reversal record, then calls Zarinpal's
+short-window reverse endpoint outside a database transaction. It emits either
+`payment.refunded.v1` or `payment.refund_failed.v1`. Full or partial refunds
+are deliberately not implemented because they require Zarinpal's separate
+GraphQL access-token/session workflow and settlement reconciliation.
 
 Configure `ZARINPAL_MERCHANT_ID`, `ZARINPAL_SANDBOX`, and the edge callback URL
 through the ignored `.env` file. Payment validates the merchant identifier

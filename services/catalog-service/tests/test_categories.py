@@ -13,7 +13,7 @@ from catalog_service.application import (
     create_product,
     delete_category,
 )
-from catalog_service.auth import require_catalog_admin
+from catalog_service.auth import require_administrator
 from catalog_service.main import app
 from catalog_service.schemas import CategoryCreate, ProductCreate
 from platform_auth import AuthClaims
@@ -143,7 +143,7 @@ def test_product_assignment_requires_an_existing_category() -> None:
     asyncio.run(exercise())
 
 
-def test_catalog_admin_role_is_required_for_category_writes() -> None:
+def test_administrator_role_is_required_for_category_writes() -> None:
     now = datetime.now(UTC)
     customer_claims = AuthClaims(
         subject=uuid4(),
@@ -152,16 +152,16 @@ def test_catalog_admin_role_is_required_for_category_writes() -> None:
         issued_at=now,
         expires_at=now + timedelta(minutes=15),
     )
-    catalog_admin_claims = AuthClaims(
+    administrator_claims = AuthClaims(
         subject=uuid4(),
         token_id=uuid4(),
-        roles=("catalog_admin",),
+        roles=("admin",),
         issued_at=now,
         expires_at=now + timedelta(minutes=15),
     )
 
     with pytest.raises(HTTPException) as error:
-        require_catalog_admin(customer_claims)
+        require_administrator(customer_claims)
     assert error.value.status_code == 403
 
-    require_catalog_admin(catalog_admin_claims)
+    require_administrator(administrator_claims)

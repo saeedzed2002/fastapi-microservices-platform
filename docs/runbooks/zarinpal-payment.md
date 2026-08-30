@@ -56,7 +56,23 @@ Expiry emits `payment.failed.v1`, so Order cancellation and Inventory release
 are asynchronous. Wait for the Payment outbox and downstream consumer state
 before taking manual action. A later verified provider success is recorded as
 `LATE_SUCCESS` and must not confirm the cancelled order. Escalate it for manual
-refund and customer support; this repository has no automatic refund workflow.
+reconciliation and customer support; a normal reversal is only available for a
+confirmed order inside the provider's short reversal window.
+
+### `REFUND_PENDING`
+
+An administrator starts the reversal through
+`POST /api/v1/orders/admin/{order_id}/refund` using one fresh `Idempotency-Key`.
+Order writes `order.refund_requested.v1` and changes to `REFUND_PENDING`; do
+not send a fulfillment update while it is in that state. Payment persists the
+reversal before calling Zarinpal. A provider success emits
+`payment.refunded.v1` and Order becomes `REFUNDED`; a provider rejection emits
+`payment.refund_failed.v1` and Order returns to `CONFIRMED`.
+
+If the Payment reversal remains `REQUESTING` after a provider timeout, do not
+retry it automatically or fabricate a successful result. Reconcile the local
+authority against the provider before a manual recovery decision. This
+short-window reversal is not a full or partial refund facility.
 
 ## Verification
 
@@ -68,6 +84,8 @@ refund and customer support; this repository has no automatic refund workflow.
   `CANCELLED` and Inventory releases the reservation after normal Kafka
   delivery.
 - A repeated successful callback does not create a second outbox success row.
+- A completed reversal has one `payment.refunded.v1` and Inventory has exactly
+  one `refund_return` movement for every committed SKU quantity.
 
 ## Escalation and follow-up
 

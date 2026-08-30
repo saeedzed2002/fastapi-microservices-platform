@@ -14,3 +14,7 @@ def test_liveness() -> None:
     response = asyncio.run(request())
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_identity_openapi_exposes_no_delegated_staff_role_api() -> None:
+    assert "/api/v1/admin/support-agents" not in app.openapi()["paths"]

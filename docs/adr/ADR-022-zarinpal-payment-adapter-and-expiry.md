@@ -4,7 +4,7 @@
 - Date: 2026-08-29
 - Owners: platform engineering
 - Supersedes: none
-- Superseded by: none
+- Superseded by: ADR-024 for the refund policy only
 
 ## Context
 
@@ -91,8 +91,9 @@ and browser tokens are not logged.
   boundary; there is no distributed transaction with a provider. The expiry
   and late-success policy makes that case visible and prevents an order from
   being resurrected.
-- Refund execution is not implemented. A late or manually reconciled charge
-  requires an operator procedure until a dedicated refund workflow is approved.
+- Refund policy is superseded by ADR-024. The platform now supports only the
+  documented short-window reversal; a late, full, or partial refund still
+  requires a separate approved settlement workflow.
 
 ## Alternatives considered
 

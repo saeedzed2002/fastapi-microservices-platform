@@ -1,5 +1,8 @@
+import asyncio
 from datetime import UTC, datetime
 from decimal import Decimal
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
@@ -10,11 +13,14 @@ from order_service.application import (
     checkout_total,
     decode_order_cursor,
     encode_order_cursor,
+    process_saga_result,
     required_customer_email,
     transition_order,
+    update_order_fulfillment,
     validate_checkout_payment,
 )
-from order_service.models import Order, OrderItem
+from order_service.models import Order, OrderItem, OutboxMessage
+from order_service.schemas import FulfillmentUpdateRequest
 from order_service.workers.invoice_tasks import render_invoice_pdf
 
 
@@ -51,6 +57,77 @@ def test_late_payment_success_cannot_resurrect_cancelled_order() -> None:
         order, event_type="payment.succeeded.v1", event_id=uuid4(), reason=""
     )
     assert order.status == "CANCELLED"
+
+
+def test_refund_saga_transitions_cannot_interleave_with_fulfillment() -> None:
+    order = Order(status="REFUND_PENDING", tracking_code="ORD-TEST", currency="IRT", total_amount=1)
+
+    assert transition_order(order, event_type="payment.refunded.v1", event_id=uuid4(), reason="")
+    assert order.status == "REFUNDED"
+    assert not transition_order(
+        order, event_type="payment.refund_failed.v1", event_id=uuid4(), reason=""
+    )
+
+    failed = Order(
+        status="REFUND_PENDING", tracking_code="ORD-FAIL", currency="IRT", total_amount=1
+    )
+    assert transition_order(
+        failed, event_type="payment.refund_failed.v1", event_id=uuid4(), reason=""
+    )
+    assert failed.status == "CONFIRMED"
+
+
+def test_refund_failure_does_not_create_a_second_order_confirmation_event() -> None:
+    async def exercise() -> None:
+        order = Order(
+            status="REFUND_PENDING", tracking_code="ORD-FAIL", currency="IRT", total_amount=1
+        )
+        db = SimpleNamespace(
+            scalar=AsyncMock(side_effect=[None, order]),
+            add=Mock(),
+            commit=AsyncMock(),
+        )
+        envelope = {
+            "event_id": str(uuid4()),
+            "event_type": "payment.refund_failed.v1",
+            "payload": {"order_id": str(uuid4())},
+        }
+
+        assert await process_saga_result(db, envelope)
+        assert order.status == "CONFIRMED"
+        assert not any(isinstance(call.args[0], OutboxMessage) for call in db.add.call_args_list)
+
+    asyncio.run(exercise())
+
+
+def test_refund_pending_order_cannot_enter_fulfillment() -> None:
+    async def exercise() -> None:
+        order = Order(
+            status="REFUND_PENDING", tracking_code="ORD-REFUND", currency="IRT", total_amount=1
+        )
+        db = SimpleNamespace(
+            scalar=AsyncMock(side_effect=[order, None]),
+            add=Mock(),
+            commit=AsyncMock(),
+        )
+
+        with pytest.raises(HTTPException, match="invalid fulfillment transition"):
+            await update_order_fulfillment(
+                db,
+                order_id=uuid4(),
+                updated_by=uuid4(),
+                payload=FulfillmentUpdateRequest(status="PROCESSING"),
+            )
+
+    asyncio.run(exercise())
+
+
+def test_shipping_requires_both_tracking_fields() -> None:
+    with pytest.raises(ValueError, match="carrier and tracking_number"):
+        FulfillmentUpdateRequest(status="SHIPPED")
+
+    shipment = FulfillmentUpdateRequest(status="SHIPPED", carrier="Post", tracking_number="TRK-1")
+    assert shipment.tracking_number == "TRK-1"
 
 
 def test_invoice_pdf_is_rendered_from_order_snapshot() -> None:

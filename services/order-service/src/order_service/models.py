@@ -59,6 +59,34 @@ class OrderStateTransition(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
+class OrderFulfillment(Base):
+    __tablename__ = "order_fulfillments"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    order_id: Mapped[UUID] = mapped_column(
+        ForeignKey("orders.id", ondelete="RESTRICT"), unique=True, index=True
+    )
+    carrier: Mapped[str | None] = mapped_column(String(120))
+    tracking_number: Mapped[str | None] = mapped_column(String(160))
+    updated_by: Mapped[UUID] = mapped_column(index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
+class OrderRefundRequest(Base):
+    __tablename__ = "order_refund_requests"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    order_id: Mapped[UUID] = mapped_column(
+        ForeignKey("orders.id", ondelete="RESTRICT"), unique=True, index=True
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), unique=True)
+    requested_by: Mapped[UUID] = mapped_column(index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
 class InboxMessage(Base):
     __tablename__ = "inbox_messages"
 

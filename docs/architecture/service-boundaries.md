@@ -10,8 +10,8 @@ Owns accounts, credential hashes, access/refresh-token lifecycle, device/session
 
 Does not own customer profiles, addresses, preferences, carts, orders, or payment records.
 
-Customers authenticate with phone and OTP; `admin` and `support_agent` staff
-authenticate with email and password. Identity owns staff lifecycle, the
+Customers authenticate with phone and OTP; `admin` users authenticate with
+email and password. Identity owns administrator provisioning, the
 normalized phone, code hash, verification attempts, cooldown, rate limits, and
 short-lived delivery code in its own Redis namespace. It asks Notification for
 directed SMS delivery through an authenticated private API, but never exposes
@@ -60,8 +60,8 @@ Owns checkout acceptance, orders, immutable purchase snapshots, order items, sta
 
 Does not own catalog truth, inventory reservations, provider-facing payment truth, notification delivery, user-upload media lifecycle, or file bytes in PostgreSQL. Order does own the invoice business lifecycle, metadata, and storage key for generated invoices; the bytes live in object storage through its `ObjectStorage` adapter.
 
-It exposes customer-owned checkout/history APIs and a separate read-only
-administrator order-review API, writes critical events through an outbox,
+It exposes customer-owned checkout/history APIs and a separate administrator
+order-review, fulfillment, and refund-request API, writes critical events through an outbox,
 consumes Inventory/Payment results, and owns invoice-generation intent after
 confirmation.
 
@@ -102,7 +102,7 @@ Owns conversations, participants, messages, durable attachment associations, sup
 
 Does not own identity credentials, binary attachment storage, or durable presence.
 
-It serves HTTP/WebSocket clients, commits messages to PostgreSQL before acknowledgement/fan-out, uses Redis for cross-pod delivery and presence, and references authorized Media assets. Customer-support conversations are queued in Chat PostgreSQL and atomically claimed by one eligible agent, who then becomes the only agent participant. When a participant needs an attachment URL, Chat validates its own membership and requests a short-lived Media URL through a signed internal REST proof; Media continues to own bytes, lifecycle, and URL generation without querying Chat data.
+It serves HTTP/WebSocket clients, commits messages to PostgreSQL before acknowledgement/fan-out, uses Redis for cross-pod delivery and presence, and references authorized Media assets. Customer-support conversations are queued in Chat PostgreSQL and atomically claimed by one eligible administrator, who then becomes the only administrator participant. When a participant needs an attachment URL, Chat validates its own membership and requests a short-lived Media URL through a signed internal REST proof; Media continues to own bytes, lifecycle, and URL generation without querying Chat data.
 
 ## Later services
 

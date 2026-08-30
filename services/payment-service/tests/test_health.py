@@ -40,3 +40,4 @@ def test_zarinpal_routes_are_present_in_payment_openapi() -> None:
             "schema": {"type": "string", "minLength": 1, "maxLength": 32, "title": "Status"},
         },
     ]
+    assert "/api/v1/payments/orders/{order_id}/zarinpal/reverse" not in openapi["paths"]

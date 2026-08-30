@@ -1,7 +1,9 @@
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
+import httpx
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -21,6 +23,16 @@ from inventory_service.schemas import (
     StockItemResponse,
     StockMovementResponse,
 )
+
+
+class OrderGatewayUnavailable(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class ReconciliationResult:
+    scanned: int
+    committed: int
 
 
 def stock_item_response(stock_item: StockItem) -> StockItemResponse:
@@ -149,28 +161,22 @@ async def process_saga_event(db: AsyncSession, envelope: dict[str, object]) -> b
     )
     if event_type == "payment.failed.v1":
         if reservation is not None and reservation.status == "RESERVED":
-            for item in reservation.items:
-                stock = await db.scalar(
-                    select(StockItem)
-                    .where(StockItem.sku == str(item["sku"]).upper())
-                    .with_for_update()
-                )
-                if stock is not None:
-                    quantity = cast(int, item["quantity"])
-                    stock.reserved -= quantity
-                    stock.version += 1
-                    db.add(
-                        StockMovement(
-                            stock_item_id=stock.id,
-                            kind="release",
-                            quantity_delta=0,
-                            reserved_delta=-quantity,
-                            reason=f"payment failed for order {order_id}",
-                            idempotency_key=f"release:{order_id}:{stock.sku}",
-                        )
-                    )
-            reservation.status = "RELEASED"
-            reservation.released_at = datetime.now(UTC)
+            await _release_reservation(db, reservation=reservation, order_id=order_id)
+        await db.commit()
+        return True
+    if event_type == "payment.succeeded.v1":
+        if reservation is not None and reservation.status == "RESERVED":
+            await _commit_reservation(db, reservation=reservation, order_id=order_id)
+        await db.commit()
+        return True
+    if event_type == "payment.refunded.v1":
+        if reservation is not None:
+            if reservation.status == "COMMITTED":
+                await _return_committed_reservation(db, reservation=reservation, order_id=order_id)
+            elif reservation.status == "RESERVED":
+                # A consumer may observe the refund after missing the success
+                # event. The correct net stock outcome is then a release.
+                await _release_reservation(db, reservation=reservation, order_id=order_id)
         await db.commit()
         return True
     if event_type != "order.created.v1" or reservation is not None:
@@ -231,3 +237,134 @@ async def process_saga_event(db: AsyncSession, envelope: dict[str, object]) -> b
     )
     await db.commit()
     return True
+
+
+async def _release_reservation(
+    db: AsyncSession, *, reservation: Reservation, order_id: UUID
+) -> None:
+    for item in reservation.items:
+        stock = await db.scalar(
+            select(StockItem).where(StockItem.sku == str(item["sku"]).upper()).with_for_update()
+        )
+        if stock is None:
+            raise RuntimeError(f"reserved stock item is missing for order {order_id}")
+        quantity = cast(int, item["quantity"])
+        stock.reserved -= quantity
+        stock.version += 1
+        db.add(
+            StockMovement(
+                stock_item_id=stock.id,
+                kind="release",
+                quantity_delta=0,
+                reserved_delta=-quantity,
+                reason=f"payment failed for order {order_id}",
+                idempotency_key=f"release:{order_id}:{stock.sku}",
+            )
+        )
+    reservation.status = "RELEASED"
+    reservation.released_at = datetime.now(UTC)
+
+
+async def _commit_reservation(
+    db: AsyncSession, *, reservation: Reservation, order_id: UUID
+) -> None:
+    for item in reservation.items:
+        stock = await db.scalar(
+            select(StockItem).where(StockItem.sku == str(item["sku"]).upper()).with_for_update()
+        )
+        if stock is None:
+            raise RuntimeError(f"reserved stock item is missing for order {order_id}")
+        quantity = cast(int, item["quantity"])
+        stock.on_hand -= quantity
+        stock.reserved -= quantity
+        stock.version += 1
+        db.add(
+            StockMovement(
+                stock_item_id=stock.id,
+                kind="commit",
+                quantity_delta=-quantity,
+                reserved_delta=-quantity,
+                reason=f"payment succeeded for order {order_id}",
+                idempotency_key=f"commit:{order_id}:{stock.sku}",
+            )
+        )
+    reservation.status = "COMMITTED"
+    reservation.committed_at = datetime.now(UTC)
+
+
+async def _return_committed_reservation(
+    db: AsyncSession, *, reservation: Reservation, order_id: UUID
+) -> None:
+    for item in reservation.items:
+        stock = await db.scalar(
+            select(StockItem).where(StockItem.sku == str(item["sku"]).upper()).with_for_update()
+        )
+        if stock is None:
+            raise RuntimeError(f"committed stock item is missing for order {order_id}")
+        quantity = cast(int, item["quantity"])
+        stock.on_hand += quantity
+        stock.version += 1
+        db.add(
+            StockMovement(
+                stock_item_id=stock.id,
+                kind="refund_return",
+                quantity_delta=quantity,
+                reserved_delta=0,
+                reason=f"payment refunded for order {order_id}",
+                idempotency_key=f"refund-return:{order_id}:{stock.sku}",
+            )
+        )
+    reservation.status = "RETURNED"
+    reservation.returned_at = datetime.now(UTC)
+
+
+async def reconcile_confirmed_reservations(
+    db: AsyncSession,
+    *,
+    order_base_url: str,
+    timeout_seconds: float,
+    access_token: str,
+    limit: int,
+) -> ReconciliationResult:
+    """Commit only legacy reservations whose Order-owned state is CONFIRMED.
+
+    The first query ends before every Order REST request, so Inventory never
+    holds one of its database transactions across the network boundary.
+    """
+    order_ids = list(
+        await db.scalars(
+            select(Reservation.order_id)
+            .where(Reservation.status == "RESERVED")
+            .order_by(Reservation.created_at, Reservation.id)
+            .limit(limit)
+        )
+    )
+    await db.rollback()
+    committed = 0
+    async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+        for order_id in order_ids:
+            try:
+                response = await client.get(
+                    f"{order_base_url.rstrip('/')}/api/v1/orders/admin/{order_id}",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                )
+            except httpx.RequestError as exc:
+                raise OrderGatewayUnavailable from exc
+            if response.status_code >= 500:
+                raise OrderGatewayUnavailable
+            if response.status_code != 200:
+                continue
+            try:
+                payload = response.json()
+            except ValueError as exc:
+                raise OrderGatewayUnavailable from exc
+            if not isinstance(payload, dict) or payload.get("status") != "CONFIRMED":
+                continue
+            reservation = await db.scalar(
+                select(Reservation).where(Reservation.order_id == order_id).with_for_update()
+            )
+            if reservation is not None and reservation.status == "RESERVED":
+                await _commit_reservation(db, reservation=reservation, order_id=order_id)
+                committed += 1
+            await db.commit()
+    return ReconciliationResult(scanned=len(order_ids), committed=committed)

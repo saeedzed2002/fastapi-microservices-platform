@@ -3,7 +3,7 @@
   "info": {
     "title": "Payment Zarinpal API",
     "version": "v1",
-    "description": "Customer payment start and Zarinpal browser-return verification. Payment owns provider state; Order ownership is checked through Order's authenticated API."
+    "description": "Customer payment start and Zarinpal browser-return verification. Payment owns provider state and consumes durable administrator refund requests from Order."
   },
   "paths": {
     "/api/v1/payments/orders/{order_id}/zarinpal": {

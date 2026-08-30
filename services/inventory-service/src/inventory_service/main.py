@@ -3,18 +3,21 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, status
+from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from inventory_service.application import (
+    OrderGatewayUnavailable,
     adjust_stock,
     create_stock_item,
     list_stock_movements,
     load_stock_item_or_404,
+    reconcile_confirmed_reservations,
     stock_item_response,
 )
-from inventory_service.auth import current_user, require_inventory_admin
+from inventory_service.auth import bearer, current_user, require_administrator
 from inventory_service.config import get_settings
 from inventory_service.db import dispose_engine, get_session
 from inventory_service.schemas import (
@@ -23,6 +26,7 @@ from inventory_service.schemas import (
     StockItemCreate,
     StockItemResponse,
     StockMovementResponse,
+    StockReconciliationResponse,
 )
 from inventory_service.workers.kafka import consume_saga_events, publish_outbox
 from platform_auth import AuthClaims
@@ -74,7 +78,7 @@ async def create_stock_item_endpoint(
     claims: AuthClaims = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> StockItemResponse:
-    require_inventory_admin(claims)
+    require_administrator(claims)
     return stock_item_response(await create_stock_item(db, payload))
 
 
@@ -84,7 +88,7 @@ async def get_stock_item_endpoint(
     claims: AuthClaims = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> StockItemResponse:
-    require_inventory_admin(claims)
+    require_administrator(claims)
     return stock_item_response(await load_stock_item_or_404(db, sku))
 
 
@@ -98,7 +102,7 @@ async def adjust_stock_endpoint(
     claims: AuthClaims = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> StockAdjustmentResponse:
-    require_inventory_admin(claims)
+    require_administrator(claims)
     return await adjust_stock(db, sku, payload)
 
 
@@ -111,9 +115,40 @@ async def list_stock_movements_endpoint(
     claims: AuthClaims = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> list[StockMovementResponse]:
-    require_inventory_admin(claims)
+    require_administrator(claims)
     stock_item = await load_stock_item_or_404(db, sku)
     return await list_stock_movements(db, stock_item.id)
+
+
+@app.post(
+    "/api/v1/inventory/admin/reconcile-confirmed-reservations",
+    response_model=StockReconciliationResponse,
+)
+async def reconcile_confirmed_reservations_endpoint(
+    limit: int = Query(default=100, ge=1, le=500),
+    claims: AuthClaims = Depends(current_user),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+    db: AsyncSession = Depends(get_session),
+) -> StockReconciliationResponse:
+    require_administrator(claims)
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="authentication required"
+        )
+    try:
+        result = await reconcile_confirmed_reservations(
+            db,
+            order_base_url=settings.order_base_url,
+            timeout_seconds=settings.order_request_timeout_seconds,
+            access_token=credentials.credentials,
+            limit=limit,
+        )
+    except OrderGatewayUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="order lookup unavailable",
+        ) from exc
+    return StockReconciliationResponse(scanned=result.scanned, committed=result.committed)
 
 
 @app.get("/metrics", tags=["observability"])

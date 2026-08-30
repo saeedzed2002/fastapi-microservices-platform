@@ -35,14 +35,6 @@
       "schema": "openapi/identity-auth.v1.openapi.json"
     },
     {
-      "name": "identity.admin.v1",
-      "kind": "service-openapi",
-      "owner": "identity-service",
-      "status": "active",
-      "notes": "Administrator-only support-agent lifecycle API. The first administrator remains an interactive CLI bootstrap operation.",
-      "schema": "openapi/identity-admin.v1.openapi.json"
-    },
-    {
       "name": "customer.profile.v1",
       "kind": "service-openapi",
       "owner": "customer-service",
@@ -55,7 +47,7 @@
       "kind": "service-openapi",
       "owner": "order-service",
       "status": "active",
-      "notes": "Customer-owned order history and administrator-only read-only operational review APIs.",
+      "notes": "Customer-owned order history and administrator-only fulfillment and refund-request operations.",
       "schema": "openapi/order-query.v1.openapi.json"
     },
     {
@@ -71,7 +63,7 @@
       "kind": "service-openapi",
       "owner": "payment-service",
       "status": "active",
-      "notes": "Customer payment-start API and verified Zarinpal browser-return callback. Existing payment Saga events remain unchanged.",
+      "notes": "Customer payment-start API and verified Zarinpal browser-return callback. Zarinpal reversal is started only from Order's durable administrator refund request.",
       "schema": "openapi/payment-zarinpal.v1.openapi.json"
     },
     {
@@ -111,7 +103,7 @@
       "kind": "service-openapi",
       "owner": "chat-service",
       "status": "active",
-      "notes": "Customer support queue creation, metadata-only agent queue listing, atomic claim, release, and close operations. The assigned agent becomes the only agent participant.",
+      "notes": "Customer support queue creation, metadata-only administrator queue listing, atomic claim, release, and close operations. The assigned administrator becomes the only administrator participant.",
       "schema": "openapi/chat-support.v1.openapi.json"
     },
     {
@@ -162,7 +154,7 @@
       "name": "payment.succeeded.v1",
       "kind": "domain-event",
       "owner": "payment-service",
-      "consumers": ["order-service"],
+      "consumers": ["order-service", "inventory-service"],
       "status": "active",
       "topic": "fastapi-platform.payment.events.v1",
       "message_key": "order_id",
@@ -181,6 +173,28 @@
       "schema": "events/payment.failed.v1.schema.json"
     },
     {
+      "name": "payment.refunded.v1",
+      "kind": "domain-event",
+      "owner": "payment-service",
+      "consumers": ["order-service", "inventory-service"],
+      "status": "active",
+      "topic": "fastapi-platform.payment.events.v1",
+      "message_key": "order_id",
+      "notes": "Payment completed a Zarinpal reversal for the durable Order refund request.",
+      "schema": "events/payment.refunded.v1.schema.json"
+    },
+    {
+      "name": "payment.refund_failed.v1",
+      "kind": "domain-event",
+      "owner": "payment-service",
+      "consumers": ["order-service"],
+      "status": "active",
+      "topic": "fastapi-platform.payment.events.v1",
+      "message_key": "order_id",
+      "notes": "Payment rejected the durable Order refund request before a reversal completed.",
+      "schema": "events/payment.refund_failed.v1.schema.json"
+    },
+    {
       "name": "order.confirmed.v1",
       "kind": "domain-event",
       "owner": "order-service",
@@ -190,6 +204,28 @@
       "message_key": "order_id",
       "notes": "Order is terminally confirmed. An independent Order consumer group creates the durable invoice-generation handoff.",
       "schema": "events/order.confirmed.v1.schema.json"
+    },
+    {
+      "name": "order.refund_requested.v1",
+      "kind": "domain-event",
+      "owner": "order-service",
+      "consumers": ["payment-service"],
+      "status": "active",
+      "topic": "fastapi-platform.order.events.v1",
+      "message_key": "order_id",
+      "notes": "Administrator requested a provider-owned reversal while the Order was still confirmed.",
+      "schema": "events/order.refund_requested.v1.schema.json"
+    },
+    {
+      "name": "order.fulfillment_updated.v1",
+      "kind": "domain-event",
+      "owner": "order-service",
+      "consumers": [],
+      "status": "active",
+      "topic": "fastapi-platform.order.events.v1",
+      "message_key": "order_id",
+      "notes": "Administrator advanced a paid order through fulfillment; this is retained for future projections.",
+      "schema": "events/order.fulfillment_updated.v1.schema.json"
     },
     {
       "name": "invoice.generated.v1",

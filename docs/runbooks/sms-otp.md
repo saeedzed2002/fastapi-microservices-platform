@@ -74,10 +74,10 @@ pwsh -NoProfile -File scripts/platform.ps1 -Task provision-admin -AdminEmail adm
 
 The command prompts twice for a password and refuses to overwrite an existing
 Identity email. Do not pass the password through a command-line argument,
-environment variable, script, screenshot, or commit. An authenticated `admin`
-provisions and manages `support_agent` accounts through the Identity API; see
-the [staff operations runbook](admin-operations.md). The bootstrap command does
-not change existing roles or passwords.
+environment variable, script, screenshot, or commit. The initial platform has
+only `admin` and `customer` roles; see the [staff operations
+runbook](admin-operations.md). The bootstrap command does not change existing
+roles or passwords.
 
 ## Failure handling
 

@@ -11,13 +11,13 @@ from platform_auth import AuthClaims
 
 def test_customer_profile_access_requires_customer_role() -> None:
     now = datetime.now(UTC)
-    support_agent = AuthClaims(
+    administrator = AuthClaims(
         subject=uuid4(),
         token_id=uuid4(),
-        roles=("support_agent",),
+        roles=("admin",),
         issued_at=now,
         expires_at=now + timedelta(minutes=15),
     )
 
     with pytest.raises(HTTPException, match="customer role required"):
-        asyncio.run(require_customer(support_agent))
+        asyncio.run(require_customer(administrator))

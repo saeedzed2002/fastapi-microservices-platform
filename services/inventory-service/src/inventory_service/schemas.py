@@ -56,3 +56,8 @@ class StockMovementResponse(BaseModel):
 class StockAdjustmentResponse(BaseModel):
     stock_item: StockItemResponse
     movement: StockMovementResponse
+
+
+class StockReconciliationResponse(BaseModel):
+    scanned: int
+    committed: int

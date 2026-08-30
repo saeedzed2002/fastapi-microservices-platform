@@ -19,6 +19,8 @@ from order_service.application import (
     load_order_or_404,
     load_owned_order_or_404,
     order_response,
+    request_order_refund,
+    update_order_fulfillment,
     validate_checkout_payment,
     wait_for_payment_pending,
 )
@@ -45,8 +47,10 @@ from order_service.schemas import (
     CartCheckoutResponse,
     CheckoutRequest,
     CustomerOrderPage,
+    FulfillmentUpdateRequest,
     OrderResponse,
     OrderStatus,
+    RefundRequestResponse,
 )
 from order_service.workers.kafka import consume_invoice_events, consume_saga_events, publish_outbox
 from order_service.workers.task_dispatcher import run_task_dispatcher
@@ -121,6 +125,41 @@ async def get_administrator_order(
     db: AsyncSession = Depends(get_session),
 ) -> AdminOrderResponse:
     return await admin_order_response(db, await load_order_or_404(db, order_id))
+
+
+@app.patch("/api/v1/orders/admin/{order_id}/fulfillment", response_model=AdminOrderResponse)
+async def update_administrator_order_fulfillment(
+    order_id: UUID,
+    payload: FulfillmentUpdateRequest,
+    claims: AuthClaims = Depends(require_administrator),
+    db: AsyncSession = Depends(get_session),
+) -> AdminOrderResponse:
+    order = await update_order_fulfillment(
+        db,
+        order_id=order_id,
+        updated_by=claims.subject,
+        payload=payload,
+    )
+    return await admin_order_response(db, order)
+
+
+@app.post(
+    "/api/v1/orders/admin/{order_id}/refund",
+    response_model=RefundRequestResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def request_administrator_order_refund(
+    order_id: UUID,
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=1, max_length=128),
+    claims: AuthClaims = Depends(require_administrator),
+    db: AsyncSession = Depends(get_session),
+) -> RefundRequestResponse:
+    return await request_order_refund(
+        db,
+        order_id=order_id,
+        requested_by=claims.subject,
+        idempotency_key=idempotency_key,
+    )
 
 
 @app.get("/api/v1/orders", response_model=CustomerOrderPage)

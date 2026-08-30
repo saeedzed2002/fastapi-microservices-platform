@@ -16,6 +16,7 @@ Examples:
 - `inventory.reserved.v1`
 - `inventory.reservation_failed.v1`
 - `payment.succeeded.v1`
+- `payment.refunded.v1`
 - `media.ready.v1`
 
 Commands and Celery task names are not domain events.
@@ -28,9 +29,13 @@ Commands and Celery task names are not domain events.
 | `inventory.reserved.v1` | Inventory | Order, Payment | 5 |
 | `inventory.reservation_failed.v1` | Inventory | Order | 5 |
 | `payment.processing.v1` | Payment | Order | 5 |
-| `payment.succeeded.v1` | Payment | Order | 5 |
+| `payment.succeeded.v1` | Payment | Order, Inventory | 5 |
 | `payment.failed.v1` | Payment | Order, Inventory | 5 |
 | `order.confirmed.v1` | Order | Future invoice dispatcher | 5 |
+| `order.refund_requested.v1` | Order | Payment | 7 |
+| `payment.refunded.v1` | Payment | Order, Inventory | 7 |
+| `payment.refund_failed.v1` | Payment | Order | 7 |
+| `order.fulfillment_updated.v1` | Order | Future projections | 7 |
 
 ## Reserved events
 

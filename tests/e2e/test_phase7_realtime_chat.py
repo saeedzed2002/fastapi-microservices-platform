@@ -271,7 +271,7 @@ def test_support_queue_assigns_one_agent_and_preserves_membership_privacy() -> N
     customer_id, first_agent_id, second_agent_id = uuid4(), uuid4(), uuid4()
     customer_token = _token(subject=customer_id)
     first_agent_token = _token(subject=first_agent_id, roles=("admin",))
-    second_agent_token = _token(subject=second_agent_id, roles=("support_agent",))
+    second_agent_token = _token(subject=second_agent_id, roles=("admin",))
     customer_headers = {"Authorization": f"Bearer {customer_token}"}
     first_agent_headers = {"Authorization": f"Bearer {first_agent_token}"}
     second_agent_headers = {"Authorization": f"Bearer {second_agent_token}"}

@@ -12,9 +12,6 @@ database.
 - POST /api/v1/auth/refresh
 - POST /api/v1/auth/logout
 - GET /api/v1/auth/me
-- GET /api/v1/admin/support-agents
-- POST /api/v1/admin/support-agents
-- PATCH /api/v1/admin/support-agents/{support_agent_id}
 - GET /health/live
 - GET /health/ready
 - GET /metrics
@@ -23,7 +20,7 @@ database.
 
 Customer password registration is disabled: `/api/v1/auth/register` returns
 `410 Gone`. Customer registration and sign-in use the phone OTP endpoints.
-`/api/v1/auth/login` accepts only active `admin` or `support_agent` users with
+`/api/v1/auth/login` accepts only active `admin` users with
 an email and password hash. Redis-backed failed-attempt controls apply to this
 staff path and fail closed if Redis is unavailable. Customer profile contact
 email remains Customer-owned and is not an Identity credential.
@@ -34,9 +31,9 @@ argument, and refuses to overwrite an existing email:
 
     pwsh -NoProfile -File .\scripts\platform.ps1 -Task provision-admin -AdminEmail admin@example.com
 
-An authenticated `admin` provisions and suspends `support_agent` accounts through
-the versioned staff API. The local database records an authentication audit event
-for each support-agent lifecycle change.
+The initial platform has exactly two roles: `admin` and `customer`. The
+interactive provisioning command creates the first administrator; no public
+role-assignment API exists in this release.
 
 Copy .env.example into the deployment environment. Never commit a real JWT
 secret, database credential, or `PLATFORM_INTERNAL_OTP_SHARED_SECRET`. OTP

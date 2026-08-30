@@ -15,7 +15,7 @@ Security is enforced at every service boundary and throughout delivery; the edge
   Redis, retain the raw code only in a separate short-lived Identity delivery
   key, and fail closed when that security state is unavailable. The raw code
   must not enter PostgreSQL, Kafka, RabbitMQ, Celery payloads, logs, or traces.
-- Allow password login only for an existing `admin` or `support_agent` role.
+- Allow password login only for an existing `admin` role.
   Customer registration and sign-in use the phone OTP endpoints.
 
 The signing algorithm, JWKS/key-distribution mechanism, claim set, and service-to-service identity model are Phase 2 design decisions.

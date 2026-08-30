@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     )
     jwt_issuer: str = "fastapi-platform.identity"
     jwt_audience: str = "fastapi-platform"
+    order_base_url: str = "http://localhost:8004"
+    order_request_timeout_seconds: float = Field(default=5.0, ge=0.1, le=60.0)
     log_level: str = "INFO"
     kafka_bootstrap_servers: str = "localhost:29092"
     kafka_topic: str = "fastapi-platform.inventory.events.v1"

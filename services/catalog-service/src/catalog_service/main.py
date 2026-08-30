@@ -25,7 +25,7 @@ from catalog_service.application import (
     update_category,
     update_product,
 )
-from catalog_service.auth import current_user, require_catalog_admin
+from catalog_service.auth import current_user, require_administrator
 from catalog_service.config import get_settings
 from catalog_service.db import dispose_engine, get_session
 from catalog_service.models import Product
@@ -100,7 +100,7 @@ async def create_category_endpoint(
     claims: AuthClaims = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> CategoryResponse:
-    require_catalog_admin(claims)
+    require_administrator(claims)
     return await category_response(await create_category(db, payload))
 
 
@@ -111,7 +111,7 @@ async def update_category_endpoint(
     claims: AuthClaims = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> CategoryResponse:
-    require_catalog_admin(claims)
+    require_administrator(claims)
     category = await load_category_or_404(db, category_id)
     return await category_response(await update_category(db, category, payload))
 
@@ -122,7 +122,7 @@ async def delete_category_endpoint(
     claims: AuthClaims = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> None:
-    require_catalog_admin(claims)
+    require_administrator(claims)
     await delete_category(db, await load_category_or_404(db, category_id))
 
 
@@ -146,7 +146,7 @@ async def create_product_endpoint(
     claims: AuthClaims = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> ProductResponse:
-    require_catalog_admin(claims)
+    require_administrator(claims)
     return await product_response(db, await create_product(db, payload))
 
 
@@ -157,7 +157,7 @@ async def update_product_endpoint(
     claims: AuthClaims = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> ProductResponse:
-    require_catalog_admin(claims)
+    require_administrator(claims)
     product = await load_product_or_404(db, product_id)
     return await product_response(db, await update_product(db, product, payload))
 
@@ -168,7 +168,7 @@ async def publish_product_endpoint(
     claims: AuthClaims = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> ProductResponse:
-    require_catalog_admin(claims)
+    require_administrator(claims)
     product = await load_product_or_404(db, product_id)
     return await product_response(db, await publish_product(db, product))
 
@@ -183,7 +183,7 @@ async def attach_media_endpoint(
     claims: AuthClaims = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
-    require_catalog_admin(claims)
+    require_administrator(claims)
     product = await load_product_or_404(db, product_id)
     relation = await attach_media(db, product, payload)
     return {"product_media_id": str(relation.id)}
@@ -200,7 +200,7 @@ async def add_variant_endpoint(
     claims: AuthClaims = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> VariantResponse:
-    require_catalog_admin(claims)
+    require_administrator(claims)
     product = await load_product_or_404(db, product_id)
     return VariantResponse.model_validate(await add_variant(db, product, payload))
 

@@ -31,6 +31,11 @@ class ZarinpalVerificationResult:
     code: str
 
 
+@dataclass(frozen=True)
+class ZarinpalReverseResult:
+    code: str
+
+
 class ZarinpalClient:
     def __init__(
         self,
@@ -49,7 +54,7 @@ class ZarinpalClient:
 
     @property
     def _api_base_url(self) -> str:
-        return "https://sandbox.zarinpal.com" if self._sandbox else "https://api.zarinpal.com"
+        return "https://sandbox.zarinpal.com" if self._sandbox else "https://payment.zarinpal.com"
 
     @property
     def _start_pay_base_url(self) -> str:
@@ -94,6 +99,18 @@ class ZarinpalClient:
             reference_id=str(reference_id) if reference_id is not None else None,
             code=code,
         )
+
+    async def reverse_payment(self, *, authority: str) -> ZarinpalReverseResult:
+        """Reverse a successful payment during Zarinpal's short reversal window."""
+        payload = await self._post(
+            "/pg/v4/payment/reverse.json",
+            {"merchant_id": self._merchant_id, "authority": authority},
+        )
+        data = _data_or_rejection(payload)
+        code = _provider_code(data)
+        if code != "100":
+            raise ZarinpalRejected(code)
+        return ZarinpalReverseResult(code=code)
 
     async def _post(self, path: str, payload: dict[str, object]) -> dict[str, Any]:
         self.ensure_configured()

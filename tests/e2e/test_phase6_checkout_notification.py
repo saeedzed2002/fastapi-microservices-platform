@@ -46,7 +46,7 @@ def test_checkout_generates_invoice_and_sends_notification() -> None:
     mailpit_base_url = os.environ.get("E2E_MAILPIT_BASE_URL", "http://localhost:8025")
     user_id, admin_id = str(uuid4()), str(uuid4())
     user_headers = {"Authorization": f"Bearer {_token(subject=user_id, roles=('customer',))}"}
-    admin_token = _token(subject=admin_id, roles=("admin", "catalog_admin", "inventory_admin"))
+    admin_token = _token(subject=admin_id, roles=("admin",))
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
     suffix = uuid4().hex[:12]
     sku = f"P6-{suffix}"
@@ -137,6 +137,23 @@ def test_checkout_generates_invoice_and_sends_notification() -> None:
             return response.json()["status"] == "CONFIRMED"
 
         _wait_for(order_is_confirmed)
+
+        stock_payload: dict[str, object] = {}
+
+        def stock_is_committed() -> bool:
+            nonlocal stock_payload
+            stock = client.get(
+                f"{base_url}/api/v1/inventory/stock-items/{sku}", headers=admin_headers
+            )
+            stock.raise_for_status()
+            stock_payload = stock.json()
+            return stock_payload["on_hand"] == 1 and stock_payload["reserved"] == 0
+
+        _wait_for(stock_is_committed)
+        assert stock_payload["sku"] == sku.upper()
+        assert stock_payload["on_hand"] == 1
+        assert stock_payload["reserved"] == 0
+        assert stock_payload["available"] == 1
         object_store = boto3.client(
             "s3",
             endpoint_url=os.environ.get("E2E_S3_ENDPOINT", "http://localhost:9000"),

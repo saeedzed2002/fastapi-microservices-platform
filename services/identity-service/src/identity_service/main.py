@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
@@ -16,12 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from identity_service.application import (
     OtpDeliveryUnavailable,
     OtpNotEligible,
-    SupportAgentAlreadyExists,
-    SupportAgentNotFound,
-    list_support_agents,
-    provision_support_agent,
     request_customer_otp,
-    update_support_agent_status,
     verify_customer_otp,
 )
 from identity_service.config import get_settings
@@ -37,9 +32,6 @@ from identity_service.schemas import (
     OtpRequestResponse,
     OtpVerifyRequest,
     RefreshRequest,
-    SupportAgentCreate,
-    SupportAgentResponse,
-    SupportAgentStatusUpdate,
     TokenResponse,
     UserResponse,
 )
@@ -167,20 +159,6 @@ async def current_user(
         ) from exc
 
 
-async def current_active_administrator(
-    claims: AuthClaims = Depends(current_user),
-    db: AsyncSession = Depends(get_session),
-) -> User:
-    if "admin" not in claims.roles:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="administrator role required"
-        )
-    user = await db.get(User, claims.subject)
-    if user is None or user.status != "active" or "admin" not in user.roles:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user is inactive")
-    return user
-
-
 @app.get("/health/live", tags=["health"])
 async def liveness() -> dict[str, str]:
     return {"status": "ok"}
@@ -250,7 +228,7 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_session)) 
     staff_eligible = not (
         user is None
         or user.status != "active"
-        or not {"admin", "support_agent"}.intersection(user.roles)
+        or "admin" not in user.roles
         or user.password_hash is None
     )
     if not staff_eligible or not password_valid:
@@ -285,7 +263,7 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_session)) 
     if (
         user is None
         or user.status != "active"
-        or not {"admin", "support_agent"}.intersection(user.roles)
+        or "admin" not in user.roles
         or user.password_hash is None
     ):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
@@ -297,69 +275,6 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_session)) 
         refresh_token=refresh_token,
         user=user_response(user),
     )
-
-
-@app.get("/api/v1/admin/support-agents", response_model=list[SupportAgentResponse])
-async def get_support_agents(
-    _: User = Depends(current_active_administrator),
-    limit: int = Query(default=50, ge=1, le=100),
-    db: AsyncSession = Depends(get_session),
-) -> list[SupportAgentResponse]:
-    return [
-        SupportAgentResponse.model_validate(agent)
-        for agent in await list_support_agents(db=db, limit=limit)
-    ]
-
-
-@app.post(
-    "/api/v1/admin/support-agents",
-    response_model=SupportAgentResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_support_agent(
-    payload: SupportAgentCreate,
-    actor: User = Depends(current_active_administrator),
-    db: AsyncSession = Depends(get_session),
-) -> SupportAgentResponse:
-    try:
-        agent = await provision_support_agent(
-            db=db,
-            actor_user_id=actor.id,
-            email=payload.email,
-            password=payload.password,
-        )
-        await db.commit()
-    except SupportAgentAlreadyExists as exc:
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="identity account already uses this email"
-        ) from exc
-    await db.refresh(agent)
-    return SupportAgentResponse.model_validate(agent)
-
-
-@app.patch("/api/v1/admin/support-agents/{support_agent_id}", response_model=SupportAgentResponse)
-async def set_support_agent_status(
-    support_agent_id: UUID,
-    payload: SupportAgentStatusUpdate,
-    actor: User = Depends(current_active_administrator),
-    db: AsyncSession = Depends(get_session),
-) -> SupportAgentResponse:
-    try:
-        agent = await update_support_agent_status(
-            db=db,
-            actor_user_id=actor.id,
-            support_agent_id=support_agent_id,
-            status=payload.status,
-        )
-    except SupportAgentNotFound as exc:
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="support agent not found"
-        ) from exc
-    await db.commit()
-    await db.refresh(agent)
-    return SupportAgentResponse.model_validate(agent)
 
 
 @app.post(

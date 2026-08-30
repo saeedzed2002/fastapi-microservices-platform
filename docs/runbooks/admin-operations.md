@@ -3,9 +3,9 @@
 ## Scope
 
 This is a backend operational API, not an administrator web panel. Identity
-owns staff accounts and password authentication. Chat owns support assignment.
-Order owns immutable order review. Neither Identity nor Chat reads another
-service's database.
+owns the two-role account model and password authentication for administrators.
+Chat owns support assignment. Order owns order review, fulfillment, and
+refund-request state. Neither Identity nor Chat reads another service's database.
 
 ## First administrator
 
@@ -18,18 +18,12 @@ pwsh -NoProfile -File scripts/platform.ps1 -Task provision-admin -AdminEmail adm
 The command asks for a password twice. Never put the password in a command-line
 argument, source file, API fixture, screenshot, or commit.
 
-## Support agents
+## Roles
 
-An authenticated active `admin` uses `POST /api/v1/admin/support-agents` to
-create an account whose only role is `support_agent`. `GET` lists agents and
-`PATCH /api/v1/admin/support-agents/{support_agent_id}` sets `active` or
-`suspended`. Every provision and status transition is stored as an Identity
-authentication audit record. Suspending an agent revokes refresh sessions; an
-already-issued access token expires at its normal short lifetime.
-
-`support_agent` accounts sign in through `POST /api/v1/auth/login`, can claim
-Chat support work, and cannot administer staff or inspect Orders. Only an
-`admin` has the management and order-review capabilities.
+The initial platform has exactly two roles: `customer` and `admin`. Customers
+authenticate with phone OTP. Only an `admin` can use password login and all
+privileged catalog, inventory, support-queue, and Order operations. There is no
+public role-assignment API in this release.
 
 ## Staff-login abuse control
 
@@ -57,7 +51,15 @@ email and address snapshot in Order. Customer history is `GET /api/v1/orders`
 with an opaque cursor. A customer can retrieve only an owned order.
 
 An `admin` uses `GET /api/v1/orders/admin` with optional `status`, `limit`, and
-`cursor`, then `GET /api/v1/orders/admin/{order_id}` for immutable purchase
-details, transitions, and invoice state. These endpoints are intentionally
-read-only: fulfilment, shipment, payment, refund, invoice-download, and
-customer-profile mutation are outside their authority.
+`cursor`, then `GET /api/v1/orders/admin/{order_id}` for purchase details,
+transitions, invoice state, fulfillment, and a refund-request identifier.
+
+Use `PATCH /api/v1/orders/admin/{order_id}/fulfillment` only in the legal
+sequence `CONFIRMED -> PROCESSING -> SHIPPED -> DELIVERED`. A `SHIPPED` update
+must include both `carrier` and `tracking_number`.
+
+Use `POST /api/v1/orders/admin/{order_id}/refund` with a fresh
+`Idempotency-Key` only for a `CONFIRMED` Zarinpal order. It returns `202` and
+the order becomes `REFUND_PENDING`; Payment later emits the result. Do not
+ship while it is pending and do not claim a refund is complete before the order
+reaches `REFUNDED`.

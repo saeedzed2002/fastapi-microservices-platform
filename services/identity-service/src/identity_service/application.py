@@ -1,13 +1,10 @@
-from datetime import UTC, datetime
-from typing import Literal
-from uuid import UUID, uuid4
+from uuid import uuid4
 
-from sqlalchemy import cast, select, update
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from identity_service.config import Settings
-from identity_service.models import AuthenticationAuditEvent, OutboxMessage, RefreshSession, User
+from identity_service.models import OutboxMessage, User
 from identity_service.notification import NotificationOtpGateway, NotificationUnavailable
 from identity_service.otp import OtpStateStore
 from identity_service.security import hash_password
@@ -25,14 +22,6 @@ class OtpNotEligible(Exception):
     pass
 
 
-class SupportAgentAlreadyExists(Exception):
-    pass
-
-
-class SupportAgentNotFound(Exception):
-    pass
-
-
 async def provision_administrator(*, db: AsyncSession, email: str, password: str) -> User:
     user = await db.scalar(select(User).where(User.email == email).with_for_update())
     if user is not None:
@@ -45,72 +34,6 @@ async def provision_administrator(*, db: AsyncSession, email: str, password: str
     )
     db.add(user)
     await db.flush()
-    return user
-
-
-async def provision_support_agent(
-    *, db: AsyncSession, actor_user_id: UUID, email: str, password: str
-) -> User:
-    existing = await db.scalar(select(User).where(User.email == email).with_for_update())
-    if existing is not None:
-        raise SupportAgentAlreadyExists
-    user = User(
-        email=email,
-        phone=None,
-        password_hash=hash_password(password),
-        roles=["support_agent"],
-    )
-    db.add(user)
-    await db.flush()
-    db.add(
-        AuthenticationAuditEvent(
-            actor_user_id=actor_user_id,
-            target_user_id=user.id,
-            event_type="identity.support_agent.provisioned.v1",
-            details={"status": user.status},
-        )
-    )
-    return user
-
-
-async def list_support_agents(*, db: AsyncSession, limit: int) -> list[User]:
-    rows = await db.scalars(
-        select(User)
-        .where(cast(User.roles, JSONB).contains(["support_agent"]))
-        .order_by(User.created_at.desc(), User.id.desc())
-        .limit(limit)
-    )
-    return list(rows)
-
-
-async def update_support_agent_status(
-    *,
-    db: AsyncSession,
-    actor_user_id: UUID,
-    support_agent_id: UUID,
-    status: Literal["active", "suspended"],
-) -> User:
-    user = await db.scalar(select(User).where(User.id == support_agent_id).with_for_update())
-    if user is None or user.roles != ["support_agent"]:
-        raise SupportAgentNotFound
-    previous_status = user.status
-    if previous_status == status:
-        return user
-    user.status = status
-    if status == "suspended":
-        await db.execute(
-            update(RefreshSession)
-            .where(RefreshSession.user_id == user.id, RefreshSession.revoked_at.is_(None))
-            .values(revoked_at=datetime.now(UTC))
-        )
-    db.add(
-        AuthenticationAuditEvent(
-            actor_user_id=actor_user_id,
-            target_user_id=user.id,
-            event_type="identity.support_agent.status_changed.v1",
-            details={"previous_status": previous_status, "status": status},
-        )
-    )
     return user
 
 

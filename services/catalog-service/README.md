@@ -13,6 +13,6 @@ It stores only opaque media asset identifiers. It never queries the Media Servic
 - Catalog administrator endpoints under /api/v1/catalog/products
 - Catalog administrator endpoints under /api/v1/catalog/categories
 
-The administrator endpoints require an access token with `admin` or `catalog_admin`.
+The administrator endpoints require an access token with `admin`.
 Category writes validate the parent hierarchy and reject deleting a category that
 still has child categories or assigned products.
