@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, Numeric, String, Text
@@ -74,3 +75,23 @@ class ProductMedia(Base):
     media_asset_id: Mapped[UUID] = mapped_column(index=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class OutboxMessage(Base):
+    __tablename__ = "outbox_messages"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    event_id: Mapped[UUID] = mapped_column(unique=True, default=uuid4)
+    event_type: Mapped[str] = mapped_column(String(160))
+    aggregate_type: Mapped[str] = mapped_column(String(80))
+    aggregate_id: Mapped[UUID] = mapped_column(index=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    correlation_id: Mapped[UUID] = mapped_column()
+    causation_id: Mapped[UUID | None] = mapped_column()
+    trace_id: Mapped[str] = mapped_column(String(32))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    publish_claim_token: Mapped[UUID | None] = mapped_column()
+    publish_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(default=0)
+    last_error: Mapped[str | None] = mapped_column(Text)

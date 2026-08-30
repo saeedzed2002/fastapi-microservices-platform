@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -6,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from catalog_service.models import Category, Product, ProductMedia, ProductVariant
+from catalog_service.models import Category, OutboxMessage, Product, ProductMedia, ProductVariant
 from catalog_service.schemas import (
     CategoryCreate,
     CategoryResponse,
@@ -183,12 +184,68 @@ async def product_response(db: AsyncSession, product: Product) -> ProductRespons
     )
 
 
+def _utc_timestamp(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _product_event_payload(product: Product) -> dict[str, Any]:
+    return {
+        "product_id": str(product.id),
+        "slug": product.slug,
+        "name": product.name,
+        "description": product.description,
+        "status": product.status,
+        "brand_id": str(product.brand_id) if product.brand_id else None,
+        "category_id": str(product.category_id) if product.category_id else None,
+        "price_amount": str(product.price_amount),
+        "currency": product.currency,
+        "attributes": product.attributes,
+        "published_at": _utc_timestamp(product.published_at),
+        "updated_at": _utc_timestamp(product.updated_at),
+    }
+
+
+def _record_product_event(db: AsyncSession, *, event_type: str, product: Product) -> None:
+    db.add(
+        OutboxMessage(
+            event_type=event_type,
+            aggregate_type="product",
+            aggregate_id=product.id,
+            payload=_product_event_payload(product),
+            correlation_id=product.id,
+            causation_id=None,
+            trace_id="0" * 32,
+        )
+    )
+
+
+def _record_product_deletion(db: AsyncSession, *, product_id: UUID) -> None:
+    db.add(
+        OutboxMessage(
+            event_type="product.deleted.v1",
+            aggregate_type="product",
+            aggregate_id=product_id,
+            payload={
+                "product_id": str(product_id),
+                "deleted_at": _utc_timestamp(datetime.now(UTC)),
+            },
+            correlation_id=product_id,
+            causation_id=None,
+            trace_id="0" * 32,
+        )
+    )
+
+
 async def create_product(db: AsyncSession, payload: ProductCreate) -> Product:
     if payload.category_id is not None:
         await load_category_or_404(db, payload.category_id)
     product = Product(**payload.model_dump())
     db.add(product)
     try:
+        await db.flush()
+        _record_product_event(db, event_type="product.created.v1", product=product)
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
@@ -205,6 +262,8 @@ async def update_product(db: AsyncSession, product: Product, payload: ProductUpd
         await load_category_or_404(db, updates["category_id"])
     for field, value in updates.items():
         setattr(product, field, value)
+    await db.flush()
+    _record_product_event(db, event_type="product.updated.v1", product=product)
     await db.commit()
     await db.refresh(product)
     return product
@@ -213,9 +272,18 @@ async def update_product(db: AsyncSession, product: Product, payload: ProductUpd
 async def publish_product(db: AsyncSession, product: Product) -> Product:
     product.status = "published"
     product.published_at = datetime.now(UTC)
+    await db.flush()
+    _record_product_event(db, event_type="product.updated.v1", product=product)
     await db.commit()
     await db.refresh(product)
     return product
+
+
+async def delete_product(db: AsyncSession, product: Product) -> None:
+    product_id = product.id
+    await db.delete(product)
+    _record_product_deletion(db, product_id=product_id)
+    await db.commit()
 
 
 async def attach_media(

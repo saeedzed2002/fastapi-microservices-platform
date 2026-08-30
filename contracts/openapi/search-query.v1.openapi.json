@@ -1,0 +1,27 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "Search query API", "version": "v1"},
+  "paths": {
+    "/api/v1/search/products": {
+      "get": {
+        "summary": "Search published Catalog products",
+        "parameters": [
+          {"name": "q", "in": "query", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 200}},
+          {"name": "cursor", "in": "query", "schema": {"type": "string", "maxLength": 256}},
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20}},
+          {"name": "category_id", "in": "query", "schema": {"type": "string", "format": "uuid"}},
+          {"name": "brand_id", "in": "query", "schema": {"type": "string", "format": "uuid"}},
+          {"name": "currency", "in": "query", "schema": {"type": "string", "pattern": "^[A-Z]{3}$"}},
+          {"name": "min_price", "in": "query", "schema": {"type": "string"}},
+          {"name": "max_price", "in": "query", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Search result page"},
+          "422": {"description": "Invalid query or cursor"},
+          "429": {"description": "Public search rate limit exceeded"},
+          "503": {"description": "Search rate limiter unavailable"}
+        }
+      }
+    }
+  }
+}

@@ -8,6 +8,7 @@ import pytest
 from fastapi import HTTPException
 
 from catalog_service.application import (
+    _record_product_event,
     _validate_category_parent,
     create_category,
     create_product,
@@ -15,6 +16,7 @@ from catalog_service.application import (
 )
 from catalog_service.auth import require_administrator
 from catalog_service.main import app
+from catalog_service.models import Product
 from catalog_service.schemas import CategoryCreate, ProductCreate
 from platform_auth import AuthClaims
 
@@ -33,6 +35,7 @@ class FakeSession:
         self.commit = AsyncMock()
         self.rollback = AsyncMock()
         self.refresh = AsyncMock()
+        self.flush = AsyncMock()
 
     async def get(self, model: object, value: UUID) -> object | None:
         del model
@@ -165,3 +168,28 @@ def test_administrator_role_is_required_for_category_writes() -> None:
     assert error.value.status_code == 403
 
     require_administrator(administrator_claims)
+
+
+def test_product_event_uses_a_complete_search_projection_payload() -> None:
+    now = datetime.now(UTC)
+    product = Product(
+        id=uuid4(),
+        name="Phone",
+        slug="phone",
+        description="Searchable",
+        status="published",
+        price_amount="150000",
+        currency="IRT",
+        attributes={"color": "black"},
+        created_at=now,
+        updated_at=now,
+        published_at=now,
+    )
+    session = FakeSession()
+
+    _record_product_event(session, event_type="product.updated.v1", product=product)  # type: ignore[arg-type]
+
+    event = session.added[0]
+    assert event.event_type == "product.updated.v1"
+    assert event.payload["product_id"] == str(product.id)
+    assert event.payload["published_at"].endswith("Z")

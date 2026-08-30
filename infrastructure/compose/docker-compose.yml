@@ -185,8 +185,36 @@ services:
       CATALOG_ENVIRONMENT: local
       CATALOG_DATABASE_URL: postgresql+asyncpg://catalog_service:catalog-local-only@postgres:5432/catalog_service
       CATALOG_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
+      CATALOG_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      CATALOG_KAFKA_PUBLISHER_ENABLED: "true"
     depends_on:
       postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  search-service:
+    build:
+      context: ../..
+      dockerfile: services/search-service/Dockerfile
+    image: fastapi-microservices-platform-search-service:0.8.0-local
+    environment:
+      SEARCH_ENVIRONMENT: local
+      SEARCH_DATABASE_URL: postgresql+asyncpg://search_service:search-local-only@postgres:5432/search_service
+      SEARCH_REDIS_URL: redis://redis:6379/2
+      SEARCH_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SEARCH_KAFKA_CONSUMER_ENABLED: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
@@ -422,6 +450,8 @@ services:
       customer-service:
         condition: service_healthy
       catalog-service:
+        condition: service_healthy
+      search-service:
         condition: service_healthy
       media-service:
         condition: service_healthy

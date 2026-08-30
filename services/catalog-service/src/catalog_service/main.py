@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -15,6 +16,7 @@ from catalog_service.application import (
     create_category,
     create_product,
     delete_category,
+    delete_product,
     list_categories,
     list_variants,
     load_category_by_slug_or_404,
@@ -42,6 +44,7 @@ from catalog_service.schemas import (
     VariantCreate,
     VariantResponse,
 )
+from catalog_service.workers.kafka import publish_outbox
 from platform_auth import AuthClaims
 
 settings = get_settings()
@@ -50,8 +53,16 @@ logger = logging.getLogger(settings.service_name)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    stop = asyncio.Event()
+    task: asyncio.Task[None] | None = None
+    if settings.kafka_publisher_enabled:
+        task = asyncio.create_task(publish_outbox(settings, stop))
     logger.info("service_started")
     yield
+    stop.set()
+    if task is not None:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
     await dispose_engine()
     logger.info("service_stopped")
 
@@ -160,6 +171,16 @@ async def update_product_endpoint(
     require_administrator(claims)
     product = await load_product_or_404(db, product_id)
     return await product_response(db, await update_product(db, product, payload))
+
+
+@app.delete("/api/v1/catalog/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_product_endpoint(
+    product_id: UUID,
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> None:
+    require_administrator(claims)
+    await delete_product(db, await load_product_or_404(db, product_id))
 
 
 @app.post("/api/v1/catalog/products/{product_id}/publish", response_model=ProductResponse)

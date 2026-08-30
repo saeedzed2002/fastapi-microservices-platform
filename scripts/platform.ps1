@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("install", "lint", "format-check", "typecheck", "test", "migrate-identity", "migrate-customer", "migrate-catalog", "migrate-media", "migrate-inventory", "migrate-cart", "migrate-order", "migrate-payment", "migrate-notification", "migrate-chat", "provision-admin", "dev-up", "dev-start", "dev-stop", "dev-recreate", "dev-down", "logs")]
+    [ValidateSet("install", "lint", "format-check", "typecheck", "test", "migrate-identity", "migrate-customer", "migrate-catalog", "migrate-search", "migrate-media", "migrate-inventory", "migrate-cart", "migrate-order", "migrate-payment", "migrate-notification", "migrate-chat", "provision-admin", "dev-up", "dev-start", "dev-stop", "dev-recreate", "dev-down", "logs")]
     [string]$Task,
     [string]$AdminEmail
 )
@@ -26,6 +26,7 @@ try {
         "migrate-identity" { & $uvPath run --package identity-service alembic -c services/identity-service/alembic.ini upgrade head }
         "migrate-customer" { & $uvPath run --package customer-service alembic -c services/customer-service/alembic.ini upgrade head }
         "migrate-catalog" { & $uvPath run --package catalog-service alembic -c services/catalog-service/alembic.ini upgrade head }
+        "migrate-search" { & $uvPath run --package search-service alembic -c services/search-service/alembic.ini upgrade head }
         "migrate-media" { & $uvPath run --package media-service alembic -c services/media-service/alembic.ini upgrade head }
         "migrate-inventory" { & $uvPath run --package inventory-service alembic -c services/inventory-service/alembic.ini upgrade head }
         "migrate-cart" { & $uvPath run --package cart-service alembic -c services/cart-service/alembic.ini upgrade head }

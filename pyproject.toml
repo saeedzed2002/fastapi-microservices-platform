@@ -24,6 +24,7 @@ default-groups = ["dev"]
 [tool.uv.workspace]
 members = [
   "services/catalog-service",
+  "services/search-service",
   "services/cart-service",
   "services/media-service",
   "services/inventory-service",

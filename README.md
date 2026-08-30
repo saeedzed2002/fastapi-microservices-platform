@@ -52,6 +52,7 @@ Core bounded contexts:
 - `identity-service`
 - `customer-service`
 - `catalog-service`
+- `search-service`
 - `inventory-service`
 - `cart-service`
 - `order-service`
@@ -62,7 +63,6 @@ Core bounded contexts:
 
 Later bounded contexts:
 
-- `search-service`
 - `shipping-service`
 
 See [service boundaries](docs/architecture/service-boundaries.md) for ownership and non-ownership rules.
@@ -98,6 +98,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Invoice and notification runbook](docs/runbooks/invoice-notification.md)
 - [SMS OTP runbook](docs/runbooks/sms-otp.md)
 - [Staff operations runbook](docs/runbooks/admin-operations.md)
+- [Search projection runbook](docs/runbooks/search-projection.md)
 - [Edge gateway runbook](docs/runbooks/edge-gateway.md)
 - [Phase 0 plan](docs/development/phase-0-plan.md)
 - [Phase 1 plan](docs/development/phase-1-plan.md)
@@ -106,6 +107,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Phase 5 plan](docs/development/phase-5-plan.md)
 - [Phase 6 plan](docs/development/phase-6-plan.md)
 - [Phase 7 plan](docs/development/phase-7-plan.md)
+- [Phase 8 plan](docs/development/phase-8-plan.md)
 
 ## Roadmap
 

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fastapi-platform:events:product-created:v1",
+  "title": "Catalog product created v1 payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "product_id",
+    "slug",
+    "name",
+    "description",
+    "status",
+    "brand_id",
+    "category_id",
+    "price_amount",
+    "currency",
+    "attributes",
+    "published_at",
+    "updated_at"
+  ],
+  "properties": {
+    "product_id": {"type": "string", "format": "uuid"},
+    "slug": {"type": "string", "minLength": 1, "maxLength": 260},
+    "name": {"type": "string", "minLength": 1, "maxLength": 240},
+    "description": {"type": "string", "maxLength": 20000},
+    "status": {"enum": ["draft", "published"]},
+    "brand_id": {"oneOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]},
+    "category_id": {"oneOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]},
+    "price_amount": {"type": "string", "pattern": "^[0-9]+(?:\\.[0-9]{1,2})?$"},
+    "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+    "attributes": {"type": "object", "additionalProperties": {"type": "string"}},
+    "published_at": {"oneOf": [{"type": "string", "format": "date-time", "pattern": "Z$"}, {"type": "null"}]},
+    "updated_at": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  }
+}

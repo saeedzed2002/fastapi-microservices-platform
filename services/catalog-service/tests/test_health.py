@@ -14,3 +14,7 @@ def test_liveness() -> None:
     response = asyncio.run(request())
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_product_deletion_route_is_administrator_only() -> None:
+    assert "delete" in app.openapi()["paths"]["/api/v1/catalog/products/{product_id}"]

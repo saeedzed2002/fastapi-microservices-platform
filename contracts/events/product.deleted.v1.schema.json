@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fastapi-platform:events:product-deleted:v1",
+  "title": "Catalog product deleted v1 payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["product_id", "deleted_at"],
+  "properties": {
+    "product_id": {"type": "string", "format": "uuid"},
+    "deleted_at": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  }
+}

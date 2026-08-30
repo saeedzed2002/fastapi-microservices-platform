@@ -1,17 +1,16 @@
 [project]
-name = "catalog-service"
-version = "0.3.0"
-description = "Catalog bounded context for products, variants, categories, brands, and prices."
+name = "search-service"
+version = "0.8.0"
+description = "Rebuildable Catalog product search projection backed by PostgreSQL full-text search."
 requires-python = ">=3.14,<3.15"
 dependencies = [
   "aiokafka>=0.14,<0.15",
   "alembic>=1.19.1,<2",
   "asyncpg>=0.31,<0.32",
   "fastapi>=0.141.1,<0.142",
-  "platform-auth",
   "platform-messaging",
   "pydantic-settings>=2.15,<3",
-  "PyJWT[crypto]>=2.13,<3",
+  "redis>=8.1.0,<9",
   "SQLAlchemy[asyncio]>=2.0.52,<2.1",
   "uvicorn[standard]>=0.52.3,<0.53",
 ]
@@ -24,5 +23,4 @@ build-backend = "uv_build"
 package = true
 
 [tool.uv.sources]
-platform-auth = { workspace = true }
 platform-messaging = { workspace = true }

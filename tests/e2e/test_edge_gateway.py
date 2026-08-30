@@ -17,6 +17,7 @@ LOCAL_DOCS = {
     "cart": "Cart Service",
     "order": "Order Service",
     "payment": "Payment Service",
+    "search": "Search Service",
     "notification": "Notification Service",
     "chat": "Chat Service",
 }

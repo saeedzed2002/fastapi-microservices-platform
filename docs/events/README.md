@@ -36,6 +36,9 @@ Commands and Celery task names are not domain events.
 | `payment.refunded.v1` | Payment | Order, Inventory | 7 |
 | `payment.refund_failed.v1` | Payment | Order | 7 |
 | `order.fulfillment_updated.v1` | Order | Future projections | 7 |
+| `product.created.v1` | Catalog | Search | 8 |
+| `product.updated.v1` | Catalog | Search | 8 |
+| `product.deleted.v1` | Catalog | Search | 8 |
 
 ## Reserved events
 
@@ -43,11 +46,8 @@ Commands and Celery task names are not domain events.
 |---|---|---|---|
 | `invoice.generated.v1` | Order | Notification | 6 |
 | `media.ready.v1` | Media | Asset-owning contexts | 3+
-| `product.created.v1` | Catalog | Search | 8 |
-| `product.updated.v1` | Catalog | Search | 8 |
-| `product.deleted.v1` | Catalog | Search | 8 |
 
-These names are reserved architecture vocabulary. Their payload contracts remain unavailable until the owning phase designs aggregates, authorization, idempotency, privacy, and consumer needs.
+Reserved names are architecture vocabulary whose payload contracts are unavailable until the owning phase designs aggregates, authorization, idempotency, privacy, and consumer needs.
 
 ## Compatibility and retirement
 

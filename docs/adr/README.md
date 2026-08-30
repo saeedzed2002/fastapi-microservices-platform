@@ -23,6 +23,7 @@ ADRs record decisions that materially affect service ownership, contracts, durab
 
 | ADR | Status | Decision |
 |---|---|---|
+| [ADR-025](ADR-025-catalog-search-projection.md) | Accepted | Rebuildable Catalog search projection |
 | [ADR-024](ADR-024-two-role-order-administration.md) | Accepted | Two-role model and paid-order administration |
 | [ADR-023](ADR-023-cart-backed-zarinpal-checkout.md) | Accepted | Cart-backed Zarinpal checkout redirect |
 | [ADR-022](ADR-022-zarinpal-payment-adapter-and-expiry.md) | Accepted | Zarinpal payment adapter and expiry |

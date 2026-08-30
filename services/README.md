@@ -2,7 +2,7 @@
 
 Each child directory represents one independently deployable bounded context and owns its code, migrations, tests, contracts, image, documentation, and runtime behavior.
 
-Planned core services are Identity, Customer, Catalog, Inventory, Cart, Order, Payment, Notification, Media, and Chat. Search and Shipping are later contexts.
+Core services are Identity, Customer, Catalog, Search, Inventory, Cart, Order, Payment, Notification, Media, and Chat. Shipping is a later context.
 
 ## Rules
 
