@@ -70,6 +70,22 @@ readonly DEPENDENCY_LOCAL_IMAGES=(
 
 cluster_created=false
 
+dump_namespace_logs() {
+  local namespace="$1"
+  local pod
+
+  kubectl --context "${CONTEXT}" -n "${namespace}" get pods -o name 2>/dev/null |
+    while IFS= read -r pod; do
+      [[ -n "${pod}" ]] || continue
+      echo "--- current logs: ${namespace}/${pod} ---" >&2
+      kubectl --context "${CONTEXT}" -n "${namespace}" logs "${pod}" \
+        --all-containers=true --prefix --tail=200 || true
+      echo "--- previous logs: ${namespace}/${pod} ---" >&2
+      kubectl --context "${CONTEXT}" -n "${namespace}" logs "${pod}" \
+        --all-containers=true --prefix --previous --tail=200 || true
+    done || true
+}
+
 diagnose() {
   local exit_code="$?"
   if [[ "${cluster_created}" == true ]]; then
@@ -79,6 +95,8 @@ diagnose() {
       kubectl --context "${CONTEXT}" get events --all-namespaces --sort-by=.lastTimestamp || true
       kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" get pods -o wide || true
       kubectl --context "${CONTEXT}" -n "${DEPENDENCY_NAMESPACE}" get pods -o wide || true
+      dump_namespace_logs "${DEPENDENCY_NAMESPACE}"
+      dump_namespace_logs "${APP_NAMESPACE}"
       kind export logs --name "${CLUSTER_NAME}" "${ROOT_DIR}/kind-conformance-logs" || true
     fi
     kind delete cluster --name "${CLUSTER_NAME}" || true

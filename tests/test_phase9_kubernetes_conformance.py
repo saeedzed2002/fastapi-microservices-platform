@@ -105,6 +105,8 @@ def test_kind_cluster_and_ci_script_are_pinned_and_disposable() -> None:
     assert expected_node_image in kind_config
     assert "kind delete cluster" in script
     assert "kind export logs" in script
+    assert "dump_namespace_logs" in script
+    assert "--previous --tail=200" in script
     assert "platform-health-smoke" in script
     assert script.count("--provenance=false") == 2
     assert "DEPENDENCY_SOURCE_IMAGES" in script
