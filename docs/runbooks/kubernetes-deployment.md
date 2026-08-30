@@ -4,10 +4,13 @@
 
 This runbook deploys the Phase 9 raw resources. It does not create a cluster,
 an ingress controller, TLS issuer, secret manager, or managed stateful service.
-Do not treat a successful `kubectl apply` as proof that migrations, image pulls,
-external dependencies, or public routing work.
+Do not treat a successful `kubectl apply` as proof of a target environment's
+external dependencies or public routing. The disposable CI conformance job
+does prove the repository sequence of foundation, migration Jobs, workloads,
+and in-cluster readiness against local test dependencies; it does not replace
+this environment-specific runbook.
 
-Use a Kubernetes `v1.37` control plane and a supported `kubectl` client. The
+Use a Kubernetes `v1.36.1` control plane and a supported `kubectl` client. The
 resource layout is:
 
 1. `infrastructure/kubernetes/foundation`

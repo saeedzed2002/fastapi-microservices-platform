@@ -23,6 +23,19 @@ against the migrated schemas before executing checkout-to-invoice-to-email E2E
 and collecting logs on failure. Application processes must never begin
 background database work against an unmigrated schema.
 
+Pushes to `main` and manual workflow dispatches additionally run
+`kubernetes-conformance`. It downloads checksum-verified `kubectl v1.36.1`
+and `Kind v0.32.0`, builds every service image from the checked-out revision,
+and loads those local images into a disposable `Kind` cluster. The job applies
+the test-only foundation (including isolated PostgreSQL, Kafka, RabbitMQ,
+Redis, MinIO, and Mailpit), waits for dependency readiness, runs controlled
+migration Jobs, waits for all API and worker Deployments, and executes an
+in-cluster `/health/ready` smoke Job. It always destroys the cluster and
+exports diagnostics if the proof fails. This is deployment evidence for the
+repository manifests, not a production delivery environment: it has no real
+provider credentials, public ingress, certificate, or external managed-state
+dependency.
+
 Only a validated push to `main` can run `publish-ghcr`. That job receives
 `packages: write` and no broader write permission, authenticates with the
 workflow-scoped `GITHUB_TOKEN`, and publishes one image per service to
@@ -98,7 +111,8 @@ smoke tests, and permit rollback only when the schema remains compatible.
 ## Required GitHub settings
 
 Before relying on delivery, protect `main`: require pull requests, require the
-`quality`, `migration-heads`, `image-build`, and `integration` checks, require
+`quality`, `migration-heads`, `image-build`, `integration`, and
+`kubernetes-conformance` checks, require
 up-to-date branches, restrict direct pushes, and prohibit required-check
 bypass. Configure Actions with read-only defaults and permit `GITHUB_TOKEN`
 package writes for this repository. Enable Dependency Graph, Dependabot alerts,

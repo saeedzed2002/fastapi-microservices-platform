@@ -1,0 +1,89 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../workloads
+
+images:
+  - name: ghcr.io/saeedzed2002/fastapi-microservices-platform/reference-service
+    newName: fastapi-platform/reference-service
+    newTag: conformance
+  - name: ghcr.io/saeedzed2002/fastapi-microservices-platform/identity-service
+    newName: fastapi-platform/identity-service
+    newTag: conformance
+  - name: ghcr.io/saeedzed2002/fastapi-microservices-platform/customer-service
+    newName: fastapi-platform/customer-service
+    newTag: conformance
+  - name: ghcr.io/saeedzed2002/fastapi-microservices-platform/catalog-service
+    newName: fastapi-platform/catalog-service
+    newTag: conformance
+  - name: ghcr.io/saeedzed2002/fastapi-microservices-platform/search-service
+    newName: fastapi-platform/search-service
+    newTag: conformance
+  - name: ghcr.io/saeedzed2002/fastapi-microservices-platform/media-service
+    newName: fastapi-platform/media-service
+    newTag: conformance
+  - name: ghcr.io/saeedzed2002/fastapi-microservices-platform/inventory-service
+    newName: fastapi-platform/inventory-service
+    newTag: conformance
+  - name: ghcr.io/saeedzed2002/fastapi-microservices-platform/cart-service
+    newName: fastapi-platform/cart-service
+    newTag: conformance
+  - name: ghcr.io/saeedzed2002/fastapi-microservices-platform/order-service
+    newName: fastapi-platform/order-service
+    newTag: conformance
+  - name: ghcr.io/saeedzed2002/fastapi-microservices-platform/payment-service
+    newName: fastapi-platform/payment-service
+    newTag: conformance
+  - name: ghcr.io/saeedzed2002/fastapi-microservices-platform/notification-service
+    newName: fastapi-platform/notification-service
+    newTag: conformance
+  - name: ghcr.io/saeedzed2002/fastapi-microservices-platform/chat-service
+    newName: fastapi-platform/chat-service
+    newTag: conformance
+
+replicas:
+  - name: reference-service
+    count: 1
+  - name: identity-service
+    count: 1
+  - name: customer-service
+    count: 1
+  - name: catalog-service
+    count: 1
+  - name: search-service
+    count: 1
+  - name: media-service
+    count: 1
+  - name: inventory-service
+    count: 1
+  - name: cart-service
+    count: 1
+  - name: order-service
+    count: 1
+  - name: payment-service
+    count: 1
+  - name: notification-service
+    count: 1
+  - name: chat-service
+    count: 1
+
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/imagePullSecrets
+        value: []
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+  - target:
+      kind: CronJob
+    patch: |-
+      - op: replace
+        path: /spec/jobTemplate/spec/template/spec/imagePullSecrets
+        value: []
+      - op: replace
+        path: /spec/jobTemplate/spec/template/spec/containers/0/imagePullPolicy
+        value: Never

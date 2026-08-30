@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-runtime-config
+  namespace: fastapi-platform
+data:
+  PLATFORM_ENVIRONMENT: conformance
+  IDENTITY_ENVIRONMENT: conformance
+  CUSTOMER_ENVIRONMENT: conformance
+  CATALOG_ENVIRONMENT: conformance
+  SEARCH_ENVIRONMENT: conformance
+  MEDIA_ENVIRONMENT: conformance
+  INVENTORY_ENVIRONMENT: conformance
+  CART_ENVIRONMENT: conformance
+  ORDER_ENVIRONMENT: conformance
+  PAYMENT_ENVIRONMENT: conformance
+  NOTIFICATION_ENVIRONMENT: conformance
+  CHAT_ENVIRONMENT: conformance
+  NOTIFICATION_SMTP_PORT: "1025"
+  PAYMENT_ZARINPAL_CALLBACK_URL: http://edge-disabled.invalid/api/v1/payments/zarinpal/callback

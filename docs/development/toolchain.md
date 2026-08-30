@@ -43,8 +43,9 @@ Phase 1 selects the minimum executable platform profile. Direct package constrai
 | Grafana | 1/11 | Not selected | Datasource/dashboard compatibility, image digest and security review |
 | Loki | 1/11 | Not selected | Collector/export path, storage model, image digest and security review |
 | Tempo | 1/11 | Not selected | OTLP/Collector compatibility, storage model and image digest |
-| Kubernetes | 9 | `v1.37.0` control-plane target; reviewed `2026-08-30` | Active stable release branch, API lifecycle, target-cluster compatibility, and managed-provider support |
-| `kubectl` | 9 | `v1.37.0` CI/release client target; SHA-256 verified download | Kubernetes client-version skew policy, reproducible official distribution, and target-cluster compatibility |
+| Kubernetes | 9 | `v1.36.1` Kind conformance control-plane target; reviewed `2026-08-30` | Stable Kind node image availability, API lifecycle, target-cluster compatibility, and managed-provider support |
+| `kubectl` | 9 | `v1.36.1` CI/release client target; SHA-256 verified download | Kubernetes client-version skew policy, reproducible official distribution, and target-cluster compatibility |
+| Kind | 9 | `v0.32.0`; exact `kindest/node:v1.36.1` digest in the conformance config | Official release, Kubernetes-node compatibility, ephemeral CI support, and image-loading behavior |
 | Helm | 10 | Not selected | Supported release, Kubernetes compatibility and chart API behavior |
 
 ## Phase 0 evidence
@@ -301,17 +302,23 @@ source for the workspace.
 
 ## Phase 9 Kubernetes selection evidence
 
-- Kubernetes `v1.37.0` was the newest stable upstream release line when
-  reviewed on `2026-08-30`. The active release branches listed by the
-  Kubernetes project were `1.37`, `1.36`, and `1.35`; `1.37` is selected for
-  the Phase 9 target. A managed Kubernetes provider or self-managed cluster
-  must still prove that it supports the selected version before environment
-  adoption.
-- The CI/release client target is the official `kubectl` `v1.37.0` binary
+- Kubernetes `v1.36.1` is the control-plane version of the official stable
+  `Kind v0.32.0` node image used by the executable Phase 9 conformance job.
+  The node image is pinned by digest in
+  `infrastructure/kubernetes/conformance/kind-config.yaml`. A managed
+  Kubernetes provider or self-managed cluster must still prove its selected
+  version before environment adoption; the disposable CI cluster is not an
+  assertion about a future production provider.
+- The CI/release client target is the official `kubectl` `v1.36.1` binary
   fetched from `dl.k8s.io` together with its official SHA-256 file and
   verified before installation. Kubernetes documents that `kubectl` is
   supported within one minor version of the control plane, so an exact target
   client removes an avoidable deployment discrepancy.
+- `Kind v0.32.0` is downloaded from its official release and verified against
+  the published `kind-linux-amd64` SHA-256 before the CI job uses it. The
+  conformance job loads checkout-built application images by deterministic
+  test-only tags into the disposable node; production manifests remain
+  immutable-digest-only and never reference those tags.
 - The repository uses the Kustomize functionality integrated into `kubectl`
   rather than adding a separate templating runtime. Kubernetes documents its
   support in `kubectl` and this phase only needs raw-resource rendering. Helm
@@ -323,6 +330,8 @@ source for the workspace.
   image or `latest` dependency is selected.
 - Official sources reviewed: [Kubernetes releases](https://kubernetes.io/releases/),
   [kubectl overview and version skew](https://kubernetes.io/docs/concepts/overview/kubectl/),
+  [Kind `v0.32.0` release](https://github.com/kubernetes-sigs/kind/releases/tag/v0.32.0),
+  [Kind quick start](https://kind.sigs.k8s.io/docs/user/quick-start/),
   [Kustomize with kubectl](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/),
   [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/),
   [NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/),

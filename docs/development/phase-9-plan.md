@@ -19,6 +19,10 @@ and no committed runtime secret.
 - immutable image-digest placeholders, a runtime configuration `ConfigMap`,
   a non-applied secret example, a portable ingress contract, deployment
   runbook, and CI rendering validation;
+- a disposable `Kind` conformance path that builds the checked-out service
+  images, loads them into a temporary cluster, applies foundation, migrations,
+  and workloads in delivery order, and proves every API readiness endpoint
+  from inside the application namespace.
 - migration sources and `alembic.ini` included in every database-owning
   service image so the migration Jobs can actually execute.
 
@@ -47,12 +51,16 @@ and no committed runtime secret.
 
 ## Dependency selection
 
-Phase 9 selects Kubernetes `v1.37.0` and `kubectl` `v1.37.0`. The supported
-Kubernetes release line and client-version skew policy were reviewed from the
-official Kubernetes documentation on `2026-08-30`. The local rendering check
-uses the available `kubectl v1.34.1`; it validates Kustomize structure only
-and is not proof of compatibility with a target cluster. The selected release
-record and links are in `docs/development/toolchain.md`.
+Phase 9 selects Kubernetes `v1.36.1`, `kubectl` `v1.36.1`, and `Kind`
+`v0.32.0`. The latter's official stable release ships the exact pinned
+`kindest/node:v1.36.1` image used by the conformance cluster. The job runs on
+pushes to `main` and manual dispatches, rather than untrusted pull requests,
+because it builds and starts the complete platform. It uses isolated,
+deterministic test-only infrastructure credentials and never calls Zarinpal
+or the SMS provider. This proves the repository deployment sequence, but not
+target-environment ingress, real TLS, managed stateful-service networking, or
+production credential delivery. The selection record and links are in
+`docs/development/toolchain.md`.
 
 Raw Kustomize resources are selected before Helm because the workload model,
 external-state topology, ingress controller, and secret manager must stabilize

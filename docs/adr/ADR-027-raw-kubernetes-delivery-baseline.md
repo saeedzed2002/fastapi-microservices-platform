@@ -60,7 +60,9 @@ external payment provider cannot be safely restricted by guessed CIDRs.
   credentials, external service endpoints, and an egress policy before public
   deployment.
 - Static manifest validation cannot prove image pull, managed-service access,
-  migration success, or ingress routing.
+  migration success, or ingress routing. `ADR-028` adds a disposable
+  conformance cluster to prove the first three against test-only dependencies;
+  it cannot prove a target environment's ingress or managed-service topology.
 - Fixed-name migration Jobs must be deleted before a later release can create
   them again; the runbook makes this an explicit audited step.
 
@@ -86,7 +88,8 @@ an automatic Alembic downgrade.
 
 ## Validation
 
-- CI renders all three Kustomize entry points and checks the manifest policy.
+- CI renders the production and conformance Kustomize entry points and checks
+  the manifest policy.
 - CI image builds prove migration sources are present in every owned image.
 - A target cluster deployment follows `docs/runbooks/kubernetes-deployment.md`
   and records migration completion, rollout state, readiness, and ingress
@@ -97,3 +100,4 @@ an automatic Alembic downgrade.
 - [ADR-010](ADR-010-kubernetes-first-runtime.md)
 - [Phase 9 plan](../development/phase-9-plan.md)
 - [Kubernetes deployment runbook](../runbooks/kubernetes-deployment.md)
+- [ADR-028](ADR-028-kubernetes-conformance-ci.md)

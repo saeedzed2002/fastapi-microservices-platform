@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# Run the Phase 9 proof against a disposable Kind cluster. This script is for
+# CI and local verification only; production deployments use immutable GHCR
+# digests and the operator runbook instead.
+set -euo pipefail
+
+readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly CLUSTER_NAME="${KIND_CLUSTER_NAME:-fastapi-platform-conformance}"
+readonly SKIP_IMAGE_BUILD="${CONFORMANCE_SKIP_IMAGE_BUILD:-false}"
+readonly CONTEXT="kind-${CLUSTER_NAME}"
+readonly APP_NAMESPACE="fastapi-platform"
+readonly DEPENDENCY_NAMESPACE="fastapi-platform-dependencies"
+readonly SERVICE_IMAGES=(
+  reference-service
+  identity-service
+  customer-service
+  catalog-service
+  search-service
+  media-service
+  inventory-service
+  cart-service
+  order-service
+  payment-service
+  notification-service
+  chat-service
+)
+readonly API_DEPLOYMENTS=(
+  reference-service
+  identity-service
+  customer-service
+  catalog-service
+  search-service
+  media-service
+  inventory-service
+  cart-service
+  order-service
+  payment-service
+  notification-service
+  chat-service
+)
+readonly WORKER_DEPLOYMENTS=(
+  order-invoice-worker
+  notification-email-worker
+  notification-sms-worker
+  media-worker
+  payment-expiry-worker
+)
+readonly DEPENDENCY_IMAGES=(
+  "postgres:18.6@sha256:1957b2ff3137e4ef7f3bc813e74fff50b1e1ffddc85c8b9d6f14ade972be8687"
+  "apache/kafka:4.2.0@sha256:9516fb7634bad307d17c33b589fde9023003b0cb761374f500002b980a3149b9"
+  "rabbitmq:4.3.5-management@sha256:06fb591136a49e861e01aaaf9ce45085839ca23c35913d45a1e83519bb9778ca"
+  "redis:8.10.0@sha256:344e3945a0b431c8ff1eecd58c5573538126bd756f02fc7e218ddf1fc2546366"
+  "axllent/mailpit:v1.30.0@sha256:0059ef81e492a7192af3816281eed6859eb078bd7bdc58b76757c13e10e53a7d"
+)
+
+cluster_created=false
+
+diagnose() {
+  local exit_code="$?"
+  if [[ "${cluster_created}" == true ]]; then
+    if [[ "${exit_code}" -ne 0 ]]; then
+      echo "Kubernetes conformance failed; collecting diagnostics." >&2
+      kubectl --context "${CONTEXT}" get all --all-namespaces || true
+      kubectl --context "${CONTEXT}" get events --all-namespaces --sort-by=.lastTimestamp || true
+      kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" get pods -o wide || true
+      kubectl --context "${CONTEXT}" -n "${DEPENDENCY_NAMESPACE}" get pods -o wide || true
+      kind export logs --name "${CLUSTER_NAME}" "${ROOT_DIR}/kind-conformance-logs" || true
+    fi
+    kind delete cluster --name "${CLUSTER_NAME}" || true
+  fi
+  exit "${exit_code}"
+}
+trap diagnose EXIT
+
+cd "${ROOT_DIR}"
+
+if kind get clusters | grep --fixed-strings --line-regexp --quiet "${CLUSTER_NAME}"; then
+  echo "Refusing to overwrite existing Kind cluster: ${CLUSTER_NAME}" >&2
+  exit 1
+fi
+
+if [[ "${SKIP_IMAGE_BUILD}" == "true" ]]; then
+  echo "Skipping local image builds; using prebuilt conformance images."
+else
+  echo "Building service images from the checked-out source revision."
+  for service in "${SERVICE_IMAGES[@]}"; do
+    docker build \
+      --quiet \
+      --provenance=false \
+      --file "services/${service}/Dockerfile" \
+      --tag "fastapi-platform/${service}:conformance" \
+      .
+  done
+  docker build \
+    --quiet \
+    --provenance=false \
+    --file infrastructure/minio/Dockerfile \
+    --tag fastapi-platform/minio:conformance \
+    infrastructure/minio
+fi
+
+echo "Pulling pinned disposable dependency images."
+for image in "${DEPENDENCY_IMAGES[@]}"; do
+  docker pull "${image}"
+done
+
+kind create cluster \
+  --name "${CLUSTER_NAME}" \
+  --config infrastructure/kubernetes/conformance/kind-config.yaml \
+  --wait 180s
+cluster_created=true
+
+echo "Loading checked-out and pinned images into the disposable Kind node."
+for image in "${DEPENDENCY_IMAGES[@]}" "fastapi-platform/minio:conformance"; do
+  kind load docker-image --name "${CLUSTER_NAME}" "${image}"
+done
+for service in "${SERVICE_IMAGES[@]}"; do
+  kind load docker-image --name "${CLUSTER_NAME}" "fastapi-platform/${service}:conformance"
+done
+
+kubectl --context "${CONTEXT}" apply -k infrastructure/kubernetes/conformance/foundation
+kubectl --context "${CONTEXT}" -n "${DEPENDENCY_NAMESPACE}" rollout status deployment --all --timeout=10m
+
+kubectl --context "${CONTEXT}" apply -k infrastructure/kubernetes/conformance/migrations
+kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" wait \
+  --for=condition=complete \
+  job \
+  --selector=platform.fastapi.io/workload=migration \
+  --timeout=10m
+
+kubectl --context "${CONTEXT}" apply -k infrastructure/kubernetes/conformance/workloads
+for deployment in "${API_DEPLOYMENTS[@]}" "${WORKER_DEPLOYMENTS[@]}"; do
+  kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" rollout status "deployment/${deployment}" --timeout=10m
+done
+
+kubectl --context "${CONTEXT}" apply -k infrastructure/kubernetes/conformance/smoke
+kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" wait --for=condition=complete job/platform-health-smoke --timeout=5m
+kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" logs job/platform-health-smoke
+echo "Kubernetes conformance completed successfully."

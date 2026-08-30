@@ -1,0 +1,62 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: platform-health-smoke
+  namespace: fastapi-platform
+  labels:
+    app.kubernetes.io/name: platform-health-smoke
+    app.kubernetes.io/part-of: fastapi-microservices-platform
+    platform.fastapi.io/workload: conformance-smoke
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 180
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: platform-health-smoke
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: conformance-smoke
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: health-smoke
+          image: fastapi-platform/reference-service:conformance
+          imagePullPolicy: Never
+          command:
+            - python
+            - -c
+            - |
+              import urllib.request
+
+              services = (
+                  "reference-service",
+                  "identity-service",
+                  "customer-service",
+                  "catalog-service",
+                  "search-service",
+                  "media-service",
+                  "inventory-service",
+                  "cart-service",
+                  "order-service",
+                  "payment-service",
+                  "notification-service",
+                  "chat-service",
+              )
+              for service in services:
+                  url = f"http://{service}/health/ready"
+                  with urllib.request.urlopen(url, timeout=10) as response:
+                      if response.status != 200:
+                          raise RuntimeError(f"{url} returned {response.status}")
+                  print(f"ready: {service}")
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {cpu: 500m, memory: 256Mi}}

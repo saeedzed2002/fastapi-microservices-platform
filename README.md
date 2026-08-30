@@ -5,10 +5,13 @@ FastAPI Microservices Platform is a backend-only, production-oriented e-commerce
 ## Project status
 
 The repository has completed **Phase 9 — Kubernetes**. Raw `Kustomize`
-resources now provide the workload baseline; a real target environment still
-must provide pinned release images, secrets, ingress/TLS, external durable
-services, and environment-specific egress policy before public deployment.
-Helm remains deliberately deferred to Phase 10.
+resources now provide the workload baseline, and the `main`-branch/manual CI
+workflow is configured to prove the delivery sequence in a disposable `Kind`
+cluster: foundation, controlled migrations, workloads, and in-cluster API
+readiness.
+A real target environment still must provide pinned release images, secrets,
+ingress/TLS, external durable services, and environment-specific egress policy
+before public deployment. Helm remains deliberately deferred to Phase 10.
 
 ## Architecture at a glance
 
