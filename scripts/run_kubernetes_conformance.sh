@@ -53,12 +53,19 @@ readonly DEPENDENCY_DEPLOYMENTS=(
   minio
   mailpit
 )
-readonly DEPENDENCY_IMAGES=(
+readonly DEPENDENCY_SOURCE_IMAGES=(
   "postgres:18.6@sha256:1957b2ff3137e4ef7f3bc813e74fff50b1e1ffddc85c8b9d6f14ade972be8687"
   "apache/kafka:4.2.0@sha256:9516fb7634bad307d17c33b589fde9023003b0cb761374f500002b980a3149b9"
   "rabbitmq:4.3.5-management@sha256:06fb591136a49e861e01aaaf9ce45085839ca23c35913d45a1e83519bb9778ca"
   "redis:8.10.0@sha256:344e3945a0b431c8ff1eecd58c5573538126bd756f02fc7e218ddf1fc2546366"
   "axllent/mailpit:v1.30.0@sha256:0059ef81e492a7192af3816281eed6859eb078bd7bdc58b76757c13e10e53a7d"
+)
+readonly DEPENDENCY_LOCAL_IMAGES=(
+  "fastapi-platform/conformance-postgres:local"
+  "fastapi-platform/conformance-kafka:local"
+  "fastapi-platform/conformance-rabbitmq:local"
+  "fastapi-platform/conformance-redis:local"
+  "fastapi-platform/conformance-mailpit:local"
 )
 
 cluster_created=false
@@ -108,8 +115,11 @@ else
 fi
 
 echo "Pulling pinned disposable dependency images."
-for image in "${DEPENDENCY_IMAGES[@]}"; do
-  docker pull "${image}"
+for index in "${!DEPENDENCY_SOURCE_IMAGES[@]}"; do
+  source_image="${DEPENDENCY_SOURCE_IMAGES[${index}]}"
+  local_image="${DEPENDENCY_LOCAL_IMAGES[${index}]}"
+  docker pull "${source_image}"
+  docker tag "${source_image}" "${local_image}"
 done
 
 kind create cluster \
@@ -118,8 +128,8 @@ kind create cluster \
   --wait 180s
 cluster_created=true
 
-echo "Loading checked-out and pinned images into the disposable Kind node."
-for image in "${DEPENDENCY_IMAGES[@]}" "fastapi-platform/minio:conformance"; do
+echo "Loading checked-out and locally tagged dependency images into the disposable Kind node."
+for image in "${DEPENDENCY_LOCAL_IMAGES[@]}" "fastapi-platform/minio:conformance"; do
   kind load docker-image --name "${CLUSTER_NAME}" "${image}"
 done
 for service in "${SERVICE_IMAGES[@]}"; do

@@ -55,6 +55,7 @@ spec:
       containers:
         - name: postgres
           image: postgres:18.6@sha256:1957b2ff3137e4ef7f3bc813e74fff50b1e1ffddc85c8b9d6f14ade972be8687
+          imagePullPolicy: Never
           ports: [{name: postgres, containerPort: 5432}]
           env:
             - {name: POSTGRES_USER, value: platform}
@@ -97,6 +98,7 @@ spec:
       containers:
         - name: kafka
           image: apache/kafka:4.2.0@sha256:9516fb7634bad307d17c33b589fde9023003b0cb761374f500002b980a3149b9
+          imagePullPolicy: Never
           ports: [{name: kafka, containerPort: 9092}]
           env:
             - {name: KAFKA_NODE_ID, value: "1"}
@@ -143,6 +145,7 @@ spec:
       containers:
         - name: rabbitmq
           image: rabbitmq:4.3.5-management@sha256:06fb591136a49e861e01aaaf9ce45085839ca23c35913d45a1e83519bb9778ca
+          imagePullPolicy: Never
           ports: [{name: amqp, containerPort: 5672}]
           env:
             - {name: RABBITMQ_DEFAULT_USER, value: platform}
@@ -178,6 +181,7 @@ spec:
       containers:
         - name: redis
           image: redis:8.10.0@sha256:344e3945a0b431c8ff1eecd58c5573538126bd756f02fc7e218ddf1fc2546366
+          imagePullPolicy: Never
           ports: [{name: redis, containerPort: 6379}]
           readinessProbe:
             exec: {command: [redis-cli, ping]}
@@ -249,6 +253,7 @@ spec:
       containers:
         - name: mailpit
           image: axllent/mailpit:v1.30.0@sha256:0059ef81e492a7192af3816281eed6859eb078bd7bdc58b76757c13e10e53a7d
+          imagePullPolicy: Never
           ports:
             - {name: smtp, containerPort: 1025}
             - {name: http, containerPort: 8025}

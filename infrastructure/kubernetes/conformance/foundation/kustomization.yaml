@@ -6,6 +6,26 @@ resources:
   - dependencies.yaml
   - runtime-secrets.yaml
 
+# Docker images selected by digest in the script are retagged locally before
+# `kind load docker-image`. The explicit local tags survive the import and,
+# with imagePullPolicy: Never below, guarantee a hermetic conformance run.
+images:
+  - name: postgres
+    newName: fastapi-platform/conformance-postgres
+    newTag: local
+  - name: apache/kafka
+    newName: fastapi-platform/conformance-kafka
+    newTag: local
+  - name: rabbitmq
+    newName: fastapi-platform/conformance-rabbitmq
+    newTag: local
+  - name: redis
+    newName: fastapi-platform/conformance-redis
+    newTag: local
+  - name: axllent/mailpit
+    newName: fastapi-platform/conformance-mailpit
+    newTag: local
+
 patches:
   - path: runtime-config.patch.yaml
     target:

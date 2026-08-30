@@ -12,8 +12,9 @@ promoted to an environment.
    content store;
 2. creates a `Kind v0.32.0` cluster using the exact pinned Kubernetes
    `v1.36.1` node image;
-3. loads those test-only images and the digest-pinned disposable dependency
-   images into the node;
+3. pulls each disposable dependency by its pinned digest, retags it with a
+   deterministic local conformance tag, then loads those and the test-only
+   images into the node without permitting runtime image pulls;
 4. applies `foundation`, waits for PostgreSQL, Kafka, RabbitMQ, Redis, MinIO,
    and Mailpit, applies migrations, then workloads;
 5. runs `platform-health-smoke` from the restricted application namespace;

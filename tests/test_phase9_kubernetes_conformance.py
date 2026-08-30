@@ -61,7 +61,7 @@ def test_conformance_dependencies_and_secrets_are_isolated_test_inputs() -> None
     assert "fastapi-platform-dependencies" in dependencies
     assert 'platform.fastapi.io/conformance: "true"' in dependencies
     assert "image: fastapi-platform/minio:conformance" in dependencies
-    assert "imagePullPolicy: Never" in dependencies
+    assert dependencies.count("imagePullPolicy: Never") == 6
     assert "REPLACE" not in secrets
     assert "provider-disabled" in secrets
     assert "smtp://" not in secrets
@@ -107,7 +107,13 @@ def test_kind_cluster_and_ci_script_are_pinned_and_disposable() -> None:
     assert "kind export logs" in script
     assert "platform-health-smoke" in script
     assert script.count("--provenance=false") == 2
-    assert 'for image in "${DEPENDENCY_IMAGES[@]}" "fastapi-platform/minio:conformance"' in script
+    assert "DEPENDENCY_SOURCE_IMAGES" in script
+    assert "DEPENDENCY_LOCAL_IMAGES" in script
+    assert 'docker tag "${source_image}" "${local_image}"' in script
+    assert (
+        'for image in "${DEPENDENCY_LOCAL_IMAGES[@]}" "fastapi-platform/minio:conformance"'
+        in script
+    )
     assert "CONFORMANCE_SKIP_IMAGE_BUILD:-false" in script
     assert '[[ "${SKIP_IMAGE_BUILD}" == "true" ]]' in script
     assert "rollout status deployment --all" not in script
