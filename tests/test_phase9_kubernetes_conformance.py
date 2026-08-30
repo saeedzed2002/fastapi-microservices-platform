@@ -75,12 +75,15 @@ def test_conformance_dependencies_and_secrets_are_isolated_test_inputs() -> None
         "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
         "CONTROLLER://:29093,PLAINTEXT://:9092",
         "PLAINTEXT://kafka.fastapi-platform-dependencies.svc.cluster.local:9092",
-        "1@kafka:29093",
+        "1@localhost:29093",
     ):
         assert f'value: "{value}"' in dependencies
 
     for service in DATABASE_SERVICES:
         assert f"CREATE USER {service.replace('-', '_')}" in dependencies
+
+    assert "mountPath: /var/lib/postgresql}" in dependencies
+    assert "mountPath: /var/lib/postgresql/data}" not in dependencies
 
 
 def test_smoke_job_checks_every_api_readiness_endpoint() -> None:
@@ -118,6 +121,7 @@ def test_kind_cluster_and_ci_script_are_pinned_and_disposable() -> None:
     )
     assert "CONFORMANCE_SKIP_IMAGE_BUILD:-false" in script
     assert '[[ "${SKIP_IMAGE_BUILD}" == "true" ]]' in script
+    assert "Kubernetes conformance requires '${command}' on PATH." in script
     assert "rollout status deployment --all" not in script
     for deployment in ("postgres", "kafka", "rabbitmq", "redis", "minio", "mailpit"):
         assert f"  {deployment}" in script

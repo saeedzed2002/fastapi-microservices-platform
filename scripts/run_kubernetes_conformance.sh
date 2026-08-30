@@ -107,6 +107,13 @@ trap diagnose EXIT
 
 cd "${ROOT_DIR}"
 
+for command in docker kind kubectl; do
+  if ! command -v "${command}" >/dev/null 2>&1; then
+    echo "Kubernetes conformance requires '${command}' on PATH." >&2
+    exit 1
+  fi
+done
+
 if kind get clusters | grep --fixed-strings --line-regexp --quiet "${CLUSTER_NAME}"; then
   echo "Refusing to overwrite existing Kind cluster: ${CLUSTER_NAME}" >&2
   exit 1

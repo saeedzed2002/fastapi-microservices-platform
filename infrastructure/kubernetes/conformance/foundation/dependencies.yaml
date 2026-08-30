@@ -67,7 +67,10 @@ spec:
             failureThreshold: 20
           resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
           volumeMounts:
-            - {name: data, mountPath: /var/lib/postgresql/data}
+            # PostgreSQL 18 stores clusters in version-specific subdirectories.
+            # Mounting the parent directory is required by the official image and
+            # keeps this disposable volume compatible with that layout.
+            - {name: data, mountPath: /var/lib/postgresql}
             - {name: bootstrap, mountPath: /docker-entrypoint-initdb.d, readOnly: true}
       volumes:
         - {name: data, emptyDir: {}}
@@ -107,7 +110,10 @@ spec:
             - {name: KAFKA_LISTENERS, value: "CONTROLLER://:29093,PLAINTEXT://:9092"}
             - {name: KAFKA_ADVERTISED_LISTENERS, value: "PLAINTEXT://kafka.fastapi-platform-dependencies.svc.cluster.local:9092"}
             - {name: KAFKA_CONTROLLER_LISTENER_NAMES, value: "CONTROLLER"}
-            - {name: KAFKA_CONTROLLER_QUORUM_VOTERS, value: "1@kafka:29093"}
+            # This is a single-process broker/controller.  The controller
+            # endpoint must resolve to the listener inside this Pod; the Kafka
+            # Service deliberately exposes only the client listener on 9092.
+            - {name: KAFKA_CONTROLLER_QUORUM_VOTERS, value: "1@localhost:29093"}
             - {name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, value: "1"}
             - {name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, value: "1"}
             - {name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR, value: "1"}
