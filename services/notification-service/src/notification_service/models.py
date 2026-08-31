@@ -57,6 +57,22 @@ class SmsOtpDelivery(Base):
     )
 
 
+class PasswordResetEmailDelivery(Base):
+    __tablename__ = "password_reset_email_deliveries"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    recipient_email: Mapped[str] = mapped_column(String(320), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="PENDING", index=True)
+    provider_message_id: Mapped[str | None] = mapped_column(String(320))
+    failure_reason: Mapped[str | None] = mapped_column(Text)
+    processing_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
 class TaskIntent(Base):
     __tablename__ = "task_intents"
 

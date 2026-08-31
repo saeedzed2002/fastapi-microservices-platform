@@ -10,6 +10,8 @@ Security is enforced at every service boundary and throughout delivery; the edge
 - Rotate refresh tokens and detect reuse at the token-family/session level.
 - Make logout and revocation semantics explicit, including expiry and Redis-outage behavior.
 - Store only hashed refresh-token material where practical.
+- Retain only bounded device metadata and an HMAC-protected peer-address digest
+  for refresh sessions; never expose or persist a raw address for session UI.
 - Rotate signing keys through a documented distribution and overlap process.
 - For customer OTP, store the verification hash and abuse controls in Identity
   Redis, retain the raw code only in a separate short-lived Identity delivery
@@ -17,6 +19,10 @@ Security is enforced at every service boundary and throughout delivery; the edge
   must not enter PostgreSQL, Kafka, RabbitMQ, Celery payloads, logs, or traces.
 - Allow password login only for an existing `admin` role.
   Customer registration and sign-in use the phone OTP endpoints.
+- Password reset applies only to password-bearing `admin` users, returns a
+  non-enumerating response, is Redis cooldown-limited, and stores only a token
+  hash durably. The raw reset token follows the same short-lived Identity-only
+  delivery pattern as OTP and is consumed on use.
 
 The signing algorithm, JWKS/key-distribution mechanism, claim set, and service-to-service identity model are Phase 2 design decisions.
 

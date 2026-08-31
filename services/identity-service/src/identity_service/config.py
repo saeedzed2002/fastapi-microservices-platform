@@ -18,12 +18,18 @@ class Settings(BaseSettings):
     jwt_audience: str = "fastapi-platform"
     access_token_ttl_seconds: int = 900
     refresh_token_ttl_seconds: int = 2_592_000
+    session_metadata_hmac_secret: str = Field(
+        default="local-development-session-metadata-secret-change-me", min_length=32
+    )
     otp_redis_url: str = "redis://localhost:6379/1"
     otp_code_ttl_seconds: int = Field(default=300, ge=60, le=1800)
     otp_resend_cooldown_seconds: int = Field(default=60, ge=15, le=600)
     otp_max_verify_attempts: int = Field(default=5, ge=1, le=10)
     otp_phone_rate_limit: int = Field(default=5, ge=1, le=20)
     otp_phone_rate_window_seconds: int = Field(default=3600, ge=60, le=86_400)
+    password_reset_redis_url: str = "redis://localhost:6379/1"
+    password_reset_token_ttl_seconds: int = Field(default=900, ge=300, le=3600)
+    password_reset_resend_cooldown_seconds: int = Field(default=60, ge=15, le=600)
     staff_login_max_failures: int = Field(default=5, ge=1, le=20)
     staff_login_failure_window_seconds: int = Field(default=900, ge=60, le=86_400)
     staff_login_lockout_seconds: int = Field(default=900, ge=60, le=86_400)

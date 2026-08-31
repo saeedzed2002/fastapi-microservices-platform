@@ -11,11 +11,12 @@ Owns accounts, credential hashes, access/refresh-token lifecycle, device/session
 Does not own customer profiles, addresses, preferences, carts, orders, or payment records.
 
 Customers authenticate with phone and OTP; `admin` users authenticate with
-email and password. Identity owns administrator provisioning, the
+email and password. Identity owns administrator provisioning, password-reset
+state, device-session lifecycle, the
 normalized phone, code hash, verification attempts, cooldown, rate limits, and
-short-lived delivery code in its own Redis namespace. It asks Notification for
+short-lived OTP/reset delivery material in its own Redis namespace. It asks Notification for
 directed SMS delivery through an authenticated private API, but never exposes
-raw OTP values in Kafka, durable storage, logs, or public responses. It emits
+raw OTP or reset-token values in Kafka, durable storage, logs, or public responses. It emits
 only the post-verification `identity.user_registered.v2` domain fact.
 
 Primary interactions are synchronous authentication APIs, downstream token validation, asynchronous account lifecycle events, and Redis-backed short-lived security state where its failure policy is explicit.

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from notification_service.models import (
     InboxMessage,
     NotificationDelivery,
+    PasswordResetEmailDelivery,
     SmsOtpDelivery,
     TaskIntent,
 )
@@ -60,6 +61,25 @@ async def accept_otp_sms_delivery(
     db.add(
         TaskIntent(
             task_name="notification.send_otp_sms.v1",
+            payload={"delivery_id": str(delivery.id)},
+        )
+    )
+    await db.commit()
+    return delivery
+
+
+async def accept_password_reset_email_delivery(
+    db: AsyncSession, *, delivery_id: UUID, email: str
+) -> PasswordResetEmailDelivery:
+    delivery = await db.get(PasswordResetEmailDelivery, delivery_id, with_for_update=True)
+    if delivery is not None:
+        return delivery
+    delivery = PasswordResetEmailDelivery(id=delivery_id, recipient_email=email)
+    db.add(delivery)
+    await db.flush()
+    db.add(
+        TaskIntent(
+            task_name="notification.send_password_reset_email.v1",
             payload={"delivery_id": str(delivery.id)},
         )
     )

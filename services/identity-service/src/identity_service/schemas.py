@@ -61,6 +61,41 @@ class LogoutRequest(BaseModel):
     refresh_token: str = Field(min_length=32, max_length=512)
 
 
+class PasswordResetRequestPayload(BaseModel):
+    email: EmailStr
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: EmailStr) -> str:
+        return str(value).lower()
+
+
+class PasswordResetConfirmPayload(BaseModel):
+    token: str = Field(min_length=48, max_length=512)
+    new_password: str = Field(min_length=12, max_length=128)
+
+
+class PasswordResetRequestResponse(BaseModel):
+    accepted: bool = True
+
+
+class InternalPasswordResetDeliveryResponse(BaseModel):
+    email: EmailStr
+    token: str
+
+
+class SessionResponse(BaseModel):
+    id: UUID
+    user_agent: str | None
+    created_at: datetime
+    last_used_at: datetime
+    expires_at: datetime
+
+
+class SessionPage(BaseModel):
+    items: list[SessionResponse]
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

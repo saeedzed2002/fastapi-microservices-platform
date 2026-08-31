@@ -8,10 +8,18 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from notification_service.application import accept_otp_sms_delivery
+from notification_service.application import (
+    accept_otp_sms_delivery,
+    accept_password_reset_email_delivery,
+)
 from notification_service.config import get_settings
 from notification_service.db import dispose_engine, get_session
-from notification_service.schemas import OtpSmsDeliveryRequest, OtpSmsDeliveryResponse
+from notification_service.schemas import (
+    OtpSmsDeliveryRequest,
+    OtpSmsDeliveryResponse,
+    PasswordResetEmailDeliveryRequest,
+    PasswordResetEmailDeliveryResponse,
+)
 from notification_service.workers.kafka import consume_invoice_events
 from notification_service.workers.task_dispatcher import run_task_dispatcher
 from platform_observability import configure_application, metrics_response
@@ -48,12 +56,12 @@ configure_application(
 )
 
 
-def require_internal_otp_token(token: str | None) -> None:
+def require_internal_identity_token(token: str | None) -> None:
     expected = settings.internal_otp_shared_secret
     if expected is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="internal OTP delivery is not configured",
+            detail="internal service authentication is not configured",
         )
     if token is None or not secrets.compare_digest(token, expected):
         raise HTTPException(
@@ -83,7 +91,7 @@ async def enqueue_otp_delivery(
     internal_token: str | None = Header(default=None, alias="X-Platform-Internal-Token"),
     db: AsyncSession = Depends(get_session),
 ) -> OtpSmsDeliveryResponse:
-    require_internal_otp_token(internal_token)
+    require_internal_identity_token(internal_token)
     if not settings.smsir_enabled or not settings.smsir_api_key or not settings.smsir_line_number:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -95,6 +103,26 @@ async def enqueue_otp_delivery(
         phone=payload.phone,
     )
     return OtpSmsDeliveryResponse(delivery_id=delivery.id)
+
+
+@app.post(
+    "/internal/v1/password-reset-email-deliveries",
+    response_model=PasswordResetEmailDeliveryResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    include_in_schema=False,
+)
+async def enqueue_password_reset_email_delivery(
+    payload: PasswordResetEmailDeliveryRequest,
+    internal_token: str | None = Header(default=None, alias="X-Platform-Internal-Token"),
+    db: AsyncSession = Depends(get_session),
+) -> PasswordResetEmailDeliveryResponse:
+    require_internal_identity_token(internal_token)
+    delivery = await accept_password_reset_email_delivery(
+        db,
+        delivery_id=payload.delivery_id,
+        email=payload.email,
+    )
+    return PasswordResetEmailDeliveryResponse(delivery_id=delivery.id)
 
 
 @app.get("/metrics", tags=["observability"])

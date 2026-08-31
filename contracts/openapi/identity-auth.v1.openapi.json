@@ -1,55 +1,508 @@
 {
   "openapi": "3.1.0",
-  "info": {"title": "Identity Authentication API", "version": "1.0.0"},
+  "info": {
+    "title": "Identity Authentication API",
+    "version": "1.1.0"
+  },
   "paths": {
     "/api/v1/auth/register": {
       "post": {
         "summary": "Deprecated customer password registration endpoint",
         "deprecated": true,
-        "responses": {"410": {"description": "Customer password registration is disabled"}}
+        "responses": {
+          "410": {
+            "description": "Customer password registration is disabled"
+          }
+        }
       }
     },
     "/api/v1/auth/login": {
       "post": {
         "summary": "Authenticate an administrator with email and password",
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AdminLoginRequest"}}}},
-        "responses": {"200": {"description": "Authenticated administrator"}, "401": {"description": "Invalid administrator credentials"}, "429": {"description": "Administrator login rate limited"}, "503": {"description": "Administrator login rate limiter unavailable"}}
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminLoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated administrator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid administrator credentials"
+          },
+          "429": {
+            "description": "Administrator login rate limited"
+          },
+          "503": {
+            "description": "Administrator login rate limiter unavailable"
+          }
+        }
       }
     },
     "/api/v1/auth/otp/request": {
       "post": {
         "summary": "Request a customer sign-in code",
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OtpRequest"}}}},
-        "responses": {"202": {"description": "OTP accepted for delivery"}, "429": {"description": "Rate limited"}, "503": {"description": "OTP delivery unavailable"}}
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OtpRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "OTP accepted for delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtpRequestResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "OTP delivery unavailable"
+          }
+        }
       }
     },
     "/api/v1/auth/otp/verify": {
       "post": {
         "summary": "Verify a customer sign-in code and issue tokens",
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OtpVerifyRequest"}}}},
-        "responses": {"200": {"description": "Authenticated"}, "400": {"description": "Invalid or expired OTP"}, "503": {"description": "OTP state unavailable"}}
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OtpVerifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or expired OTP"
+          },
+          "503": {
+            "description": "OTP state unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password-reset/request": {
+      "post": {
+        "summary": "Request a non-enumerating password reset for an administrator",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Request accepted whether or not an eligible account exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordResetRequestResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Reset state or durable email delivery is unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password-reset/confirm": {
+      "post": {
+        "summary": "Set a new staff password and revoke all active refresh sessions",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetConfirmRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Password changed and sessions revoked"
+          },
+          "400": {
+            "description": "Reset token is invalid, expired, consumed, or ineligible"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "summary": "Rotate a refresh token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens rotated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid refresh token; verified reuse also revokes its token family"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "summary": "Revoke the presented refresh session",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Refresh session revoked or already absent"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "summary": "Return the authenticated active user",
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Active user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing, invalid, expired, or user inactive"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "summary": "List the caller's active device sessions",
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Active refresh sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing, invalid, or expired"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions/{session_id}": {
+      "delete": {
+        "summary": "Revoke one of the caller's active device sessions",
+        "security": [{"BearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/SessionId"}],
+        "responses": {
+          "204": {
+            "description": "Session revoked"
+          },
+          "401": {
+            "description": "Access token is missing, invalid, or expired"
+          },
+          "404": {
+            "description": "Session is absent, revoked, or not owned by caller"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions/revoke-all": {
+      "post": {
+        "summary": "Revoke all active device sessions of the caller",
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "204": {
+            "description": "All active sessions revoked"
+          },
+          "401": {
+            "description": "Access token is missing, invalid, or expired"
+          }
+        }
       }
     }
   },
   "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "parameters": {
+      "SessionId": {
+        "name": "session_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
     "schemas": {
       "AdminLoginRequest": {
         "type": "object",
         "additionalProperties": false,
         "required": ["email", "password"],
-        "properties": {"email": {"type": "string", "format": "email"}, "password": {"type": "string", "minLength": 1}}
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
       },
       "OtpRequest": {
         "type": "object",
         "additionalProperties": false,
         "required": ["phone"],
-        "properties": {"phone": {"type": "string", "description": "Iranian mobile number in supported local or international notation"}}
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "Iranian mobile number in supported local or international notation"
+          }
+        }
       },
       "OtpVerifyRequest": {
         "allOf": [
           {"$ref": "#/components/schemas/OtpRequest"},
-          {"type": "object", "required": ["code"], "properties": {"code": {"type": "string", "pattern": "^[0-9]{6}$"}}}
+          {
+            "type": "object",
+            "required": ["code"],
+            "properties": {
+              "code": {
+                "type": "string",
+                "pattern": "^[0-9]{6}$"
+              }
+            }
+          }
         ]
+      },
+      "OtpRequestResponse": {
+        "type": "object",
+        "required": ["expires_in"],
+        "properties": {
+          "expires_in": {
+            "type": "integer"
+          }
+        }
+      },
+      "PasswordResetRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["email"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        }
+      },
+      "PasswordResetRequestResponse": {
+        "type": "object",
+        "required": ["accepted"],
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "const": true
+          }
+        }
+      },
+      "PasswordResetConfirmRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["token", "new_password"],
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 48,
+            "maxLength": 512
+          },
+          "new_password": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 128
+          }
+        }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["refresh_token"],
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "minLength": 32,
+            "maxLength": 512
+          }
+        }
+      },
+      "UserResponse": {
+        "type": "object",
+        "required": ["id", "status", "roles", "created_at"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": ["string", "null"],
+            "format": "email"
+          },
+          "phone": {
+            "type": ["string", "null"]
+          },
+          "status": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TokenResponse": {
+        "type": "object",
+        "required": ["access_token", "token_type", "expires_in", "refresh_token", "user"],
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string",
+            "const": "bearer"
+          },
+          "expires_in": {
+            "type": "integer"
+          },
+          "refresh_token": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserResponse"
+          }
+        }
+      },
+      "SessionResponse": {
+        "type": "object",
+        "required": ["id", "created_at", "last_used_at", "expires_at"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user_agent": {
+            "type": ["string", "null"]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SessionPage": {
+        "type": "object",
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionResponse"
+            }
+          }
+        }
       }
     }
   }

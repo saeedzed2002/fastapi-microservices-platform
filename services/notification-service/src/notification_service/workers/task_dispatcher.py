@@ -83,6 +83,10 @@ async def run_task_dispatcher(settings: Settings, stop: asyncio.Event) -> None:
                     "notification_service.send_otp_sms",
                     "notification.sms",
                 ),
+                "notification.send_password_reset_email.v1": (
+                    "notification_service.send_password_reset_email",
+                    "notification.email",
+                ),
             }[intent.task_name]
             await asyncio.to_thread(
                 celery_app.send_task,
