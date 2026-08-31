@@ -19,11 +19,12 @@ and no committed runtime secret.
 - immutable image-digest placeholders, a runtime configuration `ConfigMap`,
   a non-applied secret example, a portable ingress contract, deployment
   runbook, and CI rendering validation;
-- a disposable `Kind` conformance path that builds the checked-out service
-  images, loads them into a temporary cluster, applies foundation, migrations,
-  and workloads in delivery order, proves every API readiness endpoint, then
-  runs checkout through inventory commit, invoice creation, and email delivery
-  from inside the restricted application namespace.
+- a disposable `Kind` conformance baseline that builds the checked-out service
+  images, loads them into a temporary cluster, and proves the same foundation,
+  migration, workload, readiness, checkout, inventory, invoice, and email
+  sequence from inside the restricted application namespace. Phase 10 installs
+  that stabilized sequence through Helm rather than applying the raw entries
+  directly.
 - migration sources and `alembic.ini` included in every database-owning
   service image so the migration Jobs can actually execute.
 
@@ -68,3 +69,7 @@ Raw Kustomize resources are selected before Helm because the workload model,
 external-state topology, ingress controller, and secret manager must stabilize
 before template abstraction is useful. This preserves the boundary established
 by `ADR-010` and is recorded more specifically in `ADR-027`.
+
+Phase 10 packages this accepted raw baseline as Helm charts. The current
+executable conformance path therefore installs those charts; this plan remains
+the record of the raw-resource model that was stabilized first.

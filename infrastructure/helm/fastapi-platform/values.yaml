@@ -1,0 +1,177 @@
+# Install fastapi-platform-foundation first. This chart deliberately references
+# its ConfigMap, ServiceAccount, runtime Secret, and optional registry Secret.
+serviceAccount:
+  name: platform-runtime
+runtime:
+  configMapName: platform-runtime-config
+  secretName: platform-runtime-secrets
+
+images:
+  repositoryPrefix: ghcr.io/saeedzed2002/fastapi-microservices-platform
+  pullPolicy: IfNotPresent
+  allowMutableTags: false
+  pullSecrets:
+    - ghcr-pull
+  # A delivery values file must set one immutable digest per executable image.
+  # Tags are rejected unless the disposable conformance values explicitly
+  # opt in with images.allowMutableTags=true.
+  services:
+    reference-service: {digest: "", tag: ""}
+    identity-service: {digest: "", tag: ""}
+    customer-service: {digest: "", tag: ""}
+    catalog-service: {digest: "", tag: ""}
+    search-service: {digest: "", tag: ""}
+    media-service: {digest: "", tag: ""}
+    inventory-service: {digest: "", tag: ""}
+    cart-service: {digest: "", tag: ""}
+    order-service: {digest: "", tag: ""}
+    payment-service: {digest: "", tag: ""}
+    notification-service: {digest: "", tag: ""}
+    chat-service: {digest: "", tag: ""}
+
+apiServices:
+  reference-service:
+    image: reference-service
+    terminationGracePeriodSeconds: 30
+    appProtocol: http
+    resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  identity-service:
+    image: identity-service
+    terminationGracePeriodSeconds: 30
+    appProtocol: http
+    resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  customer-service:
+    image: customer-service
+    terminationGracePeriodSeconds: 30
+    appProtocol: http
+    resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  catalog-service:
+    image: catalog-service
+    terminationGracePeriodSeconds: 30
+    appProtocol: http
+    resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  search-service:
+    image: search-service
+    terminationGracePeriodSeconds: 30
+    appProtocol: http
+    resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  media-service:
+    image: media-service
+    terminationGracePeriodSeconds: 30
+    appProtocol: http
+    resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  inventory-service:
+    image: inventory-service
+    terminationGracePeriodSeconds: 30
+    appProtocol: http
+    resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  cart-service:
+    image: cart-service
+    terminationGracePeriodSeconds: 30
+    appProtocol: http
+    resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  order-service:
+    image: order-service
+    terminationGracePeriodSeconds: 45
+    appProtocol: http
+    resources: {requests: {cpu: 200m, memory: 384Mi}, limits: {cpu: "1", memory: 768Mi}}
+  payment-service:
+    image: payment-service
+    terminationGracePeriodSeconds: 30
+    appProtocol: http
+    resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  notification-service:
+    image: notification-service
+    terminationGracePeriodSeconds: 30
+    appProtocol: http
+    resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  chat-service:
+    image: chat-service
+    terminationGracePeriodSeconds: 75
+    appProtocol: kubernetes.io/ws
+    resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+
+api:
+  replicas: 2
+  revisionHistoryLimit: 3
+  minReadySeconds: 5
+  progressDeadlineSeconds: 300
+  startupProbe: {path: /health/live, periodSeconds: 5, failureThreshold: 12}
+  livenessProbe: {path: /health/live, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 3}
+  readinessProbe: {path: /health/ready, periodSeconds: 5, timeoutSeconds: 3, failureThreshold: 3}
+
+migrations:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 86400
+  resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  services:
+    - {name: identity, image: identity-service}
+    - {name: customer, image: customer-service}
+    - {name: catalog, image: catalog-service}
+    - {name: search, image: search-service}
+    - {name: media, image: media-service}
+    - {name: inventory, image: inventory-service}
+    - {name: cart, image: cart-service}
+    - {name: order, image: order-service}
+    - {name: payment, image: payment-service}
+    - {name: notification, image: notification-service}
+    - {name: chat, image: chat-service}
+
+workers:
+  order-invoice-worker:
+    image: order-service
+    terminationGracePeriodSeconds: 90
+    command: [celery, -A, order_service.workers.celery_app:celery_app, worker, --loglevel=INFO, --without-mingle, --without-gossip, -Q, order.invoice]
+    resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 768Mi}}
+  notification-email-worker:
+    image: notification-service
+    terminationGracePeriodSeconds: 90
+    command: [celery, -A, notification_service.workers.celery_app:celery_app, worker, --loglevel=INFO, --without-mingle, --without-gossip, -Q, notification.email]
+    resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  notification-sms-worker:
+    image: notification-service
+    terminationGracePeriodSeconds: 90
+    command: [celery, -A, notification_service.workers.celery_app:celery_app, worker, --loglevel=INFO, --without-mingle, --without-gossip, -Q, notification.sms]
+    resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  media-worker:
+    image: media-service
+    terminationGracePeriodSeconds: 90
+    command: [celery, -A, media_service.workers.celery_app:celery_app, worker, --loglevel=INFO, --without-mingle, --without-gossip]
+    resources: {requests: {cpu: 150m, memory: 384Mi}, limits: {cpu: "1", memory: 1Gi}}
+  payment-expiry-worker:
+    image: payment-service
+    terminationGracePeriodSeconds: 30
+    command: [python, -m, payment_service.workers.expiry_main]
+    resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {cpu: 500m, memory: 256Mi}}
+
+cronJobs:
+  media-upload-reaper:
+    image: media-service
+    schedule: "0 * * * *"
+    command: [celery, -A, media_service.workers.celery_app:celery_app, call, media_service.reap_abandoned_uploads]
+    backoffLimit: 3
+    ttlSecondsAfterFinished: 86400
+    successfulJobsHistoryLimit: 1
+    failedJobsHistoryLimit: 3
+    resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {cpu: 500m, memory: 256Mi}}
+
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  tlsSecretName: ""
+  annotations: {}
+  paths:
+    - {path: /api/v1/auth, pathType: Prefix, service: identity-service}
+    - {path: /api/v1/admin, pathType: Prefix, service: identity-service}
+    - {path: /api/v1/customers, pathType: Prefix, service: customer-service}
+    - {path: /api/v1/catalog, pathType: Prefix, service: catalog-service}
+    - {path: /api/v1/search, pathType: Prefix, service: search-service}
+    - {path: /api/v1/media, pathType: Prefix, service: media-service}
+    - {path: /api/v1/inventory, pathType: Prefix, service: inventory-service}
+    - {path: /api/v1/carts, pathType: Prefix, service: cart-service}
+    - {path: /api/v1/orders, pathType: Prefix, service: order-service}
+    - {path: /api/v1/payments, pathType: Prefix, service: payment-service}
+    - {path: /api/v1/chat, pathType: Prefix, service: chat-service}
+    - {path: /api/v1/reference, pathType: Exact, service: reference-service}

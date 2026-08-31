@@ -1,9 +1,4 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: platform-runtime-config
-  namespace: fastapi-platform
-data:
+runtimeConfig:
   PLATFORM_ENVIRONMENT: conformance
   IDENTITY_ENVIRONMENT: conformance
   CUSTOMER_ENVIRONMENT: conformance

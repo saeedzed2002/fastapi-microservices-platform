@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: platform-container-defaults
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fastapi-platform-foundation.labels" . | nindent 4 }}
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        {{- toYaml .Values.resourcePolicy.limitRange.defaultRequest | nindent 8 }}
+      default:
+        {{- toYaml .Values.resourcePolicy.limitRange.default | nindent 8 }}
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: platform-workload-budget
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fastapi-platform-foundation.labels" . | nindent 4 }}
+spec:
+  hard:
+    pods: {{ .Values.resourcePolicy.quota.pods | quote }}
+    requests.cpu: {{ .Values.resourcePolicy.quota.requestsCpu | quote }}
+    requests.memory: {{ .Values.resourcePolicy.quota.requestsMemory | quote }}
+    limits.cpu: {{ .Values.resourcePolicy.quota.limitsCpu | quote }}
+    limits.memory: {{ .Values.resourcePolicy.quota.limitsMemory | quote }}

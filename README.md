@@ -4,14 +4,15 @@ FastAPI Microservices Platform is a backend-only, production-oriented e-commerce
 
 ## Project status
 
-The repository has completed **Phase 9 — Kubernetes**. Raw `Kustomize`
-resources now provide the workload baseline, and the `main`-branch/manual CI
-workflow is configured to prove the delivery sequence in a disposable `Kind`
-cluster: foundation, controlled migrations, workloads, and in-cluster API
-readiness.
+The repository has completed **Phase 10 — Helm**. Raw `Kustomize` resources
+remain the reviewable workload baseline, while two Helm charts package the
+controlled foundation and application-release sequence. The `main`-branch/
+manual CI workflow installs those charts in a disposable `Kind` cluster,
+waits for controlled migrations and workloads, then proves in-cluster API
+readiness and the checkout-to-invoice-to-email workflow.
 A real target environment still must provide pinned release images, secrets,
 ingress/TLS, external durable services, and environment-specific egress policy
-before public deployment. Helm remains deliberately deferred to Phase 10.
+before public deployment.
 
 ## Architecture at a glance
 
@@ -99,6 +100,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Search projection runbook](docs/runbooks/search-projection.md)
 - [Edge gateway runbook](docs/runbooks/edge-gateway.md)
 - [Kubernetes deployment runbook](docs/runbooks/kubernetes-deployment.md)
+- [Helm delivery charts](infrastructure/helm/README.md)
 - [Phase 0 plan](docs/development/phase-0-plan.md)
 - [Phase 1 plan](docs/development/phase-1-plan.md)
 - [Phase 2 plan](docs/development/phase-2-plan.md)
@@ -108,6 +110,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Phase 7 plan](docs/development/phase-7-plan.md)
 - [Phase 8 plan](docs/development/phase-8-plan.md)
 - [Phase 9 plan](docs/development/phase-9-plan.md)
+- [Phase 10 plan](docs/development/phase-10-plan.md)
 
 ## Roadmap
 

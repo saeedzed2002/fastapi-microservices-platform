@@ -1,0 +1,51 @@
+{{- range $migration := .Values.migrations.services }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $migration.name }}-migrate
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $migration.name }}-migration
+    platform.fastapi.io/workload: migration
+    {{- include "fastapi-platform.labels" $ | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    # Preserve current release evidence. Helm deletes the previous Job before
+    # creating the next hook with the same fixed, auditable name.
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: {{ $.Values.migrations.backoffLimit }}
+  activeDeadlineSeconds: {{ $.Values.migrations.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ $.Values.migrations.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $migration.name }}-migration
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: migration
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ $.Values.serviceAccount.name }}
+      automountServiceAccountToken: false
+      {{- include "fastapi-platform.imagePullSecrets" $ | nindent 6 }}
+      securityContext:
+        {{- include "fastapi-platform.podSecurityContext" $ | nindent 8 }}
+      containers:
+        - name: migrate
+          image: {{ include "fastapi-platform.image" (list $ $migration.image) | trim | quote }}
+          imagePullPolicy: {{ $.Values.images.pullPolicy }}
+          command: [alembic, -c, /app/alembic.ini, upgrade, head]
+          {{- include "fastapi-platform.runtimeEnvFrom" $ | nindent 10 }}
+          securityContext:
+            {{- include "fastapi-platform.containerSecurityContext" $ | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            {{- toYaml $.Values.migrations.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

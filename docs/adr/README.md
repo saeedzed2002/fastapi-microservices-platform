@@ -23,6 +23,7 @@ ADRs record decisions that materially affect service ownership, contracts, durab
 
 | ADR | Status | Decision |
 |---|---|---|
+| [ADR-029](ADR-029-helm-packaging-and-controlled-migrations.md) | Accepted | Helm packaging and controlled migrations |
 | [ADR-028](ADR-028-kubernetes-conformance-ci.md) | Accepted | Kubernetes conformance CI proof |
 | [ADR-027](ADR-027-raw-kubernetes-delivery-baseline.md) | Accepted | Raw Kubernetes delivery baseline |
 | [ADR-026](ADR-026-media-upload-lifecycle-cleanup.md) | Accepted | Media upload cleanup and Catalog attachment validation |

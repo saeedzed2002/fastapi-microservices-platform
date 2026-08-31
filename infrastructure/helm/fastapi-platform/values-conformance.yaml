@@ -1,0 +1,18 @@
+images:
+  repositoryPrefix: fastapi-platform
+  pullPolicy: Never
+  allowMutableTags: true
+  pullSecrets: []
+  services:
+    reference-service: {tag: conformance}
+    identity-service: {tag: conformance}
+    customer-service: {tag: conformance}
+    catalog-service: {tag: conformance}
+    search-service: {tag: conformance}
+    media-service: {tag: conformance}
+    inventory-service: {tag: conformance}
+    cart-service: {tag: conformance}
+    order-service: {tag: conformance}
+    payment-service: {tag: conformance}
+    notification-service: {tag: conformance}
+    chat-service: {tag: conformance}

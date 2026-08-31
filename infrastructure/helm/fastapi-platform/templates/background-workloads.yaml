@@ -1,0 +1,98 @@
+{{- range $name, $worker := .Values.workers }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    {{- include "fastapi-platform.labels" $ | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $name }}
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: worker
+    spec:
+      serviceAccountName: {{ $.Values.serviceAccount.name }}
+      automountServiceAccountToken: false
+      {{- include "fastapi-platform.imagePullSecrets" $ | nindent 6 }}
+      terminationGracePeriodSeconds: {{ $worker.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- include "fastapi-platform.podSecurityContext" $ | nindent 8 }}
+      containers:
+        - name: {{ $name }}
+          image: {{ include "fastapi-platform.image" (list $ $worker.image) | trim | quote }}
+          imagePullPolicy: {{ $.Values.images.pullPolicy }}
+          command:
+            {{- toYaml $worker.command | nindent 12 }}
+          {{- include "fastapi-platform.runtimeEnvFrom" $ | nindent 10 }}
+          securityContext:
+            {{- include "fastapi-platform.containerSecurityContext" $ | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            {{- toYaml $worker.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}
+{{- range $name, $job := .Values.cronJobs }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    {{- include "fastapi-platform.labels" $ | nindent 4 }}
+spec:
+  schedule: {{ $job.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ $job.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ $job.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ $job.backoffLimit }}
+      ttlSecondsAfterFinished: {{ $job.ttlSecondsAfterFinished }}
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: {{ $name }}
+            app.kubernetes.io/part-of: fastapi-microservices-platform
+            platform.fastapi.io/workload: scheduled-job
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: {{ $.Values.serviceAccount.name }}
+          automountServiceAccountToken: false
+          {{- include "fastapi-platform.imagePullSecrets" $ | nindent 10 }}
+          securityContext:
+            {{- include "fastapi-platform.podSecurityContext" $ | nindent 12 }}
+          containers:
+            - name: {{ $name }}
+              image: {{ include "fastapi-platform.image" (list $ $job.image) | trim | quote }}
+              imagePullPolicy: {{ $.Values.images.pullPolicy }}
+              command:
+                {{- toYaml $job.command | nindent 16 }}
+              {{- include "fastapi-platform.runtimeEnvFrom" $ | nindent 14 }}
+              securityContext:
+                {{- include "fastapi-platform.containerSecurityContext" $ | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+              resources:
+                {{- toYaml $job.resources | nindent 16 }}
+          volumes:
+            - name: tmp
+              emptyDir: {}
+{{- end }}

@@ -38,6 +38,18 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           kubectl version --client
 
+      - name: Install verified Helm v4.2.4
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=helm-v4.2.4-linux-amd64.tar.gz
+          curl --fail --location --retry 3 --output "$archive" "https://get.helm.sh/$archive"
+          echo "c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3  $archive" | sha256sum --check
+          tar --extract --gzip --file "$archive"
+          install --mode=0755 linux-amd64/helm "$HOME/.local/bin/helm"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          helm version
+
       - name: Set up CPython 3.14.7
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
@@ -68,6 +80,15 @@ jobs:
           kubectl kustomize infrastructure/kubernetes/conformance/workloads >/dev/null
           kubectl kustomize infrastructure/kubernetes/conformance/smoke >/dev/null
           kubectl kustomize infrastructure/kubernetes/conformance/e2e >/dev/null
+          helm lint infrastructure/helm/fastapi-platform-foundation --strict --values infrastructure/helm/fastapi-platform-foundation/values-conformance.yaml
+          helm lint infrastructure/helm/fastapi-platform --strict --values infrastructure/helm/fastapi-platform/values-conformance.yaml
+          helm template platform-foundation infrastructure/helm/fastapi-platform-foundation --namespace fastapi-platform --values infrastructure/helm/fastapi-platform-foundation/values-conformance.yaml >/dev/null
+          helm template fastapi-platform infrastructure/helm/fastapi-platform --namespace fastapi-platform --values infrastructure/helm/fastapi-platform/values-conformance.yaml >/dev/null
+          if helm template fastapi-platform infrastructure/helm/fastapi-platform --namespace fastapi-platform >/tmp/helm-default-render.out 2>&1; then
+            echo "The delivery chart rendered without immutable image digests." >&2
+            exit 1
+          fi
+          grep --fixed-strings "immutable release digest" /tmp/helm-default-render.out >/dev/null
 
       - name: Validate lock, formatting, linting, typing, and unit tests
         run: |
@@ -284,6 +305,18 @@ jobs:
           install --mode=0755 kind "$HOME/.local/bin/kind"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           kind version
+
+      - name: Install verified Helm v4.2.4
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=helm-v4.2.4-linux-amd64.tar.gz
+          curl --fail --location --retry 3 --output "$archive" "https://get.helm.sh/$archive"
+          echo "c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3  $archive" | sha256sum --check
+          tar --extract --gzip --file "$archive"
+          install --mode=0755 linux-amd64/helm "$HOME/.local/bin/helm"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          helm version
 
       - name: Prove Kubernetes deployment in a disposable cluster
         shell: bash

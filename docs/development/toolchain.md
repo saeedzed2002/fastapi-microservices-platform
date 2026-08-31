@@ -46,7 +46,7 @@ Phase 1 selects the minimum executable platform profile. Direct package constrai
 | Kubernetes | 9 | `v1.36.1` Kind conformance control-plane target; reviewed `2026-08-30` | Stable Kind node image availability, API lifecycle, target-cluster compatibility, and managed-provider support |
 | `kubectl` | 9 | `v1.36.1` CI/release client target; SHA-256 verified download | Kubernetes client-version skew policy, reproducible official distribution, and target-cluster compatibility |
 | Kind | 9 | `v0.32.0`; exact `kindest/node:v1.36.1` digest in the conformance config | Official release, Kubernetes-node compatibility, ephemeral CI support, and image-loading behavior |
-| Helm | 10 | Not selected | Supported release, Kubernetes compatibility and chart API behavior |
+| Helm | 10 | `v4.2.4`; official archive SHA-256 `c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3`; verified `2026-08-31` | Official stable release, Kubernetes `v1.36` compatibility, chart API behavior, immutable archive verification |
 
 ## Phase 0 evidence
 
@@ -320,9 +320,9 @@ source for the workspace.
   test-only tags into the disposable node; production manifests remain
   immutable-digest-only and never reference those tags.
 - The repository uses the Kustomize functionality integrated into `kubectl`
-  rather than adding a separate templating runtime. Kubernetes documents its
-  support in `kubectl` and this phase only needs raw-resource rendering. Helm
-  remains intentionally unselected until Phase 10.
+  for the reviewed raw Phase 9 baseline. Phase 10 additionally selects Helm
+  `v4.2.4` to package that stable model; no third-party chart dependency is
+  introduced.
 - Security and compatibility: manifests use stable `apps/v1`, `batch/v1`,
   `policy/v1`, `networking.k8s.io/v1`, and `v1` APIs; the target cluster must
   enforce the reviewed restricted Pod Security Standard and provide its own
@@ -337,5 +337,28 @@ source for the workspace.
   [NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/),
   [probes](https://kubernetes.io/docs/concepts/workloads/pods/probes/), and
   [Jobs](https://kubernetes.io/docs/concepts/workloads/controllers/job/).
-  Owner: platform engineering. Next review: before selecting a target cluster,
-  before Phase 10, or `2026-09-30`, whichever occurs first.
+  Owner: platform engineering. Next review: before selecting a target cluster
+  or `2026-09-30`, whichever occurs first.
+
+## Phase 10 Helm selection evidence
+
+- Helm `v4.2.4` was the official stable release when reviewed on `2026-08-31`.
+  Its official changelog records Kubernetes `v1.36` support, matching the
+  selected `kubectl` and `Kind` conformance control plane. Helm `v3` is in its
+  support wind-down, so it was not selected for a new chart baseline.
+- CI downloads `helm-v4.2.4-linux-amd64.tar.gz` from the official
+  `get.helm.sh` distribution endpoint and verifies the recorded SHA-256 before
+  installation. Local validation used the corresponding official Windows
+  archive and its published checksum. No Helm plugin or third-party chart is
+  installed.
+- Helm charts use `apiVersion: v2`, Kubernetes stable resource APIs already
+  proven in Phase 9, and no chart dependency. Application image helpers reject
+  mutable tags by default; only the isolated conformance values opt in to local
+  tags with `imagePullPolicy: Never`.
+- Official sources reviewed: [Helm documentation](https://helm.sh/docs/),
+  [Helm `v4.2.4` changelog](https://helm.sh/docs/changelog/),
+  [Helm 4 overview](https://helm.sh/docs/overview/),
+  [Helm quick start](https://helm.sh/docs/intro/quickstart/), and
+  [Helm 3 end-of-life notice](https://docs.helm.sh/blog/helm-v3-end-of-life/).
+  Owner: platform engineering. Next review: before a target environment uses
+  Helm, before a Helm major upgrade, or `2026-09-30`, whichever occurs first.

@@ -1,0 +1,87 @@
+{{- range $name, $service := .Values.apiServices }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    {{- include "fastapi-platform.labels" $ | nindent 4 }}
+spec:
+  replicas: {{ $.Values.api.replicas }}
+  revisionHistoryLimit: {{ $.Values.api.revisionHistoryLimit }}
+  minReadySeconds: {{ $.Values.api.minReadySeconds }}
+  progressDeadlineSeconds: {{ $.Values.api.progressDeadlineSeconds }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $name }}
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: api
+    spec:
+      serviceAccountName: {{ $.Values.serviceAccount.name }}
+      automountServiceAccountToken: false
+      {{- include "fastapi-platform.imagePullSecrets" $ | nindent 6 }}
+      terminationGracePeriodSeconds: {{ $service.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- include "fastapi-platform.podSecurityContext" $ | nindent 8 }}
+      containers:
+        - name: {{ $name }}
+          image: {{ include "fastapi-platform.image" (list $ $service.image) | trim | quote }}
+          imagePullPolicy: {{ $.Values.images.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+          {{- include "fastapi-platform.runtimeEnvFrom" $ | nindent 10 }}
+          securityContext:
+            {{- include "fastapi-platform.containerSecurityContext" $ | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          startupProbe:
+            httpGet: {path: {{ $.Values.api.startupProbe.path }}, port: http}
+            periodSeconds: {{ $.Values.api.startupProbe.periodSeconds }}
+            failureThreshold: {{ $.Values.api.startupProbe.failureThreshold }}
+          livenessProbe:
+            httpGet: {path: {{ $.Values.api.livenessProbe.path }}, port: http}
+            periodSeconds: {{ $.Values.api.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ $.Values.api.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ $.Values.api.livenessProbe.failureThreshold }}
+          readinessProbe:
+            httpGet: {path: {{ $.Values.api.readinessProbe.path }}, port: http}
+            periodSeconds: {{ $.Values.api.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ $.Values.api.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ $.Values.api.readinessProbe.failureThreshold }}
+          resources:
+            {{- toYaml $service.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    {{- include "fastapi-platform.labels" $ | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: {{ $name }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      appProtocol: {{ $service.appProtocol }}
+{{- end }}

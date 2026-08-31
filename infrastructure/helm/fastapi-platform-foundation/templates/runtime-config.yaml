@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-runtime-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fastapi-platform-foundation.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.runtimeConfig }}
+  {{ $key }}: {{ tpl (toString $value) $ | quote }}
+  {{- end }}

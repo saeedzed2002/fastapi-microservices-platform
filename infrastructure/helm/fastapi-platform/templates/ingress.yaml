@@ -1,0 +1,34 @@
+{{- if .Values.ingress.enabled }}
+{{- $className := required "set ingress.className when ingress.enabled is true" .Values.ingress.className }}
+{{- $host := required "set ingress.host when ingress.enabled is true" .Values.ingress.host }}
+{{- $tlsSecretName := required "set ingress.tlsSecretName when ingress.enabled is true" .Values.ingress.tlsSecretName }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: platform-public-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fastapi-platform.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ $className }}
+  tls:
+    - hosts: [{{ $host | quote }}]
+      secretName: {{ $tlsSecretName }}
+  rules:
+    - host: {{ $host }}
+      http:
+        paths:
+          {{- range .Values.ingress.paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ .service }}
+                port:
+                  name: http
+          {{- end }}
+{{- end }}

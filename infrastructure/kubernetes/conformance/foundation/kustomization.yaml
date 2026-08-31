@@ -2,7 +2,6 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - ../../foundation
   - dependencies.yaml
   - runtime-secrets.yaml
 
@@ -25,11 +24,3 @@ images:
   - name: axllent/mailpit
     newName: fastapi-platform/conformance-mailpit
     newTag: local
-
-patches:
-  - path: runtime-config.patch.yaml
-    target:
-      version: v1
-      kind: ConfigMap
-      name: platform-runtime-config
-      namespace: fastapi-platform

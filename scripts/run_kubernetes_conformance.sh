@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Run the Phase 9 proof against a disposable Kind cluster. This script is for
-# CI and local verification only; production deployments use immutable GHCR
-# digests and the operator runbook instead.
+# Run the Helm delivery proof against a disposable Kind cluster. This script is
+# for CI and local verification only; production deployments use immutable
+# GHCR digests and the operator runbook instead.
 set -euo pipefail
 
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -107,7 +107,7 @@ trap diagnose EXIT
 
 cd "${ROOT_DIR}"
 
-for command in docker kind kubectl; do
+for command in docker kind kubectl helm; do
   if ! command -v "${command}" >/dev/null 2>&1; then
     echo "Kubernetes conformance requires '${command}' on PATH." >&2
     exit 1
@@ -167,19 +167,33 @@ for service in "${SERVICE_IMAGES[@]}"; do
   kind load docker-image --name "${CLUSTER_NAME}" "fastapi-platform/${service}:conformance"
 done
 
+helm --kube-context "${CONTEXT}" upgrade --install platform-foundation \
+  infrastructure/helm/fastapi-platform-foundation \
+  --namespace "${APP_NAMESPACE}" \
+  --create-namespace \
+  --values infrastructure/helm/fastapi-platform-foundation/values-conformance.yaml \
+  --wait \
+  --timeout 5m
+
 kubectl --context "${CONTEXT}" apply -k infrastructure/kubernetes/conformance/foundation
 for deployment in "${DEPENDENCY_DEPLOYMENTS[@]}"; do
   kubectl --context "${CONTEXT}" -n "${DEPENDENCY_NAMESPACE}" rollout status "deployment/${deployment}" --timeout=10m
 done
 
-kubectl --context "${CONTEXT}" apply -k infrastructure/kubernetes/conformance/migrations
+helm --kube-context "${CONTEXT}" upgrade --install fastapi-platform \
+  infrastructure/helm/fastapi-platform \
+  --namespace "${APP_NAMESPACE}" \
+  --values infrastructure/helm/fastapi-platform/values-conformance.yaml \
+  --wait \
+  --wait-for-jobs \
+  --timeout 10m
+
 kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" wait \
   --for=condition=complete \
   job \
   --selector=platform.fastapi.io/workload=migration \
   --timeout=10m
 
-kubectl --context "${CONTEXT}" apply -k infrastructure/kubernetes/conformance/workloads
 for deployment in "${API_DEPLOYMENTS[@]}" "${WORKER_DEPLOYMENTS[@]}"; do
   kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" rollout status "deployment/${deployment}" --timeout=10m
 done

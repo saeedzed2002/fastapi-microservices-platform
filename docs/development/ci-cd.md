@@ -10,7 +10,8 @@ no path filters because root dependencies, contracts, shared technical
 libraries, workflows, and infrastructure affect multiple bounded contexts.
 
 The `quality` job validates architecture artifacts, JSON contracts, raw
-Kubernetes rendering with a checksum-verified `kubectl`, the lock, formatting,
+Kubernetes rendering with a checksum-verified `kubectl`, Helm lint/render with
+a checksum-verified Helm client, the lock, formatting,
 linting, typing, unit tests, the Compose model, and locked Python dependency
 vulnerabilities. Editable workspace packages are not published
 third-party distributions, so `pip-audit` excludes them and audits their locked
@@ -24,20 +25,21 @@ and collecting logs on failure. Application processes must never begin
 background database work against an unmigrated schema.
 
 Pushes to `main` and manual workflow dispatches additionally run
-`kubernetes-conformance`. It downloads checksum-verified `kubectl v1.36.1`
-and `Kind v0.32.0`, builds every service image from the checked-out revision,
-and loads those local images into a disposable `Kind` cluster. The job applies
-the test-only foundation (including isolated PostgreSQL, Kafka, RabbitMQ,
-Redis, MinIO, and Mailpit), waits for dependency readiness, runs controlled
-migration Jobs, waits for all API and worker Deployments, and executes an
-in-cluster `/health/ready` smoke Job followed by the existing checkout to
-inventory commit, invoice, and email E2E workflow. The E2E Job runs from the
-restricted application namespace through the workload `ClusterIP` services;
-it therefore proves application behavior and the namespace ingress policy, not
-public `Ingress` routing. The job always destroys the cluster and exports
-diagnostics if the proof fails. This is deployment evidence for the repository
-manifests, not a production delivery environment: it has no real provider
-credentials, public ingress, certificate, or external managed-state dependency.
+`kubernetes-conformance`. It downloads checksum-verified `kubectl v1.36.1`,
+`Kind v0.32.0`, and `Helm v4.2.4`, builds every service image from the
+checked-out revision, and loads those local images into a disposable `Kind`
+cluster. The job installs the foundation chart, applies only the test-only
+PostgreSQL, Kafka, RabbitMQ, Redis, MinIO, Mailpit, and runtime Secret inputs,
+then installs the application chart. Helm migration hooks complete before API
+and worker workloads roll out. The job then executes an in-cluster
+`/health/ready` smoke Job followed by the existing checkout to inventory
+commit, invoice, and email E2E workflow. The E2E Job runs from the restricted
+application namespace through workload `ClusterIP` Services; it therefore
+proves application behavior and namespace ingress policy, not public `Ingress`
+routing. The job always destroys the cluster and exports diagnostics if the
+proof fails. This is deployment evidence for repository charts, not a
+production delivery environment: it has no real provider credentials, public
+ingress, certificate, or external managed-state dependency.
 
 Only a validated push to `main` can run `publish-ghcr`. That job receives
 `packages: write` and no broader write permission, authenticates with the
@@ -105,11 +107,11 @@ approval rather than rebuilding it per environment.
 CD is introduced only after Kubernetes deployment exists and its raw resources are stable. It is not an uncontrolled `kubectl apply` command. Environments, approvals, credentials, migration gates, readiness, smoke scope, rollback triggers, and audit history must be defined first.
 
 The current delivery boundary remains the verified immutable `GHCR` digest,
-not an automatic runtime deployment. Phase 9 supplies the raw Kubernetes
-resources and migration gates; a later promotion workflow must consume a
-previously published digest, require explicit environment approval, execute a
-controlled service-owned migration Job, validate rollout/readiness and bounded
-smoke tests, and permit rollback only when the schema remains compatible.
+not an automatic runtime deployment. Phase 10 supplies Helm migration hooks
+and release values; a later promotion workflow must consume a previously
+published digest, require explicit environment approval, execute a controlled
+chart upgrade, validate rollout/readiness and bounded smoke tests, and permit
+rollback only when the schema remains compatible.
 
 ## Required GitHub settings
 

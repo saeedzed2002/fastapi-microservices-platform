@@ -2,23 +2,24 @@
 
 ## Scope and safety boundary
 
-This runbook deploys the Phase 9 raw resources. It does not create a cluster,
+This runbook deploys the Phase 10 Helm charts. The Phase 9 raw resources remain
+the reviewed baseline but are not the environment delivery command. This runbook does not create a cluster,
 an ingress controller, TLS issuer, secret manager, or managed stateful service.
-Do not treat a successful `kubectl apply` as proof of a target environment's
+Do not treat a successful `helm upgrade` as proof of a target environment's
 external dependencies or public routing. The disposable CI conformance job
-does prove the repository sequence of foundation, migration Jobs, workloads,
-and in-cluster readiness against local test dependencies; it does not replace
-this environment-specific runbook.
+does prove foundation-chart installation, migration hooks, workloads, and
+in-cluster business behavior against local test dependencies; it does not
+replace this environment-specific runbook.
 
-Use a Kubernetes `v1.36.1` control plane and a supported `kubectl` client. The
-resource layout is:
+Use a Kubernetes `v1.36.1` control plane, a supported `kubectl` client, and
+checksum-verified `Helm v4.2.4`. The release layout is:
 
-1. `infrastructure/kubernetes/foundation`
-2. `infrastructure/kubernetes/migrations`
-3. `infrastructure/kubernetes/workloads`
+1. `infrastructure/helm/fastapi-platform-foundation`
+2. externally supplied runtime and optional registry Secrets
+3. `infrastructure/helm/fastapi-platform`
 
-Never apply all three directories together and never allow API replicas to run
-their own migrations.
+Never bypass the application chart's migration hooks or allow API replicas to
+run their own migrations.
 
 ## Required environment inputs
 
@@ -34,23 +35,25 @@ Before any apply, an environment owner must provide:
 - private-registry pull credentials if `GHCR` packages are not public;
 - an explicit egress-policy design for those real dependency endpoints.
 
-The raw ingress has deliberate placeholders. Before deployment, create a
-private release overlay that changes its ingress class, host, TLS host, and
-`PAYMENT_ZARINPAL_CALLBACK_URL`. Do not commit environment hostnames or
-credentials to the shared base resources.
+The optional chart ingress is disabled by default. Before deployment, create a
+private release values file that sets its ingress class, host, TLS secret, and
+`PAYMENT_ZARINPAL_CALLBACK_URL` in the foundation values file. Do not commit
+environment hostnames or credentials to the shared repository.
 
 ## Release images
 
-The base manifests contain zero digest placeholders and are intentionally not
-runnable unchanged. Obtain the exact digests from the validated `publish-ghcr`
-workflow for one Git revision. In a private release overlay, replace every
-service image with its published immutable digest. The same digest must be
-used by its API, worker, and migration Job.
+The application chart has no default image digest and intentionally fails to
+render until a private release values file sets every service's published
+immutable digest from one validated `publish-ghcr` workflow. The same digest
+must be used by its API, worker, and migration hook.
 
-Verify that no placeholder remains before applying:
+Verify that every rendered image is digest-addressed before applying:
 
 ```bash
-kubectl kustomize /secure/release-overlay | grep '0000000000000000000000000000000000000000000000000000000000000000' && exit 1
+helm template fastapi-platform infrastructure/helm/fastapi-platform \
+  --namespace fastapi-platform \
+  --values /secure/fastapi-platform-release-values.yaml | \
+  grep -E 'image: .*@sha256:[0-9a-f]{64}' >/dev/null
 ```
 
 The release image and schema must be rolling compatible. An application
@@ -82,47 +85,59 @@ kubectl label namespace <ingress-controller-namespace> platform.fastapi.io/allow
 
 ## Deployment procedure
 
-Render locally first:
+Lint and render the exact release values locally first:
 
 ```bash
-kubectl kustomize /secure/release-overlay/foundation >/dev/null
-kubectl kustomize /secure/release-overlay/migrations >/dev/null
-kubectl kustomize /secure/release-overlay/workloads >/dev/null
+helm lint infrastructure/helm/fastapi-platform-foundation --strict \
+  --values /secure/fastapi-platform-foundation-release-values.yaml
+helm lint infrastructure/helm/fastapi-platform --strict \
+  --values /secure/fastapi-platform-release-values.yaml
+helm template platform-foundation infrastructure/helm/fastapi-platform-foundation \
+  --namespace fastapi-platform \
+  --values /secure/fastapi-platform-foundation-release-values.yaml >/dev/null
+helm template fastapi-platform infrastructure/helm/fastapi-platform \
+  --namespace fastapi-platform \
+  --values /secure/fastapi-platform-release-values.yaml >/dev/null
 ```
 
-Apply the foundation and verify its policy objects:
+Install the foundation chart and verify its policy objects:
 
 ```bash
-kubectl apply -k /secure/release-overlay/foundation
+helm upgrade --install platform-foundation infrastructure/helm/fastapi-platform-foundation \
+  --namespace fastapi-platform --create-namespace \
+  --values /secure/fastapi-platform-foundation-release-values.yaml \
+  --wait --timeout 5m
 kubectl get namespace fastapi-platform
 kubectl -n fastapi-platform get configmap platform-runtime-config
 kubectl -n fastapi-platform get networkpolicy
 ```
 
-Migration Jobs have fixed names to make them renderable and auditable. Delete
-only prior completed/failed migration Jobs for this platform before creating
-the new release's Jobs; do not delete unrelated Jobs:
+Create the external runtime and optional registry Secrets only after foundation
+has created the namespace. Then install or upgrade the application chart. Its
+fixed-name migration hooks delete only a prior hook with the same name, run
+before ordinary workload resources, and remain available for current release
+evidence:
 
 ```bash
-kubectl -n fastapi-platform delete job -l platform.fastapi.io/workload=migration --ignore-not-found
-kubectl apply -k /secure/release-overlay/migrations
-kubectl -n fastapi-platform wait --for=condition=complete job -l platform.fastapi.io/workload=migration --timeout=10m
+helm upgrade --install fastapi-platform infrastructure/helm/fastapi-platform \
+  --namespace fastapi-platform \
+  --values /secure/fastapi-platform-release-values.yaml \
+  --wait --wait-for-jobs --timeout 10m
 kubectl -n fastapi-platform get jobs -l platform.fastapi.io/workload=migration
 ```
 
 If any migration fails, stop. Inspect only the failed Job logs, correct the
-release or operational dependency, and rerun from the controlled deletion
-step. Do not start or scale workloads to bypass migration failure:
+release values or operational dependency, then rerun the same Helm command.
+Do not start or scale workloads to bypass migration failure:
 
 ```bash
 kubectl -n fastapi-platform get jobs -l platform.fastapi.io/workload=migration
 kubectl -n fastapi-platform logs job/<failed-migration-job>
 ```
 
-Only after all migrations complete, apply workloads and wait for rollout:
+Only after Helm reports success, confirm its workload rollout:
 
 ```bash
-kubectl apply -k /secure/release-overlay/workloads
 kubectl -n fastapi-platform rollout status deployment --timeout=10m
 kubectl -n fastapi-platform get pods,services,pdb,cronjobs,ingress
 ```
