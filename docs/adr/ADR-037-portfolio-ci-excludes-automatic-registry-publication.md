@@ -1,10 +1,10 @@
 # ADR-037: Portfolio CI excludes automatic registry publication
 
-- Status: Accepted
+- Status: Superseded
 - Date: 2026-08-31
 - Owners: platform engineering
 - Supersedes: none
-- Superseded by: none
+- Superseded by: [ADR-038](ADR-038-single-job-ghcr-publication.md)
 
 ## Context
 

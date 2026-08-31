@@ -327,3 +327,196 @@ jobs:
       - name: Prove Kubernetes deployment in a disposable cluster
         shell: bash
         run: bash scripts/run_kubernetes_conformance.sh
+
+  publish-ghcr:
+    name: Publish scanned service images to GHCR
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - quality
+      - migration-heads
+      - integration
+      - kubernetes-conformance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out validated commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up CPython 3.14.7
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.14.7"
+
+      - name: Build all immutable service images
+        shell: bash
+        run: |
+          set -euo pipefail
+          services=(
+            reference-service identity-service customer-service catalog-service
+            search-service media-service inventory-service cart-service
+            order-service payment-service notification-service chat-service
+          )
+          for service in "${services[@]}"; do
+            version="$(python3 -c "import tomllib; from pathlib import Path; print(tomllib.loads(Path('services/$service/pyproject.toml').read_text())['project']['version'])")"
+            image="local/${service}:${GITHUB_SHA}"
+            docker build \
+              --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+              --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+              --label "org.opencontainers.image.version=${version}" \
+              --file "services/${service}/Dockerfile" \
+              --tag "${image}" \
+              .
+          done
+
+      - name: Scan reference-service image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: local/reference-service:${{ github.sha }}
+          scan-type: image
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Scan identity-service image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: local/identity-service:${{ github.sha }}
+          scan-type: image
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Scan customer-service image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: local/customer-service:${{ github.sha }}
+          scan-type: image
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Scan catalog-service image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: local/catalog-service:${{ github.sha }}
+          scan-type: image
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Scan search-service image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: local/search-service:${{ github.sha }}
+          scan-type: image
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Scan media-service image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: local/media-service:${{ github.sha }}
+          scan-type: image
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Scan inventory-service image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: local/inventory-service:${{ github.sha }}
+          scan-type: image
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Scan cart-service image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: local/cart-service:${{ github.sha }}
+          scan-type: image
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Scan order-service image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: local/order-service:${{ github.sha }}
+          scan-type: image
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Scan payment-service image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: local/payment-service:${{ github.sha }}
+          scan-type: image
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Scan notification-service image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: local/notification-service:${{ github.sha }}
+          scan-type: image
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Scan chat-service image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: local/chat-service:${{ github.sha }}
+          scan-type: image
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Authenticate to GitHub Container Registry after every scan gate
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+
+      - name: Publish all scanned immutable service images
+        shell: bash
+        run: |
+          set -euo pipefail
+          namespace="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/fastapi-microservices-platform"
+          revision="${GITHUB_SHA}"
+          short_revision="${revision:0:12}"
+          services=(
+            reference-service identity-service customer-service catalog-service
+            search-service media-service inventory-service cart-service
+            order-service payment-service notification-service chat-service
+          )
+          for service in "${services[@]}"; do
+            version="$(python3 -c "import tomllib; from pathlib import Path; print(tomllib.loads(Path('services/$service/pyproject.toml').read_text())['project']['version'])")"
+            image="${namespace}/${service}"
+            local_image="local/${service}:${revision}"
+            docker tag "${local_image}" "${image}:sha-${revision}"
+            docker tag "${local_image}" "${image}:${version}-${short_revision}"
+            docker push "${image}:sha-${revision}"
+            docker push "${image}:${version}-${short_revision}"
+            printf '%s@%s\n' "$image" "$(docker image inspect "${image}:sha-${revision}" --format '{{index .RepoDigests 0}}')" >> "$GITHUB_STEP_SUMMARY"
+          done

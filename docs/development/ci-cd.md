@@ -43,14 +43,13 @@ production delivery environment: it has no real provider credentials, public
 ingress, certificate, external managed-state dependency, multi-node capacity,
 or a synthetic HPA scale-out load test.
 
-The repository is a portfolio project, so a validated push to `main` does not
-authenticate to `GHCR`, publish images, or request `packages: write`.
-`kubernetes-conformance` builds local images from the checked-out revision and
-destroys them with the disposable cluster. This is real chart and business-flow
-evidence, but it is not registry-release or production-deployment evidence.
-Any later release workflow must build, scan with the `HIGH`/`CRITICAL` gate,
-attest, and publish the same image artifact only after explicit release scope
-and environment controls are approved.
+A validated push to `main` runs one `publish-ghcr` job after conformance. The
+job builds all service images from the checked-out revision, scans every exact
+local tag with the `HIGH`/`CRITICAL` Trivy gate, and only then receives
+`packages: write` registry authentication. It publishes immutable tags for
+each service in one serialized job, rather than creating one Actions job per
+service. `kubernetes-conformance` remains real chart and business-flow
+evidence; publication is delivery evidence, not a production deployment.
 
 `pip-audit 2.10.1` and `Trivy Action 0.36.0` were selected from their official
 releases on `2026-08-25`; the former supports Python `3.14` and is locked as a
@@ -75,20 +74,26 @@ All actions are officially verified and immutably pinned. Workflow permissions a
 
 Initially all applicable checks run. Later affected-service detection may optimize CI, but changes to root dependency metadata, locks, shared libraries, contracts, infrastructure, or workflows trigger all relevant consumers. A required workflow is not silently skipped by fragile path filters.
 
-## Main-branch validation boundary
+## Main-branch delivery target
 
 ```text
 validated commit
-  -> service migrations and integration workflow
-  -> disposable Kind chart installation
-  -> readiness, HPA-metrics, smoke, and business E2E proof
-  -> destroy local images and disposable cluster
+  -> build every exact service image
+  -> scan every exact local image
+  -> one GHCR authentication and serialized immutable pushes
+  -> promote immutable digest
+  -> controlled service migration step
+  -> Kubernetes rollout
+  -> readiness and rollout validation
+  -> smoke tests
+  -> explicit rollback or incident path
 ```
 
-The current phase has no registry release. When an environment is introduced,
-a separate release workflow must build and attest once, scan that exact image,
-and promote the same immutable digest after explicit approval rather than
-rebuilding it per environment.
+The current phase publishes each independently deployable image from one
+validated job; it does not promote images between environments because
+Kubernetes delivery environments do not exist. When those environments are
+introduced, the release workflow must build and attest once, then promote the
+same digest after explicit approval rather than rebuilding it per environment.
 
 ## Migrations and rollback
 
@@ -103,9 +108,9 @@ rebuilding it per environment.
 
 CD is introduced only after Kubernetes deployment exists and its raw resources are stable. It is not an uncontrolled `kubectl apply` command. Environments, approvals, credentials, migration gates, readiness, smoke scope, rollback triggers, and audit history must be defined first.
 
-The current validation boundary ends after successful `Kind` conformance, not
-at a registry digest or runtime deployment. Phase 10 supplies Helm migration
-hooks and release values; a later promotion workflow must consume a previously
+The current delivery boundary remains the verified immutable `GHCR` digest,
+not an automatic runtime deployment. Phase 10 supplies Helm migration hooks
+and release values; a later promotion workflow must consume a previously
 published digest, require explicit environment approval, execute a controlled
 chart upgrade, validate rollout/readiness and bounded smoke tests, and permit
 rollback only when the schema remains compatible.
@@ -116,8 +121,8 @@ Before relying on delivery, protect `main`: require pull requests, require the
 `quality`, `migration-heads`, `image-build`, `integration`, and
 `kubernetes-conformance` checks, require up-to-date branches, restrict direct
 pushes, and prohibit required-check bypass. Configure Actions with read-only
-defaults; this portfolio repository does not require `GITHUB_TOKEN` package
-writes. Enable Dependency Graph, Dependabot alerts,
+defaults and grant `GITHUB_TOKEN` package writes only to the publish job.
+Enable Dependency Graph, Dependabot alerts,
 Dependabot security updates, and Dependabot version updates; the committed
 configuration checks `uv`, GitHub Actions, Docker Compose, and service
 Dockerfiles weekly.
