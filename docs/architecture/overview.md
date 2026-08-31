@@ -155,7 +155,14 @@ in Redis.
 
 ## Runtime model
 
-API pods are stateless and normally run one application process per pod. Workers and consumers are separate workloads. Durable files are never written to container-local paths. Configuration is environment-based, secrets are externalized, and all workloads require appropriate startup, liveness, readiness, shutdown, and resource behavior.
+API pods are stateless and normally run one application process per pod.
+Kafka publishers/consumers and durable task dispatchers run in dedicated
+service-owned event-worker Deployments; Celery and scheduled work run in their
+own worker or Job workloads. Docker Compose may co-locate those loops only for
+developer convenience and is not the delivery topology. Durable files are
+never written to container-local paths. Configuration is environment-based,
+secrets are externalized, and all workloads require appropriate startup,
+liveness, readiness, shutdown, and resource behavior.
 
 ## Evolution rule
 

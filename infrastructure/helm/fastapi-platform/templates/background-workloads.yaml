@@ -35,6 +35,13 @@ spec:
           command:
             {{- toYaml $worker.command | nindent 12 }}
           {{- include "fastapi-platform.runtimeEnvFrom" $ | nindent 10 }}
+          {{- with $worker.env }}
+          env:
+            {{- range $key, $value := . }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
           securityContext:
             {{- include "fastapi-platform.containerSecurityContext" $ | nindent 12 }}
           volumeMounts:

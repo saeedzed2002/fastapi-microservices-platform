@@ -72,11 +72,11 @@ def test_helm_exposes_bounded_cpu_hpas_and_one_node_conformance_override() -> No
     assert "scaleTargetRef:" in autoscaling
     assert "ternary $.Values.autoscaling.minReplicas" in api_workloads
     for quota_value in (
-        'pods: "75"',
+        'pods: "90"',
         'requestsCpu: "12"',
         "requestsMemory: 24Gi",
-        'limitsCpu: "72"',
-        "limitsMemory: 36Gi",
+        'limitsCpu: "84"',
+        "limitsMemory: 48Gi",
     ):
         assert quota_value in foundation_values
 

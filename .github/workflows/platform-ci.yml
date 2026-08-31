@@ -329,7 +329,7 @@ jobs:
         run: bash scripts/run_kubernetes_conformance.sh
 
   publish-ghcr:
-    name: Publish immutable service images to GHCR
+    name: Publish scanned ${{ matrix.service }} image to GHCR
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
       - quality
@@ -338,6 +338,22 @@ jobs:
       - kubernetes-conformance
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - reference-service
+          - identity-service
+          - customer-service
+          - catalog-service
+          - search-service
+          - media-service
+          - inventory-service
+          - cart-service
+          - order-service
+          - payment-service
+          - notification-service
+          - chat-service
     permissions:
       contents: read
       packages: write
@@ -352,30 +368,47 @@ jobs:
         with:
           python-version: "3.14.7"
 
-      - name: Authenticate to GitHub Container Registry
+      - name: Build immutable service image
+        shell: bash
+        run: |
+          set -euo pipefail
+          service="${{ matrix.service }}"
+          version="$(python3 -c "import tomllib; from pathlib import Path; print(tomllib.loads(Path('services/$service/pyproject.toml').read_text())['project']['version'])")"
+          image="local/${service}:${GITHUB_SHA}"
+          docker build \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${version}" \
+            --file "services/${service}/Dockerfile" \
+            --tag "${image}" \
+            .
+          printf 'LOCAL_IMAGE=%s\nSERVICE_VERSION=%s\n' "${image}" "${version}" >> "$GITHUB_ENV"
+
+      - name: Scan exact publish image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: local/${{ matrix.service }}:${{ github.sha }}
+          scan-type: image
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Authenticate to GitHub Container Registry after the scan gate
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
 
-      - name: Build and publish immutable service images
+      - name: Publish the scanned immutable service image
         shell: bash
         run: |
           set -euo pipefail
           namespace="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/fastapi-microservices-platform"
           revision="${GITHUB_SHA}"
+          image="${namespace}/${{ matrix.service }}"
           short_revision="${revision:0:12}"
-          for service in reference-service identity-service customer-service catalog-service search-service media-service inventory-service cart-service order-service payment-service notification-service chat-service; do
-            version="$(python3 -c "import tomllib; from pathlib import Path; print(tomllib.loads(Path('services/$service/pyproject.toml').read_text())['project']['version'])")"
-            image="$namespace/$service"
-            docker build \
-              --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
-              --label "org.opencontainers.image.revision=${revision}" \
-              --label "org.opencontainers.image.version=${version}" \
-              --file "services/$service/Dockerfile" \
-              --tag "$image:sha-${revision}" \
-              --tag "$image:${version}-${short_revision}" \
-              .
-            docker push "$image:sha-${revision}"
-            docker push "$image:${version}-${short_revision}"
-            printf '%s@%s\n' "$image" "$(docker image inspect "$image:sha-${revision}" --format '{{index .RepoDigests 0}}')" >> "$GITHUB_STEP_SUMMARY"
-          done
+          docker tag "${LOCAL_IMAGE}" "${image}:sha-${revision}"
+          docker tag "${LOCAL_IMAGE}" "${image}:${SERVICE_VERSION}-${short_revision}"
+          docker push "${image}:sha-${revision}"
+          docker push "${image}:${SERVICE_VERSION}-${short_revision}"
+          printf '%s@%s\n' "$image" "$(docker image inspect "${image}:sha-${revision}" --format '{{index .RepoDigests 0}}')" >> "$GITHUB_STEP_SUMMARY"

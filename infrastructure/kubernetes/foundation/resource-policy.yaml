@@ -21,10 +21,11 @@ metadata:
 spec:
   hard:
     # Covers all API HPA targets at their four-replica ceiling, a one-Pod
-    # rolling-update surge per API, and the separately owned worker/migration
-    # workloads. Cluster capacity remains the scheduler's responsibility.
-    pods: "75"
+    # rolling-update surge per API, dedicated event/Celery workers, CronJobs,
+    # and controlled migration workloads. Cluster capacity remains the
+    # scheduler's responsibility.
+    pods: "90"
     requests.cpu: "12"
     requests.memory: 24Gi
-    limits.cpu: "72"
-    limits.memory: 36Gi
+    limits.cpu: "84"
+    limits.memory: 48Gi

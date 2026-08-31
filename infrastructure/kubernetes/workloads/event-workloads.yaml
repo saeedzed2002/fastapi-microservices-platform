@@ -1,0 +1,320 @@
+# Background event and dispatch loops are deliberately separate from the
+# stateless HTTP Deployments. Their per-container environment overrides the
+# disabled API defaults in platform-runtime-config.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity-event-worker
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: identity-event-worker, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: identity-event-worker}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: identity-event-worker
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: event-worker
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      terminationGracePeriodSeconds: 45
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: identity-event-worker
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/identity-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command: [python, -m, identity_service.workers.runtime_main]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          env: [{name: IDENTITY_KAFKA_PUBLISHER_ENABLED, value: "true"}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: customer-event-worker
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: customer-event-worker, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: customer-event-worker}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: customer-event-worker
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: event-worker
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      terminationGracePeriodSeconds: 45
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: customer-event-worker
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/customer-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command: [python, -m, customer_service.workers.runtime_main]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          env: [{name: CUSTOMER_KAFKA_CONSUMER_ENABLED, value: "true"}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-event-worker
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: catalog-event-worker, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: catalog-event-worker}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: catalog-event-worker
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: event-worker
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      terminationGracePeriodSeconds: 45
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: catalog-event-worker
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/catalog-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command: [python, -m, catalog_service.workers.runtime_main]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          env: [{name: CATALOG_KAFKA_PUBLISHER_ENABLED, value: "true"}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-event-worker
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: search-event-worker, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: search-event-worker}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: search-event-worker
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: event-worker
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      terminationGracePeriodSeconds: 45
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: search-event-worker
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/search-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command: [python, -m, search_service.workers.runtime_main]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          env: [{name: SEARCH_KAFKA_CONSUMER_ENABLED, value: "true"}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-event-worker
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: inventory-event-worker, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: inventory-event-worker}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: inventory-event-worker
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: event-worker
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      terminationGracePeriodSeconds: 60
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: inventory-event-worker
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/inventory-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command: [python, -m, inventory_service.workers.runtime_main]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          env:
+            - {name: INVENTORY_KAFKA_PUBLISHER_ENABLED, value: "true"}
+            - {name: INVENTORY_KAFKA_CONSUMER_ENABLED, value: "true"}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-event-worker
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: order-event-worker, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: order-event-worker}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: order-event-worker
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: event-worker
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      terminationGracePeriodSeconds: 90
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: order-event-worker
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/order-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command: [python, -m, order_service.workers.runtime_main]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          env:
+            - {name: ORDER_KAFKA_PUBLISHER_ENABLED, value: "true"}
+            - {name: ORDER_KAFKA_CONSUMER_ENABLED, value: "true"}
+            - {name: ORDER_INVOICE_CONSUMER_ENABLED, value: "true"}
+            - {name: ORDER_TASK_DISPATCHER_ENABLED, value: "true"}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 200m, memory: 384Mi}, limits: {cpu: "1", memory: 768Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-event-worker
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: payment-event-worker, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: payment-event-worker}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: payment-event-worker
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: event-worker
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      terminationGracePeriodSeconds: 60
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: payment-event-worker
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/payment-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command: [python, -m, payment_service.workers.runtime_main]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          env:
+            - {name: PAYMENT_KAFKA_PUBLISHER_ENABLED, value: "true"}
+            - {name: PAYMENT_KAFKA_CONSUMER_ENABLED, value: "true"}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: media-event-worker
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: media-event-worker, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: media-event-worker}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: media-event-worker
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: event-worker
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      terminationGracePeriodSeconds: 60
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: media-event-worker
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/media-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command: [python, -m, media_service.workers.runtime_main]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          env:
+            - {name: MEDIA_KAFKA_PUBLISHER_ENABLED, value: "true"}
+            - {name: MEDIA_TASK_DISPATCHER_ENABLED, value: "true"}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 150m, memory: 384Mi}, limits: {cpu: "1", memory: 1Gi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-event-worker
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: notification-event-worker, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: notification-event-worker}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notification-event-worker
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: event-worker
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      terminationGracePeriodSeconds: 60
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: notification-event-worker
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/notification-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command: [python, -m, notification_service.workers.runtime_main]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          env:
+            - {name: NOTIFICATION_KAFKA_CONSUMER_ENABLED, value: "true"}
+            - {name: NOTIFICATION_TASK_DISPATCHER_ENABLED, value: "true"}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]

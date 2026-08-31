@@ -43,13 +43,16 @@ production delivery environment: it has no real provider credentials, public
 ingress, certificate, external managed-state dependency, multi-node capacity,
 or a synthetic HPA scale-out load test.
 
-Only a validated push to `main` can run `publish-ghcr`. That job receives
-`packages: write` and no broader write permission, authenticates with the
-workflow-scoped `GITHUB_TOKEN`, and publishes one image per service to
+Only a validated push to `main` can run `publish-ghcr`. Its per-service matrix
+builds the checked-out source revision into a local tag, scans that exact tag
+with the `HIGH`/`CRITICAL` Trivy gate, and only after the scan passes receives
+`packages: write` registry authentication through the workflow-scoped
+`GITHUB_TOKEN`. It then publishes one image per service to
 `ghcr.io/saeedzed2002/fastapi-microservices-platform/<service>`. Images receive
 `sha-<full-git-sha>` and `<service-version>-<short-git-sha>` tags plus OCI
 source, revision, and version labels. No `latest` tag is published and the
-workflow summary records the resulting digest.
+workflow summary records the resulting digest. A pull-request scan or a
+separately rebuilt main image is not treated as a delivery scan gate.
 
 `pip-audit 2.10.1` and `Trivy Action 0.36.0` were selected from their official
 releases on `2026-08-25`; the former supports Python `3.14` and is locked as a
@@ -78,7 +81,8 @@ Initially all applicable checks run. Later affected-service detection may optimi
 
 ```text
 validated commit
-  -> build and publish the exact validated source revision
+  -> build the exact validated source revision
+  -> scan that exact local image
   -> tag with service version and Git SHA
   -> push to GHCR
   -> promote immutable digest

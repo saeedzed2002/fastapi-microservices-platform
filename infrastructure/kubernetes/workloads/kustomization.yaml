@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - api-workloads.yaml
   - background-workloads.yaml
+  - event-workloads.yaml
   - availability.yaml
   - autoscaling.yaml
   - ingress.yaml

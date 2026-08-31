@@ -65,6 +65,9 @@ The signing algorithm, JWKS/key-distribution mechanism, claim set, and service-t
 - Verify dependencies and images from official sources.
 - Pin reproducibly and avoid unsupported releases or floating image tags.
 - Run dependency and container scans with explicit severity gates, owners, and expiring exceptions.
+- A delivery job must scan the exact local image it will tag and publish before
+  registry authentication or any push; a scan from a different event, runner,
+  or rebuilt image is not a publication gate.
 - Use minimal CI permissions and immutable action references.
 - Build non-root, minimal runtime images and retain artifact provenance when delivery is implemented.
 

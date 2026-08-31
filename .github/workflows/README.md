@@ -9,11 +9,15 @@ quality
   ├── migration-heads
   ├── image-build + Trivy scan (pull requests only)
   └── integration
-        └── publish-ghcr (main only)
+        └── kubernetes-conformance (main only)
+              └── publish-ghcr: build + Trivy scan + publish per service (main only)
 ```
 
-`image-build` scans every independently deployable image with Trivy and fails
-for fixable `HIGH` or `CRITICAL` vulnerabilities. `publish-ghcr` is delivery,
+`image-build` scans every independently deployable pull-request image with
+Trivy and fails for fixable `HIGH` or `CRITICAL` vulnerabilities. On `main`,
+each `publish-ghcr` matrix entry builds one local image, scans that exact local
+tag with the same gate, and only then authenticates and pushes it. A failed or
+skipped scan therefore cannot publish an image. `publish-ghcr` is delivery,
 not deployment. It publishes immutable OCI images
 only after validation; no workflow deploys to Kubernetes before reviewed
 Kubernetes and Helm resources, environment gates, migration Jobs, readiness

@@ -95,11 +95,11 @@ def test_runtime_config_sets_each_service_environment_explicitly() -> None:
 def test_resource_quota_allows_hpa_and_zero_unavailable_rolling_updates() -> None:
     resource_policy = _read("foundation", "resource-policy.yaml")
 
-    assert 'pods: "75"' in resource_policy
+    assert 'pods: "90"' in resource_policy
     assert 'requests.cpu: "12"' in resource_policy
     assert "requests.memory: 24Gi" in resource_policy
-    assert 'limits.cpu: "72"' in resource_policy
-    assert "limits.memory: 36Gi" in resource_policy
+    assert 'limits.cpu: "84"' in resource_policy
+    assert "limits.memory: 48Gi" in resource_policy
 
 
 def test_secret_template_is_not_in_the_foundation_apply_set() -> None:

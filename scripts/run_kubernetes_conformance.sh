@@ -43,6 +43,15 @@ readonly API_DEPLOYMENTS=(
   chat-service
 )
 readonly WORKER_DEPLOYMENTS=(
+  identity-event-worker
+  customer-event-worker
+  catalog-event-worker
+  search-event-worker
+  inventory-event-worker
+  order-event-worker
+  payment-event-worker
+  media-event-worker
+  notification-event-worker
   order-invoice-worker
   notification-email-worker
   notification-sms-worker

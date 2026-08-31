@@ -165,6 +165,60 @@ workers:
     terminationGracePeriodSeconds: 30
     command: [python, -m, payment_service.workers.expiry_main]
     resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {cpu: 500m, memory: 256Mi}}
+  identity-event-worker:
+    image: identity-service
+    terminationGracePeriodSeconds: 45
+    command: [python, -m, identity_service.workers.runtime_main]
+    env: {IDENTITY_KAFKA_PUBLISHER_ENABLED: "true"}
+    resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  customer-event-worker:
+    image: customer-service
+    terminationGracePeriodSeconds: 45
+    command: [python, -m, customer_service.workers.runtime_main]
+    env: {CUSTOMER_KAFKA_CONSUMER_ENABLED: "true"}
+    resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  catalog-event-worker:
+    image: catalog-service
+    terminationGracePeriodSeconds: 45
+    command: [python, -m, catalog_service.workers.runtime_main]
+    env: {CATALOG_KAFKA_PUBLISHER_ENABLED: "true"}
+    resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  search-event-worker:
+    image: search-service
+    terminationGracePeriodSeconds: 45
+    command: [python, -m, search_service.workers.runtime_main]
+    env: {SEARCH_KAFKA_CONSUMER_ENABLED: "true"}
+    resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  inventory-event-worker:
+    image: inventory-service
+    terminationGracePeriodSeconds: 60
+    command: [python, -m, inventory_service.workers.runtime_main]
+    env: {INVENTORY_KAFKA_PUBLISHER_ENABLED: "true", INVENTORY_KAFKA_CONSUMER_ENABLED: "true"}
+    resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  order-event-worker:
+    image: order-service
+    terminationGracePeriodSeconds: 90
+    command: [python, -m, order_service.workers.runtime_main]
+    env: {ORDER_KAFKA_PUBLISHER_ENABLED: "true", ORDER_KAFKA_CONSUMER_ENABLED: "true", ORDER_INVOICE_CONSUMER_ENABLED: "true", ORDER_TASK_DISPATCHER_ENABLED: "true"}
+    resources: {requests: {cpu: 200m, memory: 384Mi}, limits: {cpu: "1", memory: 768Mi}}
+  payment-event-worker:
+    image: payment-service
+    terminationGracePeriodSeconds: 60
+    command: [python, -m, payment_service.workers.runtime_main]
+    env: {PAYMENT_KAFKA_PUBLISHER_ENABLED: "true", PAYMENT_KAFKA_CONSUMER_ENABLED: "true"}
+    resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  media-event-worker:
+    image: media-service
+    terminationGracePeriodSeconds: 60
+    command: [python, -m, media_service.workers.runtime_main]
+    env: {MEDIA_KAFKA_PUBLISHER_ENABLED: "true", MEDIA_TASK_DISPATCHER_ENABLED: "true"}
+    resources: {requests: {cpu: 150m, memory: 384Mi}, limits: {cpu: "1", memory: 1Gi}}
+  notification-event-worker:
+    image: notification-service
+    terminationGracePeriodSeconds: 60
+    command: [python, -m, notification_service.workers.runtime_main]
+    env: {NOTIFICATION_KAFKA_CONSUMER_ENABLED: "true", NOTIFICATION_TASK_DISPATCHER_ENABLED: "true"}
+    resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
 
 cronJobs:
   media-upload-reaper:

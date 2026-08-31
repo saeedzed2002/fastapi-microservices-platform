@@ -13,3 +13,8 @@ The generated FastAPI OpenAPI document is not accepted as an unreviewed implemen
 - HTTP status remains authoritative and is not duplicated as a conflicting body field.
 - Relevant standard headers such as `Retry-After` and `WWW-Authenticate` remain intact.
 - A downstream error is translated into the calling service's contract rather than passed through blindly.
+- Every HTTP application configures the shared handlers. Framework validation,
+  route-generated `404`/`405`, explicitly raised HTTP errors, and unhandled
+  failures therefore use this envelope rather than FastAPI's default `detail`
+  response. Validation details contain only location, stable validator code,
+  and safe message text; they never echo submitted values.
