@@ -76,6 +76,18 @@ family.
 - Add a general staff role: rejected because the accepted two-role model is
   `customer` and `admin`; this feature follows that existing policy.
 
+## Compatibility and migration
+
+Identity migration `0007_password_reset_and_session_devices` adds bounded
+device metadata to `refresh_sessions` and creates the owned
+`password_reset_requests` table. Existing refresh sessions remain valid; their
+new metadata is nullable or receives a migration-time timestamp default.
+
+Notification migration `0005_password_reset_email_delivery` adds its owned
+durable delivery table. Existing authentication and refresh APIs are unchanged;
+the reset and session endpoints are additive. Apply each service's migration
+before deploying the service version that writes its new owned state.
+
 ## Validation
 
 - Unit tests cover reset-token delivery state, cooldown, cleanup, and raw-token
