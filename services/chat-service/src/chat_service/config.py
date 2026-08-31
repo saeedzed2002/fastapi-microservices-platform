@@ -1,8 +1,10 @@
 from functools import lru_cache
 from uuid import uuid4
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from platform_auth import reject_known_local_development_credentials
 
 
 class Settings(BaseSettings):
@@ -40,6 +42,18 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     model_config = SettingsConfigDict(env_prefix="CHAT_", extra="ignore")
+
+    @model_validator(mode="after")
+    def reject_local_development_credentials(self) -> Settings:
+        reject_known_local_development_credentials(
+            environment=self.environment,
+            service_name=self.service_name,
+            values={
+                "jwt_secret": self.jwt_secret,
+                "media_internal_access_secret": self.media_internal_access_secret,
+            },
+        )
+        return self
 
 
 @lru_cache

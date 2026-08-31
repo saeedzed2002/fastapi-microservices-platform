@@ -1,7 +1,9 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from platform_auth import reject_known_local_development_credentials
 
 
 class Settings(BaseSettings):
@@ -51,6 +53,21 @@ class Settings(BaseSettings):
     abandoned_upload_cleanup_batch_size: int = Field(default=100, ge=1, le=1_000)
 
     model_config = SettingsConfigDict(env_prefix="MEDIA_", extra="ignore")
+
+    @model_validator(mode="after")
+    def reject_local_development_credentials(self) -> Settings:
+        reject_known_local_development_credentials(
+            environment=self.environment,
+            service_name=self.service_name,
+            values={
+                "jwt_secret": self.jwt_secret,
+                "s3_secret_access_key": self.s3_secret_access_key,
+                "chat_access_secret": self.chat_access_secret,
+                "catalog_access_secret": self.catalog_access_secret,
+                "rabbitmq_url": self.rabbitmq_url,
+            },
+        )
+        return self
 
 
 @lru_cache

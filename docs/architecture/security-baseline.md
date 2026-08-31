@@ -10,6 +10,9 @@ Security is enforced at every service boundary and throughout delivery; the edge
 - Rotate refresh tokens and detect reuse at the token-family/session level.
 - Make logout and revocation semantics explicit, including expiry and Redis-outage behavior.
 - Store only hashed refresh-token material where practical.
+- Return the current API-first access and refresh tokens in the versioned JSON
+  response contract; do not issue authentication cookies until an approved
+  browser-session and CSRF design exists.
 - Retain only bounded device metadata and an HMAC-protected peer-address digest
   for refresh sessions; never expose or persist a raw address for session UI.
 - Rotate signing keys through a documented distribution and overlap process.
@@ -40,7 +43,9 @@ The signing algorithm, JWKS/key-distribution mechanism, claim set, and service-t
 - Apply Redis-backed rate limits to staff login, OTP, password reset, public search, uploads, and WebSocket connections.
 - Document fail-open/fail-closed behavior per limit; authentication abuse controls cannot silently disappear.
 - Chat WebSocket connection limits are fail-closed if Redis is unavailable. Chat never accepts bearer tokens in its URL; the first versioned frame authenticates the connection before any Chat operation.
-- Use narrow CORS allowlists and explicit credential behavior per environment.
+- Keep CORS disabled while the platform has no browser frontend. Before adding
+  one, define narrow origin, method, header, and credential allowlists instead
+  of enabling a permissive temporary policy.
 - Apply appropriate security headers and TLS at the edge. Local Nginx accepts only `TLSv1.2` and `TLSv1.3`, forwards a generated request ID and trusted direct-peer address, and applies documented per-instance IP limits. Its password/OTP and WebSocket-upgrade buckets are separate so login abuse on a shared source IP cannot consume a connected customer's Chat-upgrade allowance; these controls do not replace service-owned Redis-backed limits.
 
 ## Upload and object security
@@ -56,6 +61,8 @@ The signing algorithm, JWKS/key-distribution mechanism, claim set, and service-t
 
 - Never commit secrets, credentials, tokens, private keys, or production `.env` files.
 - Inject runtime secrets from approved secret stores.
+- Permit public local-development credentials only when the service environment
+  is `local`; non-local settings validation must fail before a process starts.
 - Minimize personal/sensitive data in events and tasks.
 - Redact tokens, passwords, cookies, authorization headers, raw provider data, and sensitive payloads from logs and traces.
 - Define retention and deletion policy for identity, customer, payment, Chat, media, audit, backup, and event data before production.

@@ -1,7 +1,9 @@
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from platform_auth import reject_known_local_development_credentials
 
 
 class Settings(BaseSettings):
@@ -49,6 +51,18 @@ class Settings(BaseSettings):
     @classmethod
     def empty_internal_otp_secret_is_unconfigured(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
+
+    @model_validator(mode="after")
+    def reject_local_development_credentials(self) -> Settings:
+        reject_known_local_development_credentials(
+            environment=self.environment,
+            service_name=self.service_name,
+            values={
+                "jwt_secret": self.jwt_secret,
+                "session_metadata_hmac_secret": self.session_metadata_hmac_secret,
+            },
+        )
+        return self
 
 
 @lru_cache

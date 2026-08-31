@@ -75,6 +75,13 @@ approved secret manager. Its required key inventory is documented in
 `infrastructure/kubernetes/foundation/runtime-secrets.example.yaml`; that file
 is not an applyable secret and must never receive real values.
 
+Do not copy Compose credentials into this Secret. Service settings reject every
+known local-development JWT, HMAC, internal-access, object-storage, and
+RabbitMQ credential outside `local` before the process starts. A validation
+failure means the release secret inventory is incomplete or unsafe; replace the
+value in the approved secret manager and rerun the release rather than bypassing
+the guard.
+
 Create `ghcr-pull` only when the selected `GHCR` packages require it. Use an
 audited pull-only token, not an administrator credential. Confirm both Secrets
 exist without printing their data:

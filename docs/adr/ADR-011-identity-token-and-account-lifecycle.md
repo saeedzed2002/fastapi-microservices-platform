@@ -35,6 +35,8 @@ event and idempotently provisions its own profile row.
 
 The platform-auth library contains only technical JWT claim and validation
 primitives. It does not contain User, Customer, or any other business model.
+The initial API transport returns tokens in JSON for API clients; browser
+origin, cookie, and CSRF behavior is defined separately in ADR-036.
 
 ## Consequences
 
@@ -73,5 +75,6 @@ until a separately versioned replacement is deployed.
 ## Related material
 
 - Phase 2 plan: docs/development/phase-2-plan.md
+- [Browser origin and token boundary](ADR-036-browser-origin-and-token-boundary.md)
 - Identity payload contract: contracts/events/identity.user_registered.v1.schema.json
 - Outbox and event envelope ADR: docs/adr/ADR-005-outbox-inbox-and-idempotency.md

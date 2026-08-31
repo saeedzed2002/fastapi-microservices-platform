@@ -1,7 +1,9 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from platform_auth import reject_known_local_development_credentials
 
 
 class Settings(BaseSettings):
@@ -42,6 +44,15 @@ class Settings(BaseSettings):
     expiry_poll_interval_seconds: float = Field(default=5.0, ge=0.1, le=60.0)
 
     model_config = SettingsConfigDict(env_prefix="PAYMENT_", extra="ignore")
+
+    @model_validator(mode="after")
+    def reject_local_development_credentials(self) -> Settings:
+        reject_known_local_development_credentials(
+            environment=self.environment,
+            service_name=self.service_name,
+            values={"jwt_secret": self.jwt_secret},
+        )
+        return self
 
 
 @lru_cache
