@@ -82,7 +82,7 @@ testpaths = [
 ]
 addopts = "-ra --import-mode=importlib"
 markers = [
-  "e2e: requires the local Docker Compose platform and is opt-in",
+  "e2e: requires an explicitly started platform topology and is opt-in",
 ]
 
 [tool.mypy]

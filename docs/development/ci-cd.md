@@ -30,11 +30,14 @@ and loads those local images into a disposable `Kind` cluster. The job applies
 the test-only foundation (including isolated PostgreSQL, Kafka, RabbitMQ,
 Redis, MinIO, and Mailpit), waits for dependency readiness, runs controlled
 migration Jobs, waits for all API and worker Deployments, and executes an
-in-cluster `/health/ready` smoke Job. It always destroys the cluster and
-exports diagnostics if the proof fails. This is deployment evidence for the
-repository manifests, not a production delivery environment: it has no real
-provider credentials, public ingress, certificate, or external managed-state
-dependency.
+in-cluster `/health/ready` smoke Job followed by the existing checkout to
+inventory commit, invoice, and email E2E workflow. The E2E Job runs from the
+restricted application namespace through the workload `ClusterIP` services;
+it therefore proves application behavior and the namespace ingress policy, not
+public `Ingress` routing. The job always destroys the cluster and exports
+diagnostics if the proof fails. This is deployment evidence for the repository
+manifests, not a production delivery environment: it has no real provider
+credentials, public ingress, certificate, or external managed-state dependency.
 
 Only a validated push to `main` can run `publish-ghcr`. That job receives
 `packages: write` and no broader write permission, authenticates with the

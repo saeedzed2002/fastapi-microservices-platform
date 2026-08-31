@@ -67,6 +67,7 @@ jobs:
           kubectl kustomize infrastructure/kubernetes/conformance/migrations >/dev/null
           kubectl kustomize infrastructure/kubernetes/conformance/workloads >/dev/null
           kubectl kustomize infrastructure/kubernetes/conformance/smoke >/dev/null
+          kubectl kustomize infrastructure/kubernetes/conformance/e2e >/dev/null
 
       - name: Validate lock, formatting, linting, typing, and unit tests
         run: |

@@ -27,7 +27,7 @@ def _read(path: Path) -> str:
 
 
 def test_conformance_has_all_delivery_entrypoints() -> None:
-    for entrypoint in ("foundation", "migrations", "workloads", "smoke"):
+    for entrypoint in ("foundation", "migrations", "workloads", "smoke", "e2e"):
         document = _read(CONFORMANCE / entrypoint / "kustomization.yaml")
         assert "apiVersion: kustomize.config.k8s.io/v1beta1" in document
         assert "kind: Kustomization" in document
@@ -37,6 +37,7 @@ def test_conformance_uses_loaded_images_not_production_registry_credentials() ->
     migrations = _read(CONFORMANCE / "migrations" / "kustomization.yaml")
     workloads = _read(CONFORMANCE / "workloads" / "kustomization.yaml")
     smoke = _read(CONFORMANCE / "smoke" / "health-smoke.yaml")
+    checkout_e2e = _read(CONFORMANCE / "e2e" / "checkout-e2e.yaml")
 
     for service in SERVICES:
         assert f"newName: fastapi-platform/{service}" in workloads
@@ -52,6 +53,25 @@ def test_conformance_uses_loaded_images_not_production_registry_credentials() ->
     assert workloads.count("value: Never") == 2
     assert "ghcr-pull" not in migrations
     assert "ghcr-pull" not in workloads
+    assert "fastapi-platform/checkout-e2e:conformance" in checkout_e2e
+    assert "E2E_CUSTOMER_BASE_URL" in checkout_e2e
+    assert "E2E_ORDER_BASE_URL" in checkout_e2e
+    assert "E2E_S3_ENDPOINT" in checkout_e2e
+    assert "readOnlyRootFilesystem: true" in checkout_e2e
+
+
+def test_checkout_e2e_reuses_the_compose_workflow_without_test_dependencies() -> None:
+    compose_test = _read(ROOT / "tests" / "e2e" / "test_phase6_checkout_notification.py")
+    workflow = _read(ROOT / "tests" / "e2e" / "checkout_workflow.py")
+    runner = _read(CONFORMANCE / "e2e" / "Dockerfile")
+
+    assert "from tests.e2e.checkout_workflow import run_checkout_workflow" in compose_test
+    assert "run_checkout_workflow()" in compose_test
+    assert "FROM fastapi-platform/order-service:conformance" in runner
+    assert "COPY tests/e2e/checkout_workflow.py /app/checkout_workflow.py" in runner
+    assert "pytest" not in runner
+    assert 'payment_method": "test_success"' in workflow
+    assert "invoice.pdf" in workflow
 
 
 def test_conformance_dependencies_and_secrets_are_isolated_test_inputs() -> None:
@@ -116,13 +136,15 @@ def test_kind_cluster_and_ci_script_are_pinned_and_disposable() -> None:
     assert "dump_namespace_logs" in script
     assert "--previous --tail=200" in script
     assert "platform-health-smoke" in script
-    assert script.count("--provenance=false") == 2
+    assert "platform-checkout-e2e" in script
+    assert script.count("--provenance=false") == 3
     assert "DEPENDENCY_SOURCE_IMAGES" in script
     assert "DEPENDENCY_LOCAL_IMAGES" in script
     assert 'docker tag "${source_image}" "${local_image}"' in script
     assert (
-        'for image in "${DEPENDENCY_LOCAL_IMAGES[@]}" "fastapi-platform/minio:conformance"'
-        in script
+        'for image in "${DEPENDENCY_LOCAL_IMAGES[@]}" '
+        '"fastapi-platform/minio:conformance" '
+        '"fastapi-platform/checkout-e2e:conformance"' in script
     )
     assert "CONFORMANCE_SKIP_IMAGE_BUILD:-false" in script
     assert '[[ "${SKIP_IMAGE_BUILD}" == "true" ]]' in script

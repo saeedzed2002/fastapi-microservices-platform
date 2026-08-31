@@ -21,8 +21,9 @@ and no committed runtime secret.
   runbook, and CI rendering validation;
 - a disposable `Kind` conformance path that builds the checked-out service
   images, loads them into a temporary cluster, applies foundation, migrations,
-  and workloads in delivery order, and proves every API readiness endpoint
-  from inside the application namespace.
+  and workloads in delivery order, proves every API readiness endpoint, then
+  runs checkout through inventory commit, invoice creation, and email delivery
+  from inside the restricted application namespace.
 - migration sources and `alembic.ini` included in every database-owning
   service image so the migration Jobs can actually execute.
 
@@ -44,7 +45,8 @@ and no committed runtime secret.
 3. Delete previous completed migration Jobs, apply the migration resources,
    and wait for every Job to complete before starting a new image revision.
 4. Apply workload resources, wait for rollout and readiness, then run the
-   public ingress and service-owned smoke checks.
+   service-owned readiness and in-cluster checkout E2E checks. A target
+   environment owner separately verifies public `Ingress` routing.
 5. Roll back only to an image compatible with the already-applied schema;
    database rollback is an explicit operator operation, never an automatic
    deployment side effect.

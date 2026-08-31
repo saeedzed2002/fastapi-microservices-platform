@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: platform-checkout-e2e
+  namespace: fastapi-platform
+  labels:
+    app.kubernetes.io/name: platform-checkout-e2e
+    app.kubernetes.io/part-of: fastapi-microservices-platform
+    platform.fastapi.io/workload: conformance-e2e
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: platform-checkout-e2e
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: conformance-e2e
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: checkout-e2e
+          image: fastapi-platform/checkout-e2e:conformance
+          imagePullPolicy: Never
+          env:
+            - name: E2E_JWT_SECRET
+              valueFrom: {secretKeyRef: {name: platform-runtime-secrets, key: IDENTITY_JWT_SECRET}}
+            - {name: E2E_CUSTOMER_BASE_URL, value: http://customer-service}
+            - {name: E2E_CATALOG_BASE_URL, value: http://catalog-service}
+            - {name: E2E_INVENTORY_BASE_URL, value: http://inventory-service}
+            - {name: E2E_ORDER_BASE_URL, value: http://order-service}
+            - {name: E2E_MAILPIT_BASE_URL, value: http://mailpit.fastapi-platform-dependencies.svc.cluster.local:8025}
+            - name: E2E_S3_ENDPOINT
+              valueFrom: {secretKeyRef: {name: platform-runtime-secrets, key: ORDER_S3_ENDPOINT_URL}}
+            - name: E2E_S3_ACCESS_KEY
+              valueFrom: {secretKeyRef: {name: platform-runtime-secrets, key: ORDER_S3_ACCESS_KEY_ID}}
+            - name: E2E_S3_SECRET_KEY
+              valueFrom: {secretKeyRef: {name: platform-runtime-secrets, key: ORDER_S3_SECRET_ACCESS_KEY}}
+            - {name: E2E_WAIT_TIMEOUT_SECONDS, value: "90"}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: 500m, memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]

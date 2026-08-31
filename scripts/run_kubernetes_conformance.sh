@@ -137,6 +137,12 @@ else
     --file infrastructure/minio/Dockerfile \
     --tag fastapi-platform/minio:conformance \
     infrastructure/minio
+  docker build \
+    --quiet \
+    --provenance=false \
+    --file infrastructure/kubernetes/conformance/e2e/Dockerfile \
+    --tag fastapi-platform/checkout-e2e:conformance \
+    .
 fi
 
 echo "Pulling pinned disposable dependency images."
@@ -154,7 +160,7 @@ kind create cluster \
 cluster_created=true
 
 echo "Loading checked-out and locally tagged dependency images into the disposable Kind node."
-for image in "${DEPENDENCY_LOCAL_IMAGES[@]}" "fastapi-platform/minio:conformance"; do
+for image in "${DEPENDENCY_LOCAL_IMAGES[@]}" "fastapi-platform/minio:conformance" "fastapi-platform/checkout-e2e:conformance"; do
   kind load docker-image --name "${CLUSTER_NAME}" "${image}"
 done
 for service in "${SERVICE_IMAGES[@]}"; do
@@ -181,4 +187,7 @@ done
 kubectl --context "${CONTEXT}" apply -k infrastructure/kubernetes/conformance/smoke
 kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" wait --for=condition=complete job/platform-health-smoke --timeout=5m
 kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" logs job/platform-health-smoke
+kubectl --context "${CONTEXT}" apply -k infrastructure/kubernetes/conformance/e2e
+kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" wait --for=condition=complete job/platform-checkout-e2e --timeout=6m
+kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" logs job/platform-checkout-e2e
 echo "Kubernetes conformance completed successfully."

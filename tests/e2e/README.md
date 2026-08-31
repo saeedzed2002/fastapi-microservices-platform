@@ -16,3 +16,11 @@ E2E tests use isolated data, bounded polling of observable state, and determinis
 `test_phase6_checkout_notification.py` is opt-in because it creates isolated
 local product, stock, customer, order, invoice, and SMTP test data. Start the
 local platform and run it with `RUN_E2E=1`.
+
+The checkout scenario is implemented once in `checkout_workflow.py`. Compose
+uses the edge URL through `E2E_BASE_URL`; the disposable Kubernetes conformance
+Job supplies individual `E2E_*_BASE_URL` values for the in-cluster
+`customer-service`, `catalog-service`, `inventory-service`, and
+`order-service` `ClusterIP` services. The test therefore remains the same
+business workflow in both environments without pretending that the Kind test
+exercises public ingress or TLS.
