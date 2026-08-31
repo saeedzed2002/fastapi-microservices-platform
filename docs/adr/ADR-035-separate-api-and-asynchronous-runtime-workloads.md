@@ -74,6 +74,9 @@ the Kubernetes delivery runtime.
   resource quotas and environment capacity must include the extra workers.
 - Local Compose still co-locates loops for simplicity, so contributors must use
   Kind conformance to verify the production-shaped process topology.
+- The disposable one-node Kind harness uses explicitly reduced scheduler
+  requests for every API and worker. It retains the production resource limits
+  and is topology evidence, not production capacity or performance evidence.
 
 ## Alternatives considered
 
@@ -107,6 +110,8 @@ image and its in-process loops are confirmed compatible.
 - The disposable Kind conformance run executes the in-cluster checkout, event,
   invoice, and notification workflow with API and asynchronous workloads
   separated.
+- Static tests require the conformance values to provide a bounded scheduler
+  request for every separately deployed API and worker workload.
 
 ## Related material
 

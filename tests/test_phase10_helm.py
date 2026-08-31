@@ -18,6 +18,22 @@ SERVICES = (
     "notification-service",
     "chat-service",
 )
+WORKERS = (
+    "order-invoice-worker",
+    "notification-email-worker",
+    "notification-sms-worker",
+    "media-worker",
+    "payment-expiry-worker",
+    "identity-event-worker",
+    "customer-event-worker",
+    "catalog-event-worker",
+    "search-event-worker",
+    "inventory-event-worker",
+    "order-event-worker",
+    "payment-event-worker",
+    "media-event-worker",
+    "notification-event-worker",
+)
 DATABASE_MIGRATIONS = (
     "identity",
     "customer",
@@ -72,6 +88,23 @@ def test_delivery_images_require_digests_and_conformance_tags_are_explicit() -> 
     for service in SERVICES:
         assert f"{service}: {{digest:" in values
         assert f"{service}: {{tag: conformance}}" in conformance_values
+
+
+def test_kind_conformance_has_a_bounded_request_for_every_runtime_workload() -> None:
+    conformance_values = _read("fastapi-platform", "values-conformance.yaml")
+
+    assert "scheduler requests only" in conformance_values
+    assert "production limits from values.yaml" in conformance_values
+    for service in SERVICES:
+        assert (
+            f"{service}: {{resources: {{requests: {{cpu: 50m, memory: 128Mi}}}}}}"
+            in conformance_values
+        )
+    for worker in WORKERS:
+        assert (
+            f"{worker}: {{resources: {{requests: {{cpu: 25m, memory: 128Mi}}}}}}"
+            in conformance_values
+        )
 
 
 def test_application_chart_retains_every_workload_and_controlled_migration() -> None:

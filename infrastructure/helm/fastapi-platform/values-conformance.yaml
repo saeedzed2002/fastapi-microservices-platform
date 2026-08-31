@@ -10,6 +10,40 @@ autoscaling:
   minReplicas: 1
   maxReplicas: 1
 
+# The disposable Kind proof has one schedulable node and now verifies the full
+# API-plus-worker topology.  These are scheduler requests only: Helm merges
+# the production limits from values.yaml, and no production capacity policy is
+# changed by this test harness.
+apiServices:
+  reference-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
+  identity-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
+  customer-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
+  catalog-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
+  search-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
+  media-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
+  inventory-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
+  cart-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
+  order-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
+  payment-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
+  notification-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
+  chat-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
+
+workers:
+  order-invoice-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
+  notification-email-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
+  notification-sms-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
+  media-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
+  payment-expiry-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
+  identity-event-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
+  customer-event-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
+  catalog-event-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
+  search-event-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
+  inventory-event-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
+  order-event-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
+  payment-event-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
+  media-event-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
+  notification-event-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
+
 images:
   repositoryPrefix: fastapi-platform
   pullPolicy: Never
