@@ -5,7 +5,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0007_password_reset_and_session_devices"
+revision: str = "0007_password_reset_sessions"
 down_revision: str | Sequence[str] | None = "0006_two_role_model"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None

@@ -236,7 +236,7 @@ jobs:
 
       - name: Start real platform infrastructure
         run: >
-          docker compose -f infrastructure/compose/docker-compose.yml up -d --wait
+          docker compose -f infrastructure/compose/docker-compose.yml up -d --build --wait
           postgres kafka rabbitmq redis minio mailpit
 
       - name: Run service-owned migrations

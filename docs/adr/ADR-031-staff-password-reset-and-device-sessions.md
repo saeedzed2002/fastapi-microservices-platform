@@ -78,7 +78,7 @@ family.
 
 ## Compatibility and migration
 
-Identity migration `0007_password_reset_and_session_devices` adds bounded
+Identity migration `0007_password_reset_sessions` adds bounded
 device metadata to `refresh_sessions` and creates the owned
 `password_reset_requests` table. Existing refresh sessions remain valid; their
 new metadata is nullable or receives a migration-time timestamp default.

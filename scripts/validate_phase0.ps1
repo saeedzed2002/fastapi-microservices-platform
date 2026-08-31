@@ -160,6 +160,29 @@ foreach ($adrFile in $adrFiles) {
     }
 }
 
+# Alembic's default version table persists revision identifiers in varchar(32).
+# Keep service-owned migration revisions within that storage contract so an
+# online migration cannot fail only when it updates alembic_version.
+$alembicRevisionLengthLimit = 32
+$migrationFiles = @($repositoryFiles | Where-Object {
+    $_.FullName -match '[\\/]migrations[\\/]versions[\\/].+\.py$'
+})
+foreach ($migrationFile in $migrationFiles) {
+    $migration = Get-Content -LiteralPath $migrationFile.FullName -Raw
+    $revisionMatch = [regex]::Match(
+        $migration,
+        '(?m)^revision:\s*str\s*=\s*"([^"]+)"\s*$'
+    )
+    if (-not $revisionMatch.Success) {
+        Add-ValidationError "Alembic migration has no typed revision identifier: $($migrationFile.FullName)"
+        continue
+    }
+    $revision = $revisionMatch.Groups[1].Value
+    if ($revision.Length -gt $alembicRevisionLengthLimit) {
+        Add-ValidationError "Alembic revision exceeds the default alembic_version width ($alembicRevisionLengthLimit): $revision in $($migrationFile.FullName)"
+    }
+}
+
 $catalogPath = Join-Path $repositoryPath "contracts/catalog.json"
 $catalog = Get-Content -LiteralPath $catalogPath -Raw | ConvertFrom-Json -Depth 100
 $allowedKinds = @("event-envelope", "api-error-envelope", "service-openapi", "domain-event", "dead-letter-envelope", "realtime-client-protocol")
@@ -318,5 +341,6 @@ Write-Host "PowerShell version: $($PSVersionTable.PSVersion)"
 Write-Host "JSON files parsed: $($jsonFiles.Count)"
 Write-Host "Markdown files and local links checked: $($markdownFiles.Count)"
 Write-Host "ADR structure checked: $($adrFiles.Count)"
+Write-Host "Alembic revision identifiers checked against the default version-table width."
 Write-Host "Contract names, statuses, JSON Schemas, event names, and examples checked."
 Write-Host "Platform CI permissions and immutable action pins checked."
