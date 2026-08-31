@@ -8,7 +8,8 @@ into three independently applied Kustomize entry points:
   service account;
 - `migrations/` runs every database-owning service's Alembic migration once;
 - `workloads/` creates API deployments, workers, scheduled maintenance,
-  services, availability budgets, and the portable ingress resource.
+  services, availability budgets, bounded API autoscaling, and the portable
+  ingress resource.
 
 Do not apply all directories at once. New environment delivery uses the Helm
 charts in `infrastructure/helm/` and follows

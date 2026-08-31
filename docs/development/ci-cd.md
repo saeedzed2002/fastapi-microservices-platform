@@ -30,8 +30,9 @@ Pushes to `main` and manual workflow dispatches additionally run
 checked-out revision, and loads those local images into a disposable `Kind`
 cluster. The job installs the foundation chart, applies only the test-only
 PostgreSQL, Kafka, RabbitMQ, Redis, MinIO, Mailpit, and runtime Secret inputs,
-then installs the application chart. Helm migration hooks complete before API
-and worker workloads roll out. The job then executes an in-cluster
+then installs the application chart. It checksum-verifies and loads the
+test-only `metrics-server` release so each API HPA receives a real CPU metric.
+Helm migration hooks complete before API and worker workloads roll out. The job then executes an in-cluster
 `/health/ready` smoke Job followed by the existing checkout to inventory
 commit, invoice, and email E2E workflow. The E2E Job runs from the restricted
 application namespace through workload `ClusterIP` Services; it therefore
@@ -39,7 +40,8 @@ proves application behavior and namespace ingress policy, not public `Ingress`
 routing. The job always destroys the cluster and exports diagnostics if the
 proof fails. This is deployment evidence for repository charts, not a
 production delivery environment: it has no real provider credentials, public
-ingress, certificate, or external managed-state dependency.
+ingress, certificate, external managed-state dependency, multi-node capacity,
+or a synthetic HPA scale-out load test.
 
 Only a validated push to `main` can run `publish-ghcr`. That job receives
 `packages: write` and no broader write permission, authenticates with the

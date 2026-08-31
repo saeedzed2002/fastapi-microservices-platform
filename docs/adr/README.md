@@ -23,6 +23,7 @@ ADRs record decisions that materially affect service ownership, contracts, durab
 
 | ADR | Status | Decision |
 |---|---|---|
+| [ADR-033](ADR-033-horizontal-pod-autoscaling.md) | Accepted | Bounded API horizontal pod autoscaling |
 | [ADR-032](ADR-032-catalog-product-review-moderation.md) | Accepted | Catalog product reviews, replies, and moderation |
 | [ADR-031](ADR-031-staff-password-reset-and-device-sessions.md) | Accepted | Staff password reset and device-session lifecycle |
 | [ADR-030](ADR-030-observability-collection-and-failure-policy.md) | Accepted | Platform observability collection and failure policy |

@@ -87,11 +87,11 @@ resourcePolicy:
       cpu: 500m
       memory: 512Mi
   quota:
-    pods: "50"
-    requestsCpu: "6"
-    requestsMemory: 12Gi
-    limitsCpu: "48"
-    limitsMemory: 24Gi
+    pods: "75"
+    requestsCpu: "12"
+    requestsMemory: 24Gi
+    limitsCpu: "72"
+    limitsMemory: 36Gi
 
 networkPolicy:
   ingressNamespaceLabel: platform.fastapi.io/allow-ingress

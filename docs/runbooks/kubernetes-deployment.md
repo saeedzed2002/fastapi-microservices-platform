@@ -4,7 +4,8 @@
 
 This runbook deploys the Phase 10 Helm charts. The Phase 9 raw resources remain
 the reviewed baseline but are not the environment delivery command. This runbook does not create a cluster,
-an ingress controller, TLS issuer, secret manager, or managed stateful service.
+an ingress controller, TLS issuer, secret manager, cluster metrics provider,
+node autoscaler, or managed stateful service.
 Do not treat a successful `helm upgrade` as proof of a target environment's
 external dependencies or public routing. The disposable CI conformance job
 does prove foundation-chart installation, migration hooks, workloads, and
@@ -32,6 +33,9 @@ Before any apply, an environment owner must provide:
   storage, SMTP/SMS configuration where enabled, and the payment-provider
   callback public URL;
 - a secret manager or equivalent audited secret-delivery method;
+- a healthy `metrics.k8s.io/v1beta1` implementation and enough node capacity
+  for the approved API HPA maximum; the chart does not install metrics-server
+  or a cluster autoscaler;
 - private-registry pull credentials if `GHCR` packages are not public;
 - an explicit egress-policy design for those real dependency endpoints.
 
@@ -135,11 +139,14 @@ kubectl -n fastapi-platform get jobs -l platform.fastapi.io/workload=migration
 kubectl -n fastapi-platform logs job/<failed-migration-job>
 ```
 
-Only after Helm reports success, confirm its workload rollout:
+Only after Helm reports success, confirm its workload rollout and HPA metric
+availability. Do not use `kubectl scale` for an HPA-managed API Deployment:
+the controller owns its replica count.
 
 ```bash
 kubectl -n fastapi-platform rollout status deployment --timeout=10m
-kubectl -n fastapi-platform get pods,services,pdb,cronjobs,ingress
+kubectl -n fastapi-platform get pods,services,pdb,hpa,cronjobs,ingress
+kubectl get --raw /apis/metrics.k8s.io/v1beta1/namespaces/fastapi-platform/pods
 ```
 
 ## Verification and rollback
@@ -156,6 +163,10 @@ to a previously validated image whose schema compatibility has been confirmed.
 If a migration itself introduced an incompatible schema, use the approved
 service-owned recovery plan; never issue a blind `alembic downgrade` in a
 shared production database.
+
+Use [the API autoscaling runbook](kubernetes-autoscaling.md) for HPA metric,
+quota, scheduling, and capacity failures. A target environment must validate
+real load and node capacity before increasing the default HPA maximum.
 
 ## Egress hardening follow-up
 

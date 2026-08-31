@@ -20,11 +20,11 @@ metadata:
   namespace: fastapi-platform
 spec:
   hard:
-    # Covers the normal workload set plus all API rolling-update surge Pods.
-    # Cluster capacity remains the scheduler's responsibility; this namespace
-    # budget must not deadlock a maxUnavailable=0 rollout.
-    pods: "50"
-    requests.cpu: "6"
-    requests.memory: 12Gi
-    limits.cpu: "48"
-    limits.memory: 24Gi
+    # Covers all API HPA targets at their four-replica ceiling, a one-Pod
+    # rolling-update surge per API, and the separately owned worker/migration
+    # workloads. Cluster capacity remains the scheduler's responsibility.
+    pods: "75"
+    requests.cpu: "12"
+    requests.memory: 24Gi
+    limits.cpu: "72"
+    limits.memory: 36Gi

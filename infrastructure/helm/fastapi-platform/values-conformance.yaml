@@ -4,6 +4,12 @@ api:
   # previously proven one-replica resource envelope.
   replicas: 1
 
+autoscaling:
+  # Keep the one-node Kind harness bounded while still proving every HPA can
+  # obtain a CPU metric from the disposable metrics-server installation.
+  minReplicas: 1
+  maxReplicas: 1
+
 images:
   repositoryPrefix: fastapi-platform
   pullPolicy: Never

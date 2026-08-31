@@ -420,3 +420,34 @@ source for the workspace.
   [Tempo releases](https://github.com/grafana/tempo/releases).
 - Owner: platform engineering. Next review: before target-environment
   deployment, a backend major upgrade, or `2026-09-30`, whichever occurs first.
+
+## Phase 15 autoscaling selection evidence
+
+- Kubernetes `autoscaling/v2` is the stable HPA API selected for the existing
+  Kubernetes `v1.36.1` baseline. The platform uses only CPU utilization against
+  already explicit API CPU requests, avoiding an unselected custom or external
+  metric adapter. The bounded API policy is `2` to `4` replicas, `70%` target
+  CPU utilization, fast bounded scale-up, and a five-minute scale-down
+  stabilization window.
+- The official Metrics Server `v0.9.0` release was reviewed on `2026-08-31`.
+  Its official compatibility matrix covers the repository's Kubernetes `v1.36`
+  target and it exposes the required `metrics.k8s.io/v1beta1` resource API.
+  The conformance harness verifies the release manifest SHA-256
+  `1cec29a5267809306a2c6ec74a3e449abbb705b4a8beed0c8a1963910f72c79b` and
+  loads image index digest
+  `sha256:d9862115e7c7881280d3d75ca26bda8ffc0fc213315979575bf23ce9826205c0`
+  into the disposable Kind node. No production cluster add-on is selected or
+  installed by the repository.
+- Kind's self-signed kubelet certificate requires the documented
+  `--kubelet-insecure-tls` test-only exception. It is limited to the disposable
+  conformance manifest after checksum verification; a target environment must
+  provide a trusted metrics implementation and sufficient node capacity.
+- Queue workers, CronJobs, and Jobs remain outside CPU HPA because queue depth,
+  provider quotas, task idempotency, and safe concurrency need a separate
+  controller and metric design. `KEDA` is deliberately not selected.
+- Official sources reviewed: [Kubernetes HPA documentation](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/),
+  [Metrics Server repository](https://github.com/kubernetes-sigs/metrics-server),
+  [Metrics Server `v0.9.0` release](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.9.0),
+  and [Metrics Server compatibility matrix](https://github.com/kubernetes-sigs/metrics-server#readme).
+  Owner: platform engineering. Next review: before a target environment enables
+  autoscaling, a Kubernetes minor upgrade, or `2026-09-30`, whichever occurs first.

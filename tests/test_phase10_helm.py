@@ -87,7 +87,10 @@ def test_application_chart_retains_every_workload_and_controlled_migration() -> 
     for migration in DATABASE_MIGRATIONS:
         assert f"name: {migration}, image:" in values
 
-    assert "replicas: {{ $.Values.api.replicas }}" in api_workloads
+    assert (
+        "replicas: {{ ternary $.Values.autoscaling.minReplicas $.Values.api.replicas "
+        "$.Values.autoscaling.enabled }}" in api_workloads
+    )
     assert "readOnlyRootFilesystem: true" in helpers
     assert "platform.fastapi.io/workload: api" in api_workloads
     assert "helm.sh/hook: pre-install,pre-upgrade" in migrations

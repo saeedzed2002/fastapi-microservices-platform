@@ -143,6 +143,7 @@ def test_kind_cluster_and_ci_script_are_pinned_and_disposable() -> None:
     assert 'docker tag "${source_image}" "${local_image}"' in script
     assert (
         'for image in "${DEPENDENCY_LOCAL_IMAGES[@]}" '
+        '"${METRICS_SERVER_LOCAL_IMAGE}" '
         '"fastapi-platform/minio:conformance" '
         '"fastapi-platform/checkout-e2e:conformance"' in script
     )

@@ -41,6 +41,8 @@ The conformance harness applies, in order:
 5. the existing checkout E2E workflow from the restricted application
    namespace, proving inventory settlement, invoice creation, and email
    delivery through ClusterIP services.
+6. the checksum-verified disposable metrics-server release and every API HPA's
+   current CPU utilization sample.
 
 The test-only dependency namespace contains disposable PostgreSQL, Kafka,
 RabbitMQ, Redis, MinIO, and Mailpit resources. Its credentials are deliberate
@@ -64,9 +66,10 @@ failure CI exports Kubernetes diagnostics, then deletes the cluster.
 
 - The job builds and starts the full platform, so it runs on trusted main-line
   and manual workflows rather than on every untrusted pull request.
-- It increases CI duration and uses a single-node test topology; it does not
-  prove autoscaling, multi-zone scheduling, real TLS, public ingress, cloud
-  IAM, or managed-stateful-service behavior.
+- It increases CI duration and uses a single-node test topology; it proves HPA
+  admission and CPU metric availability but not synthetic scale-out,
+  multi-zone scheduling, real TLS, public ingress, cloud IAM, or
+  managed-stateful-service behavior.
 - Local conformance tags are intentionally mutable within one disposable job;
   using them in a release manifest would violate `ADR-027`.
 
@@ -92,7 +95,7 @@ It is deleted after every run.
 
 - Static policy tests ensure the harness uses only local conformance images,
   disables registry pulls, preserves the production digest-only contract, and
-  includes all owned migrations and API readiness checks.
+  includes all owned migrations, HPA targets, and API readiness checks.
 - CI creates the cluster, installs both Helm charts, waits for test
   dependencies, migration hooks, and Deployments, then runs the in-cluster
   health and checkout E2E Jobs.

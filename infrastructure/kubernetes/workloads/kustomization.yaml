@@ -5,4 +5,5 @@ resources:
   - api-workloads.yaml
   - background-workloads.yaml
   - availability.yaml
+  - autoscaling.yaml
   - ingress.yaml

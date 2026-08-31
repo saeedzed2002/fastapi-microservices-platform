@@ -10,6 +10,10 @@ readonly SKIP_IMAGE_BUILD="${CONFORMANCE_SKIP_IMAGE_BUILD:-false}"
 readonly CONTEXT="kind-${CLUSTER_NAME}"
 readonly APP_NAMESPACE="fastapi-platform"
 readonly DEPENDENCY_NAMESPACE="fastapi-platform-dependencies"
+readonly METRICS_SERVER_RELEASE_URL="https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.9.0/components.yaml"
+readonly METRICS_SERVER_MANIFEST_SHA256="1cec29a5267809306a2c6ec74a3e449abbb705b4a8beed0c8a1963910f72c79b"
+readonly METRICS_SERVER_SOURCE_IMAGE="registry.k8s.io/metrics-server/metrics-server@sha256:d9862115e7c7881280d3d75ca26bda8ffc0fc213315979575bf23ce9826205c0"
+readonly METRICS_SERVER_LOCAL_IMAGE="fastapi-platform/conformance-metrics-server:local"
 readonly SERVICE_IMAGES=(
   reference-service
   identity-service
@@ -69,6 +73,62 @@ readonly DEPENDENCY_LOCAL_IMAGES=(
 )
 
 cluster_created=false
+
+install_metrics_server() {
+  local manifest
+  manifest="$(mktemp)"
+
+  curl --fail --location --retry 3 --output "${manifest}" "${METRICS_SERVER_RELEASE_URL}"
+  echo "${METRICS_SERVER_MANIFEST_SHA256}  ${manifest}" | sha256sum --check
+
+  # Kind's test kubelet certificate is self-signed. This exception is local to
+  # the disposable conformance cluster and is never part of delivery charts.
+  sed --in-place \
+    "s|image: registry.k8s.io/metrics-server/metrics-server:v0.9.0|image: ${METRICS_SERVER_LOCAL_IMAGE}|" \
+    "${manifest}"
+  sed --in-place \
+    '/--kubelet-use-node-status-port/a\\        - --kubelet-insecure-tls' \
+    "${manifest}"
+  sed --in-place 's/imagePullPolicy: IfNotPresent/imagePullPolicy: Never/' "${manifest}"
+
+  kubectl --context "${CONTEXT}" apply --filename "${manifest}"
+  rm --force "${manifest}"
+  kubectl --context "${CONTEXT}" -n kube-system rollout status deployment/metrics-server --timeout=5m
+  kubectl --context "${CONTEXT}" wait \
+    --for=condition=Available apiservice/v1beta1.metrics.k8s.io \
+    --timeout=5m
+}
+
+wait_for_hpa_metrics() {
+  local hpa utilization attempt
+
+  for attempt in {1..24}; do
+    if ! kubectl --context "${CONTEXT}" get --raw \
+      "/apis/metrics.k8s.io/v1beta1/namespaces/${APP_NAMESPACE}/pods" >/dev/null; then
+      sleep 5
+      continue
+    fi
+
+    for hpa in "${API_DEPLOYMENTS[@]}"; do
+      utilization="$(kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" get "horizontalpodautoscaler/${hpa}" \
+        --output jsonpath='{.status.currentMetrics[0].resource.current.averageUtilization}')"
+      if [[ -z "${utilization}" ]]; then
+        break
+      fi
+    done
+
+    if [[ -n "${utilization}" ]]; then
+      kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" get horizontalpodautoscaler
+      return 0
+    fi
+    sleep 5
+  done
+
+  echo "HPA targets did not receive CPU utilization metrics." >&2
+  kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" get horizontalpodautoscaler -o wide || true
+  kubectl --context "${CONTEXT}" get apiservice/v1beta1.metrics.k8s.io -o yaml || true
+  return 1
+}
 
 dump_namespace_logs() {
   local namespace="$1"
@@ -152,6 +212,8 @@ for index in "${!DEPENDENCY_SOURCE_IMAGES[@]}"; do
   docker pull "${source_image}"
   docker tag "${source_image}" "${local_image}"
 done
+docker pull "${METRICS_SERVER_SOURCE_IMAGE}"
+docker tag "${METRICS_SERVER_SOURCE_IMAGE}" "${METRICS_SERVER_LOCAL_IMAGE}"
 
 kind create cluster \
   --name "${CLUSTER_NAME}" \
@@ -160,12 +222,14 @@ kind create cluster \
 cluster_created=true
 
 echo "Loading checked-out and locally tagged dependency images into the disposable Kind node."
-for image in "${DEPENDENCY_LOCAL_IMAGES[@]}" "fastapi-platform/minio:conformance" "fastapi-platform/checkout-e2e:conformance"; do
+for image in "${DEPENDENCY_LOCAL_IMAGES[@]}" "${METRICS_SERVER_LOCAL_IMAGE}" "fastapi-platform/minio:conformance" "fastapi-platform/checkout-e2e:conformance"; do
   kind load docker-image --name "${CLUSTER_NAME}" "${image}"
 done
 for service in "${SERVICE_IMAGES[@]}"; do
   kind load docker-image --name "${CLUSTER_NAME}" "fastapi-platform/${service}:conformance"
 done
+
+install_metrics_server
 
 helm --kube-context "${CONTEXT}" upgrade --install platform-foundation \
   infrastructure/helm/fastapi-platform-foundation \
@@ -197,6 +261,7 @@ kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" wait \
 for deployment in "${API_DEPLOYMENTS[@]}" "${WORKER_DEPLOYMENTS[@]}"; do
   kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" rollout status "deployment/${deployment}" --timeout=10m
 done
+wait_for_hpa_metrics
 
 kubectl --context "${CONTEXT}" apply -k infrastructure/kubernetes/conformance/smoke
 kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" wait --for=condition=complete job/platform-health-smoke --timeout=5m

@@ -11,9 +11,9 @@ test-only.
   resource policy, and default-deny ingress NetworkPolicy. Install it with
   `--create-namespace`.
 - `fastapi-platform/` owns migrations, APIs, workers, the cleanup CronJob,
-  PodDisruptionBudgets, and the optional public Ingress. Its migrations are
-  `pre-install` and `pre-upgrade` hooks, so Helm runs them before ordinary
-  workload resources.
+  PodDisruptionBudgets, bounded API HorizontalPodAutoscalers, and the optional
+  public Ingress. Its migrations are `pre-install` and `pre-upgrade` hooks, so
+  Helm runs them before ordinary workload resources.
 
 Neither chart creates `platform-runtime-secrets`, `ghcr-pull`, a certificate,
 an ingress controller, or a stateful dependency. Those are environment-owned

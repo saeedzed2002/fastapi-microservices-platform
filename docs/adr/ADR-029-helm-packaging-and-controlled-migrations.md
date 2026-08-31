@@ -78,7 +78,9 @@ main-line/manual conformance runs.
 - The conformance chart values intentionally permit local tags. They are not
   valid release values and must never be promoted to a target environment.
 - Helm does not select an ingress controller, certificate issuer, cloud
-  provider, secret manager, or autoscaling policy.
+  provider, secret manager, cluster metrics provider, or node-autoscaling
+  policy. The application chart's bounded API HPA policy is defined by
+  `ADR-033`.
 
 ## Alternatives considered
 

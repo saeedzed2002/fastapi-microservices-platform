@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/name: {{ $name }}
     {{- include "fastapi-platform.labels" $ | nindent 4 }}
 spec:
-  replicas: {{ $.Values.api.replicas }}
+  replicas: {{ ternary $.Values.autoscaling.minReplicas $.Values.api.replicas $.Values.autoscaling.enabled }}
   revisionHistoryLimit: {{ $.Values.api.revisionHistoryLimit }}
   minReadySeconds: {{ $.Values.api.minReadySeconds }}
   progressDeadlineSeconds: {{ $.Values.api.progressDeadlineSeconds }}

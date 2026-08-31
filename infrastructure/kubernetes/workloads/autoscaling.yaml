@@ -1,0 +1,168 @@
+# API autoscaling is intentionally CPU-based and bounded. Every target has an
+# explicit CPU request in api-workloads.yaml, which is required for utilization
+# metrics. Queue workers use a different scaling concern and are excluded.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: reference-service
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: reference-service, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: reference-service}
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      selectPolicy: Max
+      policies: [{type: Pods, value: 2, periodSeconds: 60}, {type: Percent, value: 100, periodSeconds: 60}]
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      selectPolicy: Max
+      policies: [{type: Percent, value: 25, periodSeconds: 60}]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: identity-service
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: identity-service, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: identity-service}
+  minReplicas: 2
+  maxReplicas: 4
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}]
+  behavior: {scaleUp: {stabilizationWindowSeconds: 0, selectPolicy: Max, policies: [{type: Pods, value: 2, periodSeconds: 60}, {type: Percent, value: 100, periodSeconds: 60}]}, scaleDown: {stabilizationWindowSeconds: 300, selectPolicy: Max, policies: [{type: Percent, value: 25, periodSeconds: 60}]}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: customer-service
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: customer-service, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: customer-service}
+  minReplicas: 2
+  maxReplicas: 4
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}]
+  behavior: {scaleUp: {stabilizationWindowSeconds: 0, selectPolicy: Max, policies: [{type: Pods, value: 2, periodSeconds: 60}, {type: Percent, value: 100, periodSeconds: 60}]}, scaleDown: {stabilizationWindowSeconds: 300, selectPolicy: Max, policies: [{type: Percent, value: 25, periodSeconds: 60}]}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: catalog-service
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: catalog-service, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: catalog-service}
+  minReplicas: 2
+  maxReplicas: 4
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}]
+  behavior: {scaleUp: {stabilizationWindowSeconds: 0, selectPolicy: Max, policies: [{type: Pods, value: 2, periodSeconds: 60}, {type: Percent, value: 100, periodSeconds: 60}]}, scaleDown: {stabilizationWindowSeconds: 300, selectPolicy: Max, policies: [{type: Percent, value: 25, periodSeconds: 60}]}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: search-service
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: search-service, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: search-service}
+  minReplicas: 2
+  maxReplicas: 4
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}]
+  behavior: {scaleUp: {stabilizationWindowSeconds: 0, selectPolicy: Max, policies: [{type: Pods, value: 2, periodSeconds: 60}, {type: Percent, value: 100, periodSeconds: 60}]}, scaleDown: {stabilizationWindowSeconds: 300, selectPolicy: Max, policies: [{type: Percent, value: 25, periodSeconds: 60}]}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: media-service
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: media-service, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: media-service}
+  minReplicas: 2
+  maxReplicas: 4
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}]
+  behavior: {scaleUp: {stabilizationWindowSeconds: 0, selectPolicy: Max, policies: [{type: Pods, value: 2, periodSeconds: 60}, {type: Percent, value: 100, periodSeconds: 60}]}, scaleDown: {stabilizationWindowSeconds: 300, selectPolicy: Max, policies: [{type: Percent, value: 25, periodSeconds: 60}]}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: inventory-service
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: inventory-service, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: inventory-service}
+  minReplicas: 2
+  maxReplicas: 4
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}]
+  behavior: {scaleUp: {stabilizationWindowSeconds: 0, selectPolicy: Max, policies: [{type: Pods, value: 2, periodSeconds: 60}, {type: Percent, value: 100, periodSeconds: 60}]}, scaleDown: {stabilizationWindowSeconds: 300, selectPolicy: Max, policies: [{type: Percent, value: 25, periodSeconds: 60}]}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cart-service
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: cart-service, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: cart-service}
+  minReplicas: 2
+  maxReplicas: 4
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}]
+  behavior: {scaleUp: {stabilizationWindowSeconds: 0, selectPolicy: Max, policies: [{type: Pods, value: 2, periodSeconds: 60}, {type: Percent, value: 100, periodSeconds: 60}]}, scaleDown: {stabilizationWindowSeconds: 300, selectPolicy: Max, policies: [{type: Percent, value: 25, periodSeconds: 60}]}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: order-service
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: order-service, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: order-service}
+  minReplicas: 2
+  maxReplicas: 4
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}]
+  behavior: {scaleUp: {stabilizationWindowSeconds: 0, selectPolicy: Max, policies: [{type: Pods, value: 2, periodSeconds: 60}, {type: Percent, value: 100, periodSeconds: 60}]}, scaleDown: {stabilizationWindowSeconds: 300, selectPolicy: Max, policies: [{type: Percent, value: 25, periodSeconds: 60}]}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payment-service
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: payment-service, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: payment-service}
+  minReplicas: 2
+  maxReplicas: 4
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}]
+  behavior: {scaleUp: {stabilizationWindowSeconds: 0, selectPolicy: Max, policies: [{type: Pods, value: 2, periodSeconds: 60}, {type: Percent, value: 100, periodSeconds: 60}]}, scaleDown: {stabilizationWindowSeconds: 300, selectPolicy: Max, policies: [{type: Percent, value: 25, periodSeconds: 60}]}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: notification-service
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: notification-service, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: notification-service}
+  minReplicas: 2
+  maxReplicas: 4
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}]
+  behavior: {scaleUp: {stabilizationWindowSeconds: 0, selectPolicy: Max, policies: [{type: Pods, value: 2, periodSeconds: 60}, {type: Percent, value: 100, periodSeconds: 60}]}, scaleDown: {stabilizationWindowSeconds: 300, selectPolicy: Max, policies: [{type: Percent, value: 25, periodSeconds: 60}]}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: chat-service
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: chat-service, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: chat-service}
+  minReplicas: 2
+  maxReplicas: 4
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}]
+  behavior: {scaleUp: {stabilizationWindowSeconds: 0, selectPolicy: Max, policies: [{type: Pods, value: 2, periodSeconds: 60}, {type: Percent, value: 100, periodSeconds: 60}]}, scaleDown: {stabilizationWindowSeconds: 300, selectPolicy: Max, policies: [{type: Percent, value: 25, periodSeconds: 60}]}}

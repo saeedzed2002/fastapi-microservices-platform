@@ -100,6 +100,27 @@ api:
   livenessProbe: {path: /health/live, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 3}
   readinessProbe: {path: /health/ready, periodSeconds: 5, timeoutSeconds: 3, failureThreshold: 3}
 
+autoscaling:
+  # CPU utilization is calculated against each container's explicit CPU
+  # request. Real environments may tighten this policy only after capacity and
+  # load evidence is reviewed.
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      selectPolicy: Max
+      policies:
+        - {type: Pods, value: 2, periodSeconds: 60}
+        - {type: Percent, value: 100, periodSeconds: 60}
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      selectPolicy: Max
+      policies:
+        - {type: Percent, value: 25, periodSeconds: 60}
+
 migrations:
   backoffLimit: 1
   activeDeadlineSeconds: 300
