@@ -38,6 +38,7 @@ from order_service.payment_gateway import (
     PaymentNotReady,
     PaymentProviderNotConfigured,
     PaymentProviderRejected,
+    start_online_checkout,
     start_zarinpal_checkout,
 )
 from order_service.schemas import (
@@ -263,6 +264,57 @@ async def checkout_cart_with_zarinpal(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: AsyncSession = Depends(get_session),
 ) -> CartCheckoutResponse:
+    return await _checkout_cart_with_payment_method(
+        payload=payload,
+        idempotency_key=idempotency_key,
+        claims=claims,
+        credentials=credentials,
+        db=db,
+        payment_method="zarinpal",
+    )
+
+
+@app.post(
+    "/api/v1/orders/cart/online",
+    response_model=CartCheckoutResponse,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "Authentication required or invalid"},
+        status.HTTP_403_FORBIDDEN: {"description": "Customer role required"},
+        status.HTTP_409_CONFLICT: {"description": "Cart, stock, or payment is unavailable"},
+        status.HTTP_502_BAD_GATEWAY: {
+            "description": "Every configured provider rejected the request"
+        },
+        status.HTTP_503_SERVICE_UNAVAILABLE: {
+            "description": "A dependency is unavailable or checkout is still preparing"
+        },
+    },
+)
+async def checkout_cart_with_online_payment(
+    payload: CartCheckoutRequest,
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=1, max_length=128),
+    claims: AuthClaims = Depends(require_customer),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+    db: AsyncSession = Depends(get_session),
+) -> CartCheckoutResponse:
+    return await _checkout_cart_with_payment_method(
+        payload=payload,
+        idempotency_key=idempotency_key,
+        claims=claims,
+        credentials=credentials,
+        db=db,
+        payment_method="online",
+    )
+
+
+async def _checkout_cart_with_payment_method(
+    *,
+    payload: CartCheckoutRequest,
+    idempotency_key: str,
+    claims: AuthClaims,
+    credentials: HTTPAuthorizationCredentials | None,
+    db: AsyncSession,
+    payment_method: str,
+) -> CartCheckoutResponse:
     if credentials is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="authentication required"
@@ -274,6 +326,8 @@ async def checkout_cart_with_zarinpal(
     )
     existing_order_id = existing_order.id if existing_order is not None else None
     await db.rollback()
+    if existing_order is not None and existing_order.payment_method != payment_method:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="idempotency key conflict")
     if existing_order is None:
         try:
             cart_snapshot = await fetch_cart_checkout_snapshot(
@@ -296,7 +350,9 @@ async def checkout_cart_with_zarinpal(
             address_id=payload.address_id,
             item_quantities=cart_snapshot.item_quantities,
         )
-        validate_checkout_payment(payment_method="zarinpal", currency=currency, total_amount=total)
+        validate_checkout_payment(
+            payment_method=payment_method, currency=currency, total_amount=total
+        )
         created_order = await create_order(
             db,
             customer_id=claims.subject,
@@ -306,7 +362,7 @@ async def checkout_cart_with_zarinpal(
             snapshots=snapshots,
             currency=currency,
             total_amount=total,
-            payment_method="zarinpal",
+            payment_method=payment_method,
         )
         order_id = created_order.id
     else:
@@ -329,12 +385,20 @@ async def checkout_cart_with_zarinpal(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="checkout was cancelled")
 
     try:
-        payment = await start_zarinpal_checkout(
-            base_url=settings.payment_base_url,
-            timeout_seconds=settings.checkout_request_timeout_seconds,
-            order_id=order_id,
-            access_token=credentials.credentials,
-        )
+        if payment_method == "online":
+            payment = await start_online_checkout(
+                base_url=settings.payment_base_url,
+                timeout_seconds=settings.checkout_request_timeout_seconds,
+                order_id=order_id,
+                access_token=credentials.credentials,
+            )
+        else:
+            payment = await start_zarinpal_checkout(
+                base_url=settings.payment_base_url,
+                timeout_seconds=settings.checkout_request_timeout_seconds,
+                order_id=order_id,
+                access_token=credentials.credentials,
+            )
     except PaymentNotReady as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="payment not ready"

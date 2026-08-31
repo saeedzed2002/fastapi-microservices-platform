@@ -4,7 +4,7 @@
 - Date: 2026-08-29
 - Owners: platform engineering
 - Supersedes: none
-- Superseded by: none
+- Superseded by: ADR-034 for the additive routed online checkout path only
 
 ## Context
 

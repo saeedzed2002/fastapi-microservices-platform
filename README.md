@@ -4,15 +4,17 @@ FastAPI Microservices Platform is a backend-only, production-oriented e-commerce
 
 ## Project status
 
-The repository has completed **Phase 11 — Observability**. The local
+The repository has completed **Phase 16 — online payment provider routing**.
+The local
 `observability` profile collects bounded platform metrics, JSON logs, and
-traces through Prometheus, Loki, Tempo, and Grafana. **Phase 12 — Resilience**
-adds bounded Compose recovery evidence for Kafka, RabbitMQ, and Redis outages.
-Raw `Kustomize` resources remain the reviewable workload baseline, while two
-Helm charts package the controlled foundation and application-release sequence.
-The `main`-branch/manual CI workflow installs those charts in a disposable
-`Kind` cluster, waits for controlled migrations and workloads, then proves
-in-cluster API readiness and the checkout-to-invoice-to-email workflow.
+traces through Prometheus, Loki, Tempo, and Grafana. Resilience, staff account
+recovery/device sessions, moderated catalog reviews, and bounded Kubernetes
+autoscaling have durable contracts, tests, and runbooks. Raw `Kustomize`
+resources remain the reviewable workload baseline, while two Helm charts
+package the controlled foundation and application-release sequence. The
+`main`-branch/manual CI workflow installs those charts in a disposable `Kind`
+cluster, waits for controlled migrations and workloads, then proves in-cluster
+API readiness and the checkout-to-invoice-to-email workflow.
 A real target environment still must provide pinned release images, secrets,
 ingress/TLS, external durable services, and environment-specific egress policy
 before public deployment.
@@ -104,6 +106,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Edge gateway runbook](docs/runbooks/edge-gateway.md)
 - [Kubernetes deployment runbook](docs/runbooks/kubernetes-deployment.md)
 - [Helm delivery charts](infrastructure/helm/README.md)
+- [Online payment provider routing runbook](docs/runbooks/online-payment-provider-routing.md)
 - [Phase 0 plan](docs/development/phase-0-plan.md)
 - [Phase 1 plan](docs/development/phase-1-plan.md)
 - [Phase 2 plan](docs/development/phase-2-plan.md)
@@ -116,6 +119,10 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Phase 10 plan](docs/development/phase-10-plan.md)
 - [Phase 11 plan](docs/development/phase-11-plan.md)
 - [Phase 12 plan](docs/development/phase-12-plan.md)
+- [Phase 13 plan](docs/development/phase-13-plan.md)
+- [Phase 14 plan](docs/development/phase-14-plan.md)
+- [Phase 15 plan](docs/development/phase-15-plan.md)
+- [Phase 16 plan](docs/development/phase-16-plan.md)
 
 ## Roadmap
 
@@ -134,6 +141,10 @@ The complete intended layout is documented in [repository structure](docs/archit
 | 10 | Helm |
 | 11 | Complete Observability |
 | 12 | Hardening |
+| 13 | Staff password reset & device sessions |
+| 14 | Catalog reviews, replies & moderation |
+| 15 | Kubernetes API autoscaling |
+| 16 | Online payment provider routing |
 
 ## Local development
 

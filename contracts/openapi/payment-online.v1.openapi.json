@@ -1,0 +1,71 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Payment Online Provider Routing API",
+    "version": "v1",
+    "description": "Customer payment start with Payment-owned provider routing. Zarinpal is preferred; Zibal is used only after a definitive Zarinpal rejection. Browser returns are verified against a persisted provider token before a payment success fact is emitted."
+  },
+  "paths": {
+    "/api/v1/payments/orders/{order_id}/online": {
+      "post": {
+        "summary": "Create or resume an online payment redirect using the configured safe routing policy",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/OrderId"}],
+        "responses": {
+          "200": {"description": "Provider redirect is ready", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OnlinePaymentStart"}}}},
+          "401": {"description": "Authentication required or invalid"},
+          "403": {"description": "Customer role required"},
+          "409": {"description": "Order is not payable, payment is in progress, expired, or uses an unsupported currency"},
+          "502": {"description": "Every configured provider rejected the request"},
+          "503": {"description": "Order lookup, provider configuration, or a provider is unavailable"}
+        }
+      }
+    },
+    "/api/v1/payments/zibal/callback": {
+      "get": {
+        "summary": "Verify a Zibal browser return against a persisted track ID",
+        "parameters": [
+          {"name": "trackId", "in": "query", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 64}}
+        ],
+        "responses": {
+          "200": {"description": "Verified or safely recorded browser-return outcome", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CallbackResult"}}}},
+          "404": {"description": "Track ID was not issued by this Payment service"},
+          "409": {"description": "Payment cannot be verified in its current state"},
+          "502": {"description": "Provider rejected verification"},
+          "503": {"description": "Provider verification is unavailable"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+    },
+    "parameters": {
+      "OrderId": {"name": "order_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
+    },
+    "schemas": {
+      "OnlinePaymentStart": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["order_id", "provider", "redirect_url", "expires_at"],
+        "properties": {
+          "order_id": {"type": "string", "format": "uuid"},
+          "provider": {"enum": ["zarinpal", "zibal"]},
+          "redirect_url": {"type": "string", "format": "uri"},
+          "expires_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "CallbackResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["order_id", "payment_status", "provider_reference"],
+        "properties": {
+          "order_id": {"type": "string", "format": "uuid"},
+          "payment_status": {"enum": ["succeeded", "failed", "expired"]},
+          "provider_reference": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}

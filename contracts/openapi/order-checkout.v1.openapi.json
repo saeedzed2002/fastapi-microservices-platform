@@ -44,6 +44,27 @@
           "422": {"description": "Invalid address identifier"}
         }
       }
+    },
+    "/api/v1/orders/cart/online": {
+      "post": {
+        "summary": "Checkout the caller's cart and return the safe online-provider redirect",
+        "description": "The API reads the durable cart, writes the Order outbox, waits only a configured bounded time for the internal reservation/payment-ready Saga state, then invokes Payment's provider-routing API. A fallback is attempted only after a definitive primary-provider rejection; retry a 503 with the same Idempotency-Key.",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/IdempotencyKey"}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CartCheckoutRequest"}}}
+        },
+        "responses": {
+          "200": {"description": "Provider redirect is ready", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CartCheckoutResponse"}}}},
+          "401": {"description": "Authentication required or invalid"},
+          "403": {"description": "Customer role required"},
+          "409": {"description": "The cart is empty, stock reservation failed, or payment is not ready"},
+          "502": {"description": "Every configured payment provider rejected the request"},
+          "503": {"description": "A dependency is unavailable or the bounded Saga wait elapsed; retry with the same idempotency key"},
+          "422": {"description": "Invalid address identifier"}
+        }
+      }
     }
   },
   "components": {
@@ -67,7 +88,7 @@
         "properties": {
           "address_id": {"type": "string", "format": "uuid"},
           "items": {"type": "array", "minItems": 1, "maxItems": 100, "items": {"$ref": "#/components/schemas/CheckoutItem"}},
-          "payment_method": {"enum": ["test_success", "test_failure", "zarinpal"]}
+          "payment_method": {"enum": ["test_success", "test_failure", "zarinpal", "online"]}
         }
       },
       "CartCheckoutRequest": {

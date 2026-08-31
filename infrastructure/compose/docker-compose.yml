@@ -322,7 +322,7 @@ services:
     build:
       context: ../..
       dockerfile: services/order-service/Dockerfile
-    image: fastapi-microservices-platform-order-service:0.8.0-local
+    image: fastapi-microservices-platform-order-service:0.9.0-local
     environment:
       <<: *observability-environment
       ORDER_ENVIRONMENT: local
@@ -364,7 +364,7 @@ services:
     build:
       context: ../..
       dockerfile: services/payment-service/Dockerfile
-    image: fastapi-microservices-platform-payment-service:0.6.0-local
+    image: fastapi-microservices-platform-payment-service:0.7.0-local
     environment:
       <<: *observability-environment
       PAYMENT_ENVIRONMENT: local
@@ -378,6 +378,9 @@ services:
       PAYMENT_ZARINPAL_SANDBOX: ${ZARINPAL_SANDBOX:-true}
       PAYMENT_ZARINPAL_CALLBACK_URL: ${ZARINPAL_CALLBACK_URL:-https://localhost/api/v1/payments/zarinpal/callback}
       PAYMENT_ZARINPAL_REQUEST_TIMEOUT_SECONDS: ${ZARINPAL_REQUEST_TIMEOUT_SECONDS:-10}
+      PAYMENT_ZIBAL_MERCHANT_ID: ${ZIBAL_MERCHANT_ID:-}
+      PAYMENT_ZIBAL_CALLBACK_URL: ${ZIBAL_CALLBACK_URL:-https://localhost/api/v1/payments/zibal/callback}
+      PAYMENT_ZIBAL_REQUEST_TIMEOUT_SECONDS: ${ZIBAL_REQUEST_TIMEOUT_SECONDS:-10}
       PAYMENT_RESERVATION_MINUTES: ${PAYMENT_RESERVATION_MINUTES:-15}
       PAYMENT_EXPIRY_WORKER_ENABLED: "true"
     depends_on:
@@ -498,7 +501,7 @@ services:
       retries: 12
 
   order-invoice-worker:
-    image: fastapi-microservices-platform-order-service:0.8.0-local
+    image: fastapi-microservices-platform-order-service:0.9.0-local
     pull_policy: never
     command: ["celery", "-A", "order_service.workers.celery_app:celery_app", "worker", "--loglevel=INFO", "--without-mingle", "--without-gossip", "-Q", "order.invoice"]
     environment:

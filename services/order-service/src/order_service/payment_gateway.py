@@ -57,10 +57,39 @@ def _payment_error_detail(response: httpx.Response) -> str | None:
 async def start_zarinpal_checkout(
     *, base_url: str, timeout_seconds: float, order_id: UUID, access_token: str
 ) -> PaymentRedirect:
+    return await _start_payment_checkout(
+        base_url=base_url,
+        timeout_seconds=timeout_seconds,
+        order_id=order_id,
+        access_token=access_token,
+        method="zarinpal",
+    )
+
+
+async def start_online_checkout(
+    *, base_url: str, timeout_seconds: float, order_id: UUID, access_token: str
+) -> PaymentRedirect:
+    return await _start_payment_checkout(
+        base_url=base_url,
+        timeout_seconds=timeout_seconds,
+        order_id=order_id,
+        access_token=access_token,
+        method="online",
+    )
+
+
+async def _start_payment_checkout(
+    *,
+    base_url: str,
+    timeout_seconds: float,
+    order_id: UUID,
+    access_token: str,
+    method: str,
+) -> PaymentRedirect:
     try:
         async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             response = await client.post(
-                f"{base_url.rstrip('/')}/api/v1/payments/orders/{order_id}/zarinpal",
+                f"{base_url.rstrip('/')}/api/v1/payments/orders/{order_id}/{method}",
                 headers={"Authorization": f"Bearer {access_token}"},
             )
     except httpx.RequestError as exc:

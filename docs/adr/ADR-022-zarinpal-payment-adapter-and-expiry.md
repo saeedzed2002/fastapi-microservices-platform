@@ -4,7 +4,7 @@
 - Date: 2026-08-29
 - Owners: platform engineering
 - Supersedes: none
-- Superseded by: ADR-024 for the refund policy only
+- Superseded by: ADR-024 for the refund policy only; ADR-034 for routed online-provider selection only
 
 ## Context
 

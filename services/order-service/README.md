@@ -17,6 +17,12 @@ starts the Payment-owned Zarinpal adapter, and returns `redirect_url`. The
 frontend immediately navigates to that URL. A transient `503` must be retried
 with the same `Idempotency-Key`, not a new one.
 
+`POST /api/v1/orders/cart/online` follows the same Cart and Saga boundary but
+asks Payment to choose a provider. Payment prefers Zarinpal and may use Zibal
+only after a definitive rejection; Order never selects a provider or stores a
+provider token. The same idempotency key must never be reused across the
+explicit `zarinpal` and routed `online` methods.
+
 Kafka state transitions are `PENDING` -> `INVENTORY_RESERVED` ->
 `PAYMENT_PENDING` -> `CONFIRMED`. Insufficient inventory or a terminal payment
 failure ends the order in `CANCELLED`. A Zarinpal refund request transitions
@@ -34,6 +40,7 @@ own email delivery.
 
 - `POST /api/v1/orders` with `Idempotency-Key`
 - `POST /api/v1/orders/cart/zarinpal` with `Idempotency-Key`
+- `POST /api/v1/orders/cart/online` with `Idempotency-Key`
 - `GET /api/v1/orders`
 - `GET /api/v1/orders/{order_id}`
 - `GET /api/v1/orders/admin`

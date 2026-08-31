@@ -70,6 +70,13 @@ def test_cart_checkout_route_is_present_in_order_openapi() -> None:
     assert "Idempotency-Key" in str(route["parameters"])
 
 
+def test_online_cart_checkout_route_is_present_in_order_openapi() -> None:
+    route = app.openapi()["paths"]["/api/v1/orders/cart/online"]["post"]
+
+    assert route["responses"]["200"]["description"] == "Successful Response"
+    assert "Idempotency-Key" in str(route["parameters"])
+
+
 def test_payment_ready_wait_reads_durable_state_without_sleeping() -> None:
     class Session:
         async def __aenter__(self) -> Session:

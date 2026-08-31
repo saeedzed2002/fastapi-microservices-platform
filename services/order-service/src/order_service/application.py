@@ -66,17 +66,17 @@ def tracking_code() -> str:
 
 
 def validate_checkout_payment(*, payment_method: str, currency: str, total_amount: Decimal) -> None:
-    if payment_method != "zarinpal":
+    if payment_method not in {"zarinpal", "online"}:
         return
     if currency.upper() != "IRT":
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="zarinpal requires IRT currency",
+            detail=f"{payment_method} requires IRT currency",
         )
     if total_amount <= 0 or total_amount != total_amount.to_integral_value():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="zarinpal amount must be a positive whole IRT value",
+            detail=f"{payment_method} amount must be a positive whole IRT value",
         )
 
 
@@ -256,7 +256,7 @@ async def request_order_refund(
     if key_owner is not None:
         await db.commit()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="idempotency key conflict")
-    if order.status != "CONFIRMED" or order.payment_method != "zarinpal":
+    if order.status != "CONFIRMED" or order.payment_method not in {"zarinpal", "online"}:
         await db.commit()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="order is not refundable")
     refund_request = OrderRefundRequest(

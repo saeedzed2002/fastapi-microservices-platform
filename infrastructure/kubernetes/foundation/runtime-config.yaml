@@ -69,6 +69,7 @@ data:
   PAYMENT_EXPIRY_WORKER_ENABLED: "false"
   PAYMENT_ZARINPAL_SANDBOX: "false"
   PAYMENT_ZARINPAL_CALLBACK_URL: https://replace-with-public-origin.example/api/v1/payments/zarinpal/callback
+  PAYMENT_ZIBAL_CALLBACK_URL: https://replace-with-public-origin.example/api/v1/payments/zibal/callback
   NOTIFICATION_KAFKA_CONSUMER_ENABLED: "true"
   NOTIFICATION_TASK_DISPATCHER_ENABLED: "true"
   NOTIFICATION_IDENTITY_OTP_BASE_URL: http://identity-service.fastapi-platform.svc.cluster.local

@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import httpx
 
-from payment_service.application import reverse_zarinpal_payment
+from payment_service.application import _has_successful_zarinpal_attempt, reverse_zarinpal_payment
 from payment_service.models import OutboxMessage, PaymentReversal
 from payment_service.zarinpal import ZarinpalClient
 
@@ -92,5 +92,15 @@ def test_reverse_persists_the_request_before_calling_zarinpal() -> None:
         assert len(events) == 1
         assert events[0].event_type == "payment.refunded.v1"
         assert events[0].payload["refund_request_id"] == str(refund_request_id)
+
+    asyncio.run(exercise())
+
+
+def test_zibal_success_is_not_sent_to_zarinpal_reversal() -> None:
+    async def exercise() -> None:
+        intent = SimpleNamespace(id=uuid4(), order_id=uuid4(), method="online", status="SUCCEEDED")
+        db = SimpleNamespace(scalar=AsyncMock(side_effect=[intent, None]))
+
+        assert not await _has_successful_zarinpal_attempt(db, order_id=intent.order_id)
 
     asyncio.run(exercise())

@@ -1312,7 +1312,7 @@ wheels = [
 
 [[package]]
 name = "order-service"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "services/order-service" }
 dependencies = [
     { name = "aiokafka" },
@@ -1380,7 +1380,7 @@ wheels = [
 
 [[package]]
 name = "payment-service"
-version = "0.6.0"
+version = "0.7.0"
 source = { editable = "services/payment-service" }
 dependencies = [
     { name = "aiokafka" },

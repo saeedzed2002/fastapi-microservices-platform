@@ -16,9 +16,16 @@ from payment_service.models import (
 )
 from payment_service.zarinpal import (
     ZarinpalClient,
+    ZarinpalNotConfigured,
     ZarinpalRejected,
     ZarinpalReverseResult,
     ZarinpalVerificationResult,
+)
+from payment_service.zibal import (
+    ZibalClient,
+    ZibalNotConfigured,
+    ZibalRejected,
+    ZibalVerificationResult,
 )
 
 
@@ -70,6 +77,21 @@ class ZarinpalCallback:
 
 
 @dataclass(frozen=True)
+class OnlinePaymentStart:
+    order_id: UUID
+    provider: str
+    redirect_url: str
+    expires_at: datetime
+
+
+@dataclass(frozen=True)
+class ZibalCallback:
+    order_id: UUID
+    payment_status: str
+    provider_reference: str | None
+
+
+@dataclass(frozen=True)
 class ZarinpalReverse:
     order_id: UUID
     payment_status: str
@@ -77,7 +99,7 @@ class ZarinpalReverse:
     reversal_id: UUID
 
 
-_PENDING_ZARINPAL_STATUSES = ("AWAITING_CUSTOMER", "REQUESTING", "PENDING_CUSTOMER", "VERIFYING")
+_PENDING_PROVIDER_STATUSES = ("AWAITING_CUSTOMER", "REQUESTING", "PENDING_CUSTOMER", "VERIFYING")
 
 
 def utc_now() -> datetime:
@@ -160,16 +182,20 @@ async def process_reservation_event(
         return False
 
     method = str(payload["payment_method"])
-    is_zarinpal = method == "zarinpal"
-    provider_reference = f"zarinpal-pending-{uuid4().hex}" if is_zarinpal else f"fake-{uuid4().hex}"
+    is_provider_payment = method in {"zarinpal", "online"}
+    provider_reference = (
+        f"{method}-pending-{uuid4().hex}" if is_provider_payment else f"fake-{uuid4().hex}"
+    )
     intent = PaymentIntent(
         order_id=order_id,
-        status="AWAITING_CUSTOMER" if is_zarinpal else "PROCESSING",
+        status="AWAITING_CUSTOMER" if is_provider_payment else "PROCESSING",
         currency=str(payload["currency"]),
         amount=Decimal(str(payload["total_amount"])),
         method=method,
         provider_reference=provider_reference,
-        expires_at=utc_now() + timedelta(minutes=reservation_minutes) if is_zarinpal else None,
+        expires_at=utc_now() + timedelta(minutes=reservation_minutes)
+        if is_provider_payment
+        else None,
     )
     db.add(intent)
     await db.flush()
@@ -181,7 +207,7 @@ async def process_reservation_event(
         causation_id=event_id,
         trace_id=str(envelope["trace_id"]),
     )
-    if is_zarinpal:
+    if is_provider_payment:
         await db.commit()
         return True
 
@@ -324,6 +350,319 @@ async def _prepare_zarinpal_request(
     return intent, None
 
 
+class PaymentProvidersNotConfigured(PaymentWorkflowError):
+    pass
+
+
+async def start_online_payment(
+    db: AsyncSession,
+    *,
+    order_id: UUID,
+    zarinpal: ZarinpalClient,
+    zibal: ZibalClient,
+    expected_currency: str,
+) -> OnlinePaymentStart:
+    """Start the platform-owned online payment route.
+
+    Zarinpal is preferred when it is configured. A fallback attempt is made
+    only after Zarinpal returns a definitive rejection. A transport failure
+    leaves the initial attempt ``REQUESTING`` because its external outcome is
+    unknown; sending the same request to Zibal then could double charge.
+    """
+    preferred_provider = _configured_online_provider(zarinpal=zarinpal, zibal=zibal)
+    intent, existing_attempt = await _prepare_online_request(
+        db,
+        order_id=order_id,
+        expected_currency=expected_currency,
+        preferred_provider=preferred_provider,
+    )
+    if existing_attempt is not None:
+        if intent.expires_at is None or existing_attempt.authority is None:
+            raise PaymentNotReady
+        return _online_start_from_attempt(
+            intent=intent,
+            attempt=existing_attempt,
+            zarinpal=zarinpal,
+            zibal=zibal,
+        )
+    if preferred_provider == "zarinpal":
+        return await _start_online_with_zarinpal(
+            db,
+            intent=intent,
+            zarinpal=zarinpal,
+            zibal=zibal,
+            expected_currency=expected_currency,
+        )
+    if preferred_provider == "zibal":
+        return await _start_online_with_zibal(db, intent=intent, zibal=zibal)
+    raise PaymentProvidersNotConfigured
+
+
+def _configured_online_provider(*, zarinpal: ZarinpalClient, zibal: ZibalClient) -> str | None:
+    try:
+        zarinpal.ensure_configured()
+    except ZarinpalNotConfigured:
+        pass
+    else:
+        return "zarinpal"
+    try:
+        zibal.ensure_configured()
+    except ZibalNotConfigured:
+        return None
+    return "zibal"
+
+
+async def _prepare_online_request(
+    db: AsyncSession,
+    *,
+    order_id: UUID,
+    expected_currency: str,
+    preferred_provider: str | None,
+) -> tuple[PaymentIntent, PaymentAttempt | None]:
+    intent = cast(
+        PaymentIntent | None,
+        await db.scalar(
+            select(PaymentIntent).where(PaymentIntent.order_id == order_id).with_for_update()
+        ),
+    )
+    if intent is None:
+        raise PaymentIntentNotFound
+    if intent.method != "online":
+        raise PaymentNotReady
+    if intent.currency.upper() != expected_currency.upper():
+        raise UnsupportedPaymentCurrency
+    if intent.amount <= 0 or intent.amount != intent.amount.to_integral_value():
+        raise UnsupportedPaymentCurrency
+    if intent.expires_at is None:
+        raise PaymentNotReady
+    if intent.expires_at <= utc_now():
+        await _expire_intent(db, intent)
+        await db.commit()
+        raise PaymentExpired
+    if intent.status == "PENDING_CUSTOMER":
+        attempt = await db.scalar(
+            select(PaymentAttempt)
+            .where(
+                PaymentAttempt.intent_id == intent.id,
+                PaymentAttempt.status == "PENDING_CUSTOMER",
+            )
+            .order_by(PaymentAttempt.created_at.desc())
+            .limit(1)
+        )
+        if attempt is None or attempt.authority is None:
+            raise PaymentNotReady
+        await db.commit()
+        return intent, attempt
+    if intent.status in {"AWAITING_CUSTOMER", "REQUESTING"}:
+        attempt = await _recover_online_requesting_attempt(db, intent)
+        if attempt is not None:
+            return intent, attempt
+    if intent.status in {"REQUESTING", "VERIFYING"}:
+        await db.commit()
+        raise PaymentRequestInProgress
+    if intent.status == "EXPIRED":
+        await db.commit()
+        raise PaymentExpired
+    if intent.status != "AWAITING_CUSTOMER":
+        await db.commit()
+        raise PaymentNotReady
+    if preferred_provider is None:
+        await db.commit()
+        raise PaymentProvidersNotConfigured
+    intent.status = "REQUESTING"
+    db.add(
+        PaymentAttempt(
+            intent_id=intent.id,
+            provider=preferred_provider,
+            status="REQUESTING",
+            provider_reference=f"{preferred_provider}-request-{uuid4().hex}",
+            authority=None,
+            reference_id=None,
+            failure_code=None,
+        )
+    )
+    await db.commit()
+    return intent, None
+
+
+async def _recover_online_requesting_attempt(
+    db: AsyncSession, intent: PaymentIntent
+) -> PaymentAttempt | None:
+    attempt = await db.scalar(
+        select(PaymentAttempt)
+        .where(PaymentAttempt.intent_id == intent.id, PaymentAttempt.status == "REQUESTING")
+        .order_by(PaymentAttempt.created_at.desc())
+        .with_for_update()
+        .limit(1)
+    )
+    if attempt is None:
+        return None
+    if attempt.authority is None:
+        intent.status = "REQUESTING"
+        await db.commit()
+        return None
+    attempt.status = "PENDING_CUSTOMER"
+    intent.status = "PENDING_CUSTOMER"
+    intent.provider_reference = f"{attempt.provider}:{attempt.authority}"
+    await db.commit()
+    return attempt
+
+
+async def _start_online_with_zarinpal(
+    db: AsyncSession,
+    *,
+    intent: PaymentIntent,
+    zarinpal: ZarinpalClient,
+    zibal: ZibalClient,
+    expected_currency: str,
+) -> OnlinePaymentStart:
+    attempt = await _load_requesting_attempt(db, intent.id, provider="zarinpal")
+    try:
+        request = await zarinpal.create_payment(
+            amount=int(intent.amount), description=f"Order {intent.order_id}"
+        )
+    except ZarinpalRejected as exc:
+        await _record_online_rejection(db, intent.id, attempt.id, "zarinpal", exc.code)
+        try:
+            zibal.ensure_configured()
+        except ZibalNotConfigured as configuration_error:
+            raise exc from configuration_error
+        fallback_intent, existing_attempt = await _prepare_online_request(
+            db,
+            order_id=intent.order_id,
+            expected_currency=expected_currency,
+            preferred_provider="zibal",
+        )
+        if existing_attempt is not None:
+            return _online_start_from_attempt(
+                intent=fallback_intent,
+                attempt=existing_attempt,
+                zarinpal=zarinpal,
+                zibal=zibal,
+            )
+        return await _start_online_with_zibal(db, intent=fallback_intent, zibal=zibal)
+    return await _record_online_authority(
+        db,
+        intent_id=intent.id,
+        attempt_id=attempt.id,
+        provider="zarinpal",
+        authority=request.authority,
+        redirect_url=request.redirect_url,
+    )
+
+
+async def _start_online_with_zibal(
+    db: AsyncSession, *, intent: PaymentIntent, zibal: ZibalClient
+) -> OnlinePaymentStart:
+    attempt = await _load_requesting_attempt(db, intent.id, provider="zibal")
+    try:
+        request = await zibal.create_payment(
+            amount=int(intent.amount), description=f"Order {intent.order_id}"
+        )
+    except ZibalRejected as exc:
+        await _record_online_rejection(db, intent.id, attempt.id, "zibal", exc.code)
+        raise
+    return await _record_online_authority(
+        db,
+        intent_id=intent.id,
+        attempt_id=attempt.id,
+        provider="zibal",
+        authority=request.track_id,
+        redirect_url=request.redirect_url,
+    )
+
+
+async def _load_requesting_attempt(
+    db: AsyncSession, intent_id: UUID, *, provider: str
+) -> PaymentAttempt:
+    attempt = await db.scalar(
+        select(PaymentAttempt)
+        .where(
+            PaymentAttempt.intent_id == intent_id,
+            PaymentAttempt.provider == provider,
+            PaymentAttempt.status == "REQUESTING",
+        )
+        .order_by(PaymentAttempt.created_at.desc())
+        .limit(1)
+    )
+    if attempt is None:
+        raise PaymentNotReady
+    return attempt
+
+
+async def _record_online_rejection(
+    db: AsyncSession, intent_id: UUID, attempt_id: UUID, provider: str, code: str
+) -> None:
+    intent = await _load_intent_for_update(db, intent_id)
+    attempt = await _load_attempt_for_update(db, attempt_id)
+    if (
+        intent is not None
+        and attempt is not None
+        and intent.status == "REQUESTING"
+        and attempt.provider == provider
+    ):
+        attempt.status = "REJECTED"
+        attempt.failure_code = code
+        intent.status = "AWAITING_CUSTOMER"
+    await db.commit()
+
+
+async def _record_online_authority(
+    db: AsyncSession,
+    *,
+    intent_id: UUID,
+    attempt_id: UUID,
+    provider: str,
+    authority: str,
+    redirect_url: str,
+) -> OnlinePaymentStart:
+    intent = await _load_intent_for_update(db, intent_id)
+    attempt = await _load_attempt_for_update(db, attempt_id)
+    if intent is None or attempt is None or attempt.provider != provider:
+        raise PaymentNotReady
+    attempt.authority = authority
+    intent.provider_reference = f"{provider}:{authority}"
+    if intent.status == "EXPIRED":
+        attempt.status = "EXPIRED"
+        await db.commit()
+        raise PaymentExpired
+    if intent.status != "REQUESTING" or intent.expires_at is None:
+        await db.commit()
+        raise PaymentNotReady
+    attempt.status = "PENDING_CUSTOMER"
+    intent.status = "PENDING_CUSTOMER"
+    await db.commit()
+    return OnlinePaymentStart(
+        order_id=intent.order_id,
+        provider=provider,
+        redirect_url=redirect_url,
+        expires_at=intent.expires_at,
+    )
+
+
+def _online_start_from_attempt(
+    *,
+    intent: PaymentIntent,
+    attempt: PaymentAttempt,
+    zarinpal: ZarinpalClient,
+    zibal: ZibalClient,
+) -> OnlinePaymentStart:
+    if attempt.authority is None or intent.expires_at is None:
+        raise PaymentNotReady
+    if attempt.provider == "zarinpal":
+        redirect_url = zarinpal.redirect_url(attempt.authority)
+    elif attempt.provider == "zibal":
+        redirect_url = zibal.redirect_url(attempt.authority)
+    else:
+        raise PaymentNotReady
+    return OnlinePaymentStart(
+        order_id=intent.order_id,
+        provider=attempt.provider,
+        redirect_url=redirect_url,
+        expires_at=intent.expires_at,
+    )
+
+
 async def _recover_requesting_authority(db: AsyncSession, intent: PaymentIntent) -> str | None:
     """Return a durable provider authority left before a local state transition.
 
@@ -417,6 +756,83 @@ async def handle_zarinpal_callback(
         return ZarinpalCallback(intent.order_id, "succeeded", intent.provider_reference)
     verification = await provider.verify_payment(amount=int(intent.amount), authority=authority)
     return await _record_zarinpal_verification(db, attempt.id, verification)
+
+
+async def handle_zibal_callback(
+    db: AsyncSession,
+    *,
+    provider: ZibalClient,
+    track_id: str,
+) -> ZibalCallback:
+    attempt = await db.scalar(
+        select(PaymentAttempt).where(
+            PaymentAttempt.provider == "zibal", PaymentAttempt.authority == track_id
+        )
+    )
+    if attempt is None:
+        raise PaymentIntentNotFound
+    intent, already_succeeded = await _prepare_zarinpal_verification(db, attempt.id)
+    if already_succeeded:
+        return ZibalCallback(intent.order_id, "succeeded", intent.provider_reference)
+    verification = await provider.verify_payment(amount=int(intent.amount), track_id=track_id)
+    return await _record_zibal_verification(db, attempt.id, verification)
+
+
+async def _record_zibal_verification(
+    db: AsyncSession,
+    attempt_id: UUID,
+    verification: ZibalVerificationResult,
+) -> ZibalCallback:
+    attempt = await _load_attempt_for_update(db, attempt_id)
+    if attempt is None:
+        raise PaymentIntentNotFound
+    intent = await _load_intent_for_update(db, attempt.intent_id)
+    if intent is None:
+        raise PaymentIntentNotFound
+    if attempt.provider != "zibal":
+        await db.commit()
+        raise PaymentNotReady
+    if intent.status == "SUCCEEDED":
+        await db.commit()
+        return ZibalCallback(intent.order_id, "succeeded", intent.provider_reference)
+    if verification.succeeded:
+        attempt.reference_id = attempt.authority
+        if intent.status == "EXPIRED":
+            attempt.status = "LATE_SUCCESS"
+            await db.commit()
+            return ZibalCallback(intent.order_id, "expired", attempt.reference_id)
+        if intent.status != "VERIFYING":
+            await db.commit()
+            raise PaymentNotReady
+        attempt.status = "SUCCEEDED"
+        intent.status = "SUCCEEDED"
+        intent.provider_reference = f"zibal:{attempt.reference_id}"
+        _add_outbox(
+            db,
+            intent=intent,
+            event_type="payment.succeeded.v1",
+            payload={
+                "order_id": str(intent.order_id),
+                "provider_reference": intent.provider_reference,
+            },
+            causation_id=None,
+            trace_id=uuid4().hex,
+        )
+        await db.commit()
+        return ZibalCallback(intent.order_id, "succeeded", intent.provider_reference)
+    if intent.status == "EXPIRED":
+        attempt.status = "EXPIRED"
+        attempt.failure_code = verification.code
+        await db.commit()
+        return ZibalCallback(intent.order_id, "expired", None)
+    if intent.status != "VERIFYING":
+        await db.commit()
+        raise PaymentNotReady
+    attempt.status = "FAILED"
+    attempt.failure_code = verification.code
+    intent.status = "AWAITING_CUSTOMER"
+    await db.commit()
+    return ZibalCallback(intent.order_id, "failed", None)
 
 
 async def _record_zarinpal_cancellation(db: AsyncSession, attempt_id: UUID) -> ZarinpalCallback:
@@ -613,7 +1029,7 @@ async def _prepare_zarinpal_reversal(
         if reversal.status == "REQUESTING":
             raise PaymentReversalInProgress
         raise PaymentReversalRejected
-    if intent.method != "zarinpal" or intent.status != "SUCCEEDED":
+    if intent.method not in {"zarinpal", "online"} or intent.status != "SUCCEEDED":
         await db.commit()
         raise PaymentNotReady
     attempt = await db.scalar(
@@ -731,33 +1147,56 @@ async def process_zarinpal_refund_request(
     order_id = UUID(str(payload["order_id"]))
     refund_request_id = UUID(str(payload["refund_request_id"]))
     requested_by = UUID(str(payload["requested_by"]))
-    try:
-        await reverse_zarinpal_payment(
-            db,
-            order_id=order_id,
-            requested_by=requested_by,
-            idempotency_key=f"refund-request:{refund_request_id}",
-            refund_request_id=refund_request_id,
-            provider=provider,
-        )
-    except PaymentNotReady:
+    if not await _has_successful_zarinpal_attempt(db, order_id=order_id):
         await _record_refund_not_ready(
             db,
             order_id=order_id,
             refund_request_id=refund_request_id,
         )
-    except PaymentReversalRejected:
-        # The rejection and compensating domain event are already durable.
-        pass
-    except PaymentReversalInProgress:
-        # A provider result was not recorded. Do not send a second reverse
-        # request; the operator must reconcile the persisted attempt.
-        raise
-    except PaymentIntentNotFound:
-        raise
+    else:
+        try:
+            await reverse_zarinpal_payment(
+                db,
+                order_id=order_id,
+                requested_by=requested_by,
+                idempotency_key=f"refund-request:{refund_request_id}",
+                refund_request_id=refund_request_id,
+                provider=provider,
+            )
+        except PaymentNotReady:
+            await _record_refund_not_ready(
+                db,
+                order_id=order_id,
+                refund_request_id=refund_request_id,
+            )
+        except PaymentReversalRejected:
+            # The rejection and compensating domain event are already durable.
+            pass
+        except PaymentReversalInProgress:
+            # A provider result was not recorded. Do not send a second reverse
+            # request; the operator must reconcile the persisted attempt.
+            raise
+        except PaymentIntentNotFound:
+            raise
     db.add(InboxMessage(event_id=event_id, event_type="order.refund_requested.v1"))
     await db.commit()
     return True
+
+
+async def _has_successful_zarinpal_attempt(db: AsyncSession, *, order_id: UUID) -> bool:
+    intent = await db.scalar(select(PaymentIntent).where(PaymentIntent.order_id == order_id))
+    if intent is None:
+        raise PaymentIntentNotFound
+    attempt = await db.scalar(
+        select(PaymentAttempt.id)
+        .where(
+            PaymentAttempt.intent_id == intent.id,
+            PaymentAttempt.provider == "zarinpal",
+            PaymentAttempt.status == "SUCCEEDED",
+        )
+        .limit(1)
+    )
+    return attempt is not None
 
 
 async def _record_refund_not_ready(
@@ -793,8 +1232,8 @@ async def expire_due_payment_intents(db: AsyncSession, *, now: datetime | None =
         await db.scalars(
             select(PaymentIntent)
             .where(
-                PaymentIntent.method == "zarinpal",
-                PaymentIntent.status.in_(_PENDING_ZARINPAL_STATUSES),
+                PaymentIntent.method.in_(("zarinpal", "online")),
+                PaymentIntent.status.in_(_PENDING_PROVIDER_STATUSES),
                 PaymentIntent.expires_at.is_not(None),
                 PaymentIntent.expires_at <= due_at,
             )
@@ -828,7 +1267,7 @@ async def _expire_intent(db: AsyncSession, intent: PaymentIntent) -> None:
         event_type="payment.failed.v1",
         payload={
             "order_id": str(intent.order_id),
-            "provider_reference": f"zarinpal-expired:{intent.id}",
+            "provider_reference": f"{intent.method}-expired:{intent.id}",
         },
         causation_id=None,
         trace_id=uuid4().hex,

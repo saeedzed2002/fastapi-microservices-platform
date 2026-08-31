@@ -23,6 +23,7 @@ ADRs record decisions that materially affect service ownership, contracts, durab
 
 | ADR | Status | Decision |
 |---|---|---|
+| [ADR-034](ADR-034-online-payment-provider-routing.md) | Accepted | Online payment provider routing and safe fallback |
 | [ADR-033](ADR-033-horizontal-pod-autoscaling.md) | Accepted | Bounded API horizontal pod autoscaling |
 | [ADR-032](ADR-032-catalog-product-review-moderation.md) | Accepted | Catalog product reviews, replies, and moderation |
 | [ADR-031](ADR-031-staff-password-reset-and-device-sessions.md) | Accepted | Staff password reset and device-session lifecycle |

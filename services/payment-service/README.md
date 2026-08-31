@@ -7,6 +7,21 @@ customer payment credentials.
 It consumes `inventory.reserved.v1`. The deterministic `test_success` and
 `test_failure` methods remain available for automated checkout coverage.
 
+## Provider-routed online workflow
+
+The additive `online` method starts at
+`POST /api/v1/payments/orders/{order_id}/online`. Payment prefers configured
+Zarinpal and can use Zibal only after a definitive Zarinpal rejection. A
+timeout, network failure, malformed provider response, or provider `5xx`
+leaves the first attempt in `REQUESTING`; it never creates a second payable
+request. `GET /api/v1/payments/zibal/callback?trackId=...` always verifies the
+persisted track ID before emitting a success fact.
+
+Configure `ZIBAL_MERCHANT_ID` and its registered edge callback URL in addition
+to the Zarinpal values. Both routed providers require whole `IRT` amounts. A
+routed Zarinpal success remains eligible for the documented short reversal;
+Zibal refunds require a separate settlement design and are not fabricated.
+
 ## Zarinpal sandbox workflow
 
 The `zarinpal` payment method creates a Payment-owned intent after inventory
@@ -41,4 +56,6 @@ leave an order in `REQUESTING`. Apply Payment migrations from the workspace:
     pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-payment
 
 See `docs/adr/ADR-022-zarinpal-payment-adapter-and-expiry.md` for the accepted
-design and `docs/runbooks/zarinpal-payment.md` for testing and recovery.
+design, `docs/adr/ADR-034-online-payment-provider-routing.md` for provider
+routing, and `docs/runbooks/online-payment-provider-routing.md` for testing
+and recovery.

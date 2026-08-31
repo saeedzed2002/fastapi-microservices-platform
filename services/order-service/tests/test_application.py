@@ -184,3 +184,14 @@ def test_zarinpal_checkout_requires_a_whole_irt_amount() -> None:
         validate_checkout_payment(
             payment_method="zarinpal", currency="IRT", total_amount=Decimal("150000.50")
         )
+
+
+def test_online_checkout_requires_a_whole_irt_amount() -> None:
+    validate_checkout_payment(
+        payment_method="online", currency="IRT", total_amount=Decimal("150000")
+    )
+
+    with pytest.raises(HTTPException, match="online requires IRT currency"):
+        validate_checkout_payment(
+            payment_method="online", currency="USD", total_amount=Decimal("150000")
+        )

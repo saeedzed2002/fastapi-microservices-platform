@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     service_name: str = "payment-service"
-    service_version: str = "0.6.0"
+    service_version: str = "0.7.0"
     environment: str = "local"
     database_url: str = (
         "postgresql+asyncpg://payment_service:payment-local-only@localhost:5432/payment_service"
@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     zarinpal_callback_url: str = "https://localhost/api/v1/payments/zarinpal/callback"
     zarinpal_request_timeout_seconds: float = Field(default=10.0, ge=1.0, le=60.0)
     zarinpal_currency: str = "IRT"
+    zibal_merchant_id: str = ""
+    zibal_callback_url: str = "https://localhost/api/v1/payments/zibal/callback"
+    zibal_request_timeout_seconds: float = Field(default=10.0, ge=1.0, le=60.0)
+    zibal_currency: str = "IRT"
     reservation_minutes: int = Field(default=15, ge=1, le=1440)
     expiry_worker_enabled: bool = False
     expiry_poll_interval_seconds: float = Field(default=5.0, ge=0.1, le=60.0)
