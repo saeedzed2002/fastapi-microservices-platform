@@ -1,0 +1,223 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Catalog Product Reviews API",
+    "version": "v1",
+    "description": "Moderated product reviews and one-level replies owned by Catalog."
+  },
+  "paths": {
+    "/api/v1/catalog/products/{slug}/reviews": {
+      "get": {
+        "summary": "List approved root reviews and approved direct replies for a published product",
+        "parameters": [
+          {"$ref": "#/components/parameters/ProductSlug"},
+          {"$ref": "#/components/parameters/Limit"},
+          {"$ref": "#/components/parameters/Cursor"}
+        ],
+        "responses": {
+          "200": {
+            "description": "Approved review page",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PublicReviewPage"}}}
+          },
+          "404": {"description": "Published product not found"},
+          "422": {"description": "Invalid pagination cursor"}
+        }
+      }
+    },
+    "/api/v1/catalog/products/{product_id}/reviews": {
+      "post": {
+        "summary": "Submit a review for a published product",
+        "security": [{"BearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/ProductId"}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReviewWrite"}}}
+        },
+        "responses": {
+          "201": {
+            "description": "Customer review accepted as pending or administrator review accepted as approved",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReviewSubmission"}}}
+          },
+          "401": {"description": "Authentication required"},
+          "404": {"description": "Published product not found"},
+          "422": {"description": "Invalid review body"}
+        }
+      }
+    },
+    "/api/v1/catalog/reviews/{review_id}/replies": {
+      "post": {
+        "summary": "Submit one direct reply to an approved root review",
+        "security": [{"BearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/ReviewId"}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReviewWrite"}}}
+        },
+        "responses": {
+          "201": {
+            "description": "Customer reply accepted as pending or administrator reply accepted as approved",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReviewSubmission"}}}
+          },
+          "401": {"description": "Authentication required"},
+          "404": {"description": "Review or published product not found"},
+          "409": {"description": "Parent review is not approved"},
+          "422": {"description": "Invalid review body or nested reply"}
+        }
+      }
+    },
+    "/api/v1/catalog/admin/reviews": {
+      "get": {
+        "summary": "List reviews for administrator moderation",
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {"$ref": "#/components/parameters/ReviewStatus"},
+          {"$ref": "#/components/parameters/ProductIdQuery"},
+          {"$ref": "#/components/parameters/Limit"},
+          {"$ref": "#/components/parameters/Cursor"}
+        ],
+        "responses": {
+          "200": {
+            "description": "Moderation review page",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AdminReviewPage"}}}
+          },
+          "401": {"description": "Authentication required"},
+          "403": {"description": "Administrator role required"},
+          "422": {"description": "Invalid filter or pagination cursor"}
+        }
+      }
+    },
+    "/api/v1/catalog/admin/reviews/{review_id}/moderation": {
+      "post": {
+        "summary": "Approve or reject a product review",
+        "security": [{"BearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/ReviewId"}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ModerationWrite"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "Moderated review",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AdminReview"}}}
+          },
+          "401": {"description": "Authentication required"},
+          "403": {"description": "Administrator role required"},
+          "404": {"description": "Review not found"},
+          "409": {"description": "A reply cannot be approved when its root review is hidden"},
+          "422": {"description": "Invalid moderation body"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+    },
+    "parameters": {
+      "ProductSlug": {
+        "name": "slug", "in": "path", "required": true,
+        "schema": {"type": "string", "maxLength": 260}
+      },
+      "ProductId": {
+        "name": "product_id", "in": "path", "required": true,
+        "schema": {"type": "string", "format": "uuid"}
+      },
+      "ReviewId": {
+        "name": "review_id", "in": "path", "required": true,
+        "schema": {"type": "string", "format": "uuid"}
+      },
+      "ProductIdQuery": {
+        "name": "product_id", "in": "query",
+        "schema": {"type": "string", "format": "uuid"}
+      },
+      "ReviewStatus": {
+        "name": "status", "in": "query",
+        "schema": {"type": "string", "enum": ["pending", "approved", "rejected"]}
+      },
+      "Limit": {
+        "name": "limit", "in": "query",
+        "schema": {"type": "integer", "minimum": 1, "maximum": 50, "default": 20}
+      },
+      "Cursor": {
+        "name": "cursor", "in": "query",
+        "schema": {"type": "string", "maxLength": 256}
+      }
+    },
+    "schemas": {
+      "ReviewWrite": {
+        "type": "object", "additionalProperties": false, "required": ["body"],
+        "properties": {"body": {"type": "string", "minLength": 1, "maxLength": 5000}}
+      },
+      "ModerationWrite": {
+        "type": "object", "additionalProperties": false, "required": ["status"],
+        "properties": {
+          "status": {"type": "string", "enum": ["approved", "rejected"]},
+          "moderation_note": {"type": ["string", "null"], "minLength": 1, "maxLength": 500}
+        }
+      },
+      "ReviewSubmission": {
+        "type": "object", "required": ["id", "product_id", "parent_id", "status", "created_at"],
+        "properties": {
+          "id": {"type": "string", "format": "uuid"},
+          "product_id": {"type": "string", "format": "uuid"},
+          "parent_id": {"type": ["string", "null"], "format": "uuid"},
+          "status": {"type": "string", "enum": ["pending", "approved"]},
+          "created_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "PublicReply": {
+        "type": "object", "required": ["id", "parent_id", "body", "author_label", "created_at", "updated_at"],
+        "properties": {
+          "id": {"type": "string", "format": "uuid"},
+          "parent_id": {"type": "string", "format": "uuid"},
+          "body": {"type": "string"},
+          "author_label": {"type": "string", "enum": ["Customer", "Store team"]},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "PublicReview": {
+        "type": "object", "required": ["id", "body", "author_label", "created_at", "updated_at", "replies"],
+        "properties": {
+          "id": {"type": "string", "format": "uuid"},
+          "body": {"type": "string"},
+          "author_label": {"type": "string", "enum": ["Customer", "Store team"]},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"},
+          "replies": {"type": "array", "items": {"$ref": "#/components/schemas/PublicReply"}}
+        }
+      },
+      "PublicReviewPage": {
+        "type": "object", "required": ["items", "next_cursor"],
+        "properties": {
+          "items": {"type": "array", "items": {"$ref": "#/components/schemas/PublicReview"}},
+          "next_cursor": {"type": ["string", "null"]}
+        }
+      },
+      "AdminReview": {
+        "type": "object", "required": ["id", "product_id", "parent_id", "author_id", "author_role", "body", "status", "moderated_by", "moderation_note", "moderated_at", "created_at", "updated_at"],
+        "properties": {
+          "id": {"type": "string", "format": "uuid"},
+          "product_id": {"type": "string", "format": "uuid"},
+          "parent_id": {"type": ["string", "null"], "format": "uuid"},
+          "author_id": {"type": "string", "format": "uuid"},
+          "author_role": {"type": "string", "enum": ["customer", "admin"]},
+          "body": {"type": "string"},
+          "status": {"type": "string", "enum": ["pending", "approved", "rejected"]},
+          "moderated_by": {"type": ["string", "null"], "format": "uuid"},
+          "moderation_note": {"type": ["string", "null"]},
+          "moderated_at": {"type": ["string", "null"], "format": "date-time"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "AdminReviewPage": {
+        "type": "object", "required": ["items", "next_cursor"],
+        "properties": {
+          "items": {"type": "array", "items": {"$ref": "#/components/schemas/AdminReview"}},
+          "next_cursor": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}

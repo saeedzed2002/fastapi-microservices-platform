@@ -27,4 +27,5 @@ Implemented: [Kafka dead-letter inspection and replay](kafka-dlq.md),
 [staff operations and order review](admin-operations.md), and
 [Zarinpal payment recovery](zarinpal-payment.md), and
 [local Zarinpal sandbox checkout](local-zarinpal-sandbox-test.md), and
-[Catalog category administration](catalog-category-administration.md).
+[Catalog category administration](catalog-category-administration.md), and
+[Catalog product review moderation](catalog-review-moderation.md).

@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -68,6 +69,84 @@ class VariantCreate(BaseModel):
 class ProductMediaAttach(BaseModel):
     media_asset_id: UUID
     sort_order: int = Field(default=0, ge=0, le=1000)
+
+
+class ProductReviewCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=5_000)
+
+    @field_validator("body")
+    @classmethod
+    def normalize_body(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("review body must not be blank")
+        return normalized
+
+
+class ProductReviewModeration(BaseModel):
+    status: Literal["approved", "rejected"]
+    moderation_note: str | None = Field(default=None, min_length=1, max_length=500)
+
+    @field_validator("moderation_note")
+    @classmethod
+    def normalize_moderation_note(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("moderation note must not be blank")
+        return normalized
+
+
+class ProductReviewReplyResponse(BaseModel):
+    id: UUID
+    parent_id: UUID
+    body: str
+    author_label: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProductReviewResponse(BaseModel):
+    id: UUID
+    body: str
+    author_label: str
+    created_at: datetime
+    updated_at: datetime
+    replies: list[ProductReviewReplyResponse]
+
+
+class ProductReviewListResponse(BaseModel):
+    items: list[ProductReviewResponse]
+    next_cursor: str | None
+
+
+class ProductReviewSubmissionResponse(BaseModel):
+    id: UUID
+    product_id: UUID
+    parent_id: UUID | None
+    status: Literal["pending", "approved"]
+    created_at: datetime
+
+
+class AdminProductReviewResponse(BaseModel):
+    id: UUID
+    product_id: UUID
+    parent_id: UUID | None
+    author_id: UUID
+    author_role: Literal["customer", "admin"]
+    body: str
+    status: Literal["pending", "approved", "rejected"]
+    moderated_by: UUID | None
+    moderation_note: str | None
+    moderated_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminProductReviewListResponse(BaseModel):
+    items: list[AdminProductReviewResponse]
+    next_cursor: str | None
 
 
 class VariantResponse(BaseModel):

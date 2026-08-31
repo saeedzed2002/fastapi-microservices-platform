@@ -2,12 +2,21 @@
 
 Catalog owns products, variants, categories, brands, prices, attributes, and product lifecycle.
 
+It also owns product-review text, one-level replies, and moderation state. It
+stores the authenticated author subject only as an opaque identifier for the
+administrator queue; public review responses contain generic labels and never
+call Identity or Customer for profile data.
+
 It stores only opaque media asset identifiers. It never queries the Media Service database or stores file bytes. The initial Phase 3 API exposes those references; a future edge/read projection will resolve publicly publishable media after an explicit contract is approved.
 
 ## API
 
 - GET /api/v1/catalog/products with `limit` and an opaque `cursor`, returning `items` and `next_cursor`
 - GET /api/v1/catalog/products/{slug}
+- GET /api/v1/catalog/products/{slug}/reviews with `limit` and an opaque `cursor`
+- POST /api/v1/catalog/products/{product_id}/reviews for authenticated submissions
+- POST /api/v1/catalog/reviews/{review_id}/replies for one direct reply
+- GET /api/v1/catalog/admin/reviews and POST /api/v1/catalog/admin/reviews/{review_id}/moderation for administrators
 - GET /api/v1/catalog/categories
 - GET /api/v1/catalog/categories/{slug}
 - Catalog administrator endpoints under /api/v1/catalog/products

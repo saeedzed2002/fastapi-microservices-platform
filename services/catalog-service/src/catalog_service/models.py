@@ -3,7 +3,17 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, Numeric, String, Text
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -76,6 +86,46 @@ class ProductMedia(Base):
     media_asset_id: Mapped[UUID] = mapped_column(index=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class ProductReview(Base):
+    __tablename__ = "product_reviews"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'approved', 'rejected')",
+            name="ck_product_reviews_status",
+        ),
+        CheckConstraint(
+            "author_role IN ('customer', 'admin')",
+            name="ck_product_reviews_author_role",
+        ),
+        Index(
+            "ix_product_reviews_public_page",
+            "product_id",
+            "status",
+            "parent_id",
+            "created_at",
+            "id",
+        ),
+        Index("ix_product_reviews_author_page", "author_id", "created_at", "id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"))
+    parent_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("product_reviews.id", ondelete="CASCADE")
+    )
+    author_id: Mapped[UUID] = mapped_column(index=True)
+    author_role: Mapped[str] = mapped_column(String(16))
+    body: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    moderated_by: Mapped[UUID | None] = mapped_column()
+    moderation_note: Mapped[str | None] = mapped_column(Text)
+    moderated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
 
 
 class OutboxMessage(Base):

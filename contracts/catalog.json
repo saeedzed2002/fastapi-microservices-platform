@@ -83,6 +83,14 @@
       "schema": "openapi/catalog-products.v1.openapi.json"
     },
     {
+      "name": "catalog.reviews.v1",
+      "kind": "service-openapi",
+      "owner": "catalog-service",
+      "status": "active",
+      "notes": "Public approved product reviews and one-level replies, authenticated submissions, and administrator-only moderation. Public responses intentionally omit author identifiers and internal moderation state.",
+      "schema": "openapi/catalog-reviews.v1.openapi.json"
+    },
+    {
       "name": "media.catalog_attachment.v1",
       "kind": "service-openapi",
       "owner": "media-service",

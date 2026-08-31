@@ -10,8 +10,17 @@ from sqlalchemy import and_, desc, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from catalog_service.models import Category, OutboxMessage, Product, ProductMedia, ProductVariant
+from catalog_service.models import (
+    Category,
+    OutboxMessage,
+    Product,
+    ProductMedia,
+    ProductReview,
+    ProductVariant,
+)
 from catalog_service.schemas import (
+    AdminProductReviewListResponse,
+    AdminProductReviewResponse,
     CategoryCreate,
     CategoryResponse,
     CategoryUpdate,
@@ -19,6 +28,12 @@ from catalog_service.schemas import (
     ProductCreate,
     ProductMediaAttach,
     ProductResponse,
+    ProductReviewCreate,
+    ProductReviewListResponse,
+    ProductReviewModeration,
+    ProductReviewReplyResponse,
+    ProductReviewResponse,
+    ProductReviewSubmissionResponse,
     ProductUpdate,
     VariantCreate,
     VariantResponse,
@@ -420,3 +435,263 @@ async def checkout_variants(
             detail="one or more variants are unavailable for checkout",
         )
     return snapshots
+
+
+async def load_product_review_or_404(db: AsyncSession, review_id: UUID) -> ProductReview:
+    review = await db.get(ProductReview, review_id)
+    if review is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="product review not found"
+        )
+    return review
+
+
+def _review_author_label(review: ProductReview) -> str:
+    return "Store team" if review.author_role == "admin" else "Customer"
+
+
+def _review_reply_response(review: ProductReview) -> ProductReviewReplyResponse:
+    if review.parent_id is None:
+        raise ValueError("a reply response requires a parent review")
+    return ProductReviewReplyResponse(
+        id=review.id,
+        parent_id=review.parent_id,
+        body=review.body,
+        author_label=_review_author_label(review),
+        created_at=review.created_at,
+        updated_at=review.updated_at,
+    )
+
+
+def _review_response(
+    review: ProductReview, *, replies: list[ProductReview]
+) -> ProductReviewResponse:
+    return ProductReviewResponse(
+        id=review.id,
+        body=review.body,
+        author_label=_review_author_label(review),
+        created_at=review.created_at,
+        updated_at=review.updated_at,
+        replies=[_review_reply_response(reply) for reply in replies],
+    )
+
+
+def admin_product_review_response(review: ProductReview) -> AdminProductReviewResponse:
+    return AdminProductReviewResponse(
+        id=review.id,
+        product_id=review.product_id,
+        parent_id=review.parent_id,
+        author_id=review.author_id,
+        author_role=review.author_role,  # type: ignore[arg-type]
+        body=review.body,
+        status=review.status,  # type: ignore[arg-type]
+        moderated_by=review.moderated_by,
+        moderation_note=review.moderation_note,
+        moderated_at=review.moderated_at,
+        created_at=review.created_at,
+        updated_at=review.updated_at,
+    )
+
+
+def product_review_submission_response(review: ProductReview) -> ProductReviewSubmissionResponse:
+    return ProductReviewSubmissionResponse(
+        id=review.id,
+        product_id=review.product_id,
+        parent_id=review.parent_id,
+        status=review.status,  # type: ignore[arg-type]
+        created_at=review.created_at,
+    )
+
+
+def encode_product_review_cursor(review: ProductReview) -> str:
+    payload = {
+        "created_at": _utc_timestamp(review.created_at),
+        "review_id": str(review.id),
+    }
+    return base64.urlsafe_b64encode(json.dumps(payload).encode("utf-8")).decode("ascii").rstrip("=")
+
+
+def decode_product_review_cursor(cursor: str | None) -> tuple[datetime, UUID] | None:
+    if cursor is None:
+        return None
+    try:
+        padded = cursor + "=" * (-len(cursor) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")))
+        created_at = datetime.fromisoformat(str(payload["created_at"]).replace("Z", "+00:00"))
+        review_id = UUID(str(payload["review_id"]))
+    except (binascii.Error, KeyError, TypeError, UnicodeDecodeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="invalid product review cursor",
+        ) from exc
+    if created_at.tzinfo is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="invalid product review cursor",
+        )
+    return created_at.astimezone(UTC), review_id
+
+
+async def list_published_product_reviews(
+    db: AsyncSession,
+    *,
+    product: Product,
+    limit: int,
+    cursor: str | None,
+) -> ProductReviewListResponse:
+    cursor_values = decode_product_review_cursor(cursor)
+    conditions = [
+        ProductReview.product_id == product.id,
+        ProductReview.parent_id.is_(None),
+        ProductReview.status == "approved",
+    ]
+    if cursor_values is not None:
+        created_at, review_id = cursor_values
+        conditions.append(
+            or_(
+                ProductReview.created_at < created_at,
+                and_(ProductReview.created_at == created_at, ProductReview.id < review_id),
+            )
+        )
+    reviews = list(
+        await db.scalars(
+            select(ProductReview)
+            .where(*conditions)
+            .order_by(desc(ProductReview.created_at), desc(ProductReview.id))
+            .limit(limit + 1)
+        )
+    )
+    has_next_page = len(reviews) > limit
+    if has_next_page:
+        reviews = reviews[:limit]
+    review_ids = [review.id for review in reviews]
+    replies_by_parent: dict[UUID, list[ProductReview]] = {review_id: [] for review_id in review_ids}
+    if review_ids:
+        replies = list(
+            await db.scalars(
+                select(ProductReview)
+                .where(
+                    ProductReview.parent_id.in_(review_ids),
+                    ProductReview.status == "approved",
+                )
+                .order_by(ProductReview.created_at, ProductReview.id)
+            )
+        )
+        for reply in replies:
+            if reply.parent_id is not None:
+                replies_by_parent[reply.parent_id].append(reply)
+    return ProductReviewListResponse(
+        items=[
+            _review_response(review, replies=replies_by_parent[review.id]) for review in reviews
+        ],
+        next_cursor=encode_product_review_cursor(reviews[-1]) if has_next_page else None,
+    )
+
+
+async def create_product_review(
+    db: AsyncSession,
+    *,
+    product: Product,
+    payload: ProductReviewCreate,
+    author_id: UUID,
+    author_role: str,
+    parent: ProductReview | None = None,
+) -> ProductReview:
+    if product.status != "published":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="product not found")
+    if parent is not None:
+        if parent.product_id != product.id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="review product mismatch"
+            )
+        if parent.parent_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="only one reply level is supported",
+            )
+        if parent.status != "approved":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="replies require an approved parent review",
+            )
+    review = ProductReview(
+        product_id=product.id,
+        parent_id=parent.id if parent is not None else None,
+        author_id=author_id,
+        author_role=author_role,
+        body=payload.body,
+        status="approved" if author_role == "admin" else "pending",
+    )
+    db.add(review)
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="product review could not be saved",
+        ) from exc
+    await db.refresh(review)
+    return review
+
+
+async def list_admin_product_reviews(
+    db: AsyncSession,
+    *,
+    status_filter: str | None,
+    product_id: UUID | None,
+    limit: int,
+    cursor: str | None,
+) -> AdminProductReviewListResponse:
+    cursor_values = decode_product_review_cursor(cursor)
+    conditions = []
+    if status_filter is not None:
+        conditions.append(ProductReview.status == status_filter)
+    if product_id is not None:
+        conditions.append(ProductReview.product_id == product_id)
+    if cursor_values is not None:
+        created_at, review_id = cursor_values
+        conditions.append(
+            or_(
+                ProductReview.created_at < created_at,
+                and_(ProductReview.created_at == created_at, ProductReview.id < review_id),
+            )
+        )
+    reviews = list(
+        await db.scalars(
+            select(ProductReview)
+            .where(*conditions)
+            .order_by(desc(ProductReview.created_at), desc(ProductReview.id))
+            .limit(limit + 1)
+        )
+    )
+    has_next_page = len(reviews) > limit
+    if has_next_page:
+        reviews = reviews[:limit]
+    return AdminProductReviewListResponse(
+        items=[admin_product_review_response(review) for review in reviews],
+        next_cursor=encode_product_review_cursor(reviews[-1]) if has_next_page else None,
+    )
+
+
+async def moderate_product_review(
+    db: AsyncSession,
+    *,
+    review: ProductReview,
+    payload: ProductReviewModeration,
+    moderator_id: UUID,
+) -> ProductReview:
+    if payload.status == "approved" and review.parent_id is not None:
+        parent = await db.get(ProductReview, review.parent_id)
+        if parent is None or parent.status != "approved":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="a reply cannot be approved while its parent is hidden",
+            )
+    review.status = payload.status
+    review.moderated_by = moderator_id
+    review.moderation_note = payload.moderation_note
+    review.moderated_at = datetime.now(UTC)
+    await db.commit()
+    await db.refresh(review)
+    return review

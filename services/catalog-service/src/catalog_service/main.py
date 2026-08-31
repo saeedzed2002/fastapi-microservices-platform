@@ -2,6 +2,7 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Literal
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
@@ -10,20 +11,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from catalog_service.application import (
     add_variant,
+    admin_product_review_response,
     attach_media,
     category_response,
     checkout_variants,
     create_category,
     create_product,
+    create_product_review,
     delete_category,
     delete_product,
+    list_admin_product_reviews,
     list_categories,
+    list_published_product_reviews,
     list_published_products,
     list_variants,
     load_category_by_slug_or_404,
     load_category_or_404,
     load_product_or_404,
+    load_product_review_or_404,
+    moderate_product_review,
     product_response,
+    product_review_submission_response,
     publish_product,
     update_category,
     update_product,
@@ -34,6 +42,8 @@ from catalog_service.db import dispose_engine, get_session
 from catalog_service.media import HttpMediaCatalogGateway
 from catalog_service.models import Product
 from catalog_service.schemas import (
+    AdminProductReviewListResponse,
+    AdminProductReviewResponse,
     CategoryCreate,
     CategoryResponse,
     CategoryUpdate,
@@ -43,6 +53,10 @@ from catalog_service.schemas import (
     ProductListResponse,
     ProductMediaAttach,
     ProductResponse,
+    ProductReviewCreate,
+    ProductReviewListResponse,
+    ProductReviewModeration,
+    ProductReviewSubmissionResponse,
     ProductUpdate,
     VariantCreate,
     VariantResponse,
@@ -162,6 +176,113 @@ async def get_product(slug: str, db: AsyncSession = Depends(get_session)) -> Pro
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="product not found")
     return await product_response(db, product)
+
+
+@app.get(
+    "/api/v1/catalog/products/{slug}/reviews",
+    response_model=ProductReviewListResponse,
+)
+async def list_product_reviews_endpoint(
+    slug: str,
+    limit: int = Query(default=20, ge=1, le=50),
+    cursor: str | None = Query(default=None, max_length=256),
+    db: AsyncSession = Depends(get_session),
+) -> ProductReviewListResponse:
+    product = await db.scalar(
+        select(Product).where(Product.slug == slug, Product.status == "published")
+    )
+    if product is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="product not found")
+    return await list_published_product_reviews(db, product=product, limit=limit, cursor=cursor)
+
+
+@app.post(
+    "/api/v1/catalog/products/{product_id}/reviews",
+    response_model=ProductReviewSubmissionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_product_review_endpoint(
+    product_id: UUID,
+    payload: ProductReviewCreate,
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> ProductReviewSubmissionResponse:
+    review = await create_product_review(
+        db,
+        product=await load_product_or_404(db, product_id),
+        payload=payload,
+        author_id=claims.subject,
+        author_role="admin" if "admin" in claims.roles else "customer",
+    )
+    return product_review_submission_response(review)
+
+
+@app.post(
+    "/api/v1/catalog/reviews/{review_id}/replies",
+    response_model=ProductReviewSubmissionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_product_review_reply_endpoint(
+    review_id: UUID,
+    payload: ProductReviewCreate,
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> ProductReviewSubmissionResponse:
+    parent = await load_product_review_or_404(db, review_id)
+    review = await create_product_review(
+        db,
+        product=await load_product_or_404(db, parent.product_id),
+        payload=payload,
+        author_id=claims.subject,
+        author_role="admin" if "admin" in claims.roles else "customer",
+        parent=parent,
+    )
+    return product_review_submission_response(review)
+
+
+@app.get(
+    "/api/v1/catalog/admin/reviews",
+    response_model=AdminProductReviewListResponse,
+)
+async def list_admin_product_reviews_endpoint(
+    review_status: Literal["pending", "approved", "rejected"] | None = Query(
+        default=None,
+        alias="status",
+    ),
+    product_id: UUID | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=50),
+    cursor: str | None = Query(default=None, max_length=256),
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> AdminProductReviewListResponse:
+    require_administrator(claims)
+    return await list_admin_product_reviews(
+        db,
+        status_filter=review_status,
+        product_id=product_id,
+        limit=limit,
+        cursor=cursor,
+    )
+
+
+@app.post(
+    "/api/v1/catalog/admin/reviews/{review_id}/moderation",
+    response_model=AdminProductReviewResponse,
+)
+async def moderate_product_review_endpoint(
+    review_id: UUID,
+    payload: ProductReviewModeration,
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> AdminProductReviewResponse:
+    require_administrator(claims)
+    review = await moderate_product_review(
+        db,
+        review=await load_product_review_or_404(db, review_id),
+        payload=payload,
+        moderator_id=claims.subject,
+    )
+    return admin_product_review_response(review)
 
 
 @app.post(

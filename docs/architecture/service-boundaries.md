@@ -33,11 +33,11 @@ It exposes authenticated profile/address APIs and may consume Identity lifecycle
 
 ### Catalog Service
 
-Owns products, variants, categories, brands, attributes, prices, metadata, and product lifecycle.
+Owns products, variants, categories, brands, attributes, prices, metadata, product reviews, review moderation, and product lifecycle.
 
 Does not own stock, reservations, carts, orders, binary files, or the search index as source of truth.
 
-It exposes product/admin APIs, references Media assets through contracts, and emits versioned catalog facts for Search and other projections.
+It exposes product/admin APIs, references Media assets through contracts, and emits versioned catalog facts for Search and other projections. Public review responses expose only generic author labels; Catalog stores opaque Identity subjects for moderation but never queries Identity or Customer databases for profile data.
 
 ### Inventory Service
 

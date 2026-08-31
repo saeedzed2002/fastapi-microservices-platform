@@ -23,6 +23,7 @@ ADRs record decisions that materially affect service ownership, contracts, durab
 
 | ADR | Status | Decision |
 |---|---|---|
+| [ADR-032](ADR-032-catalog-product-review-moderation.md) | Accepted | Catalog product reviews, replies, and moderation |
 | [ADR-031](ADR-031-staff-password-reset-and-device-sessions.md) | Accepted | Staff password reset and device-session lifecycle |
 | [ADR-030](ADR-030-observability-collection-and-failure-policy.md) | Accepted | Platform observability collection and failure policy |
 | [ADR-029](ADR-029-helm-packaging-and-controlled-migrations.md) | Accepted | Helm packaging and controlled migrations |
