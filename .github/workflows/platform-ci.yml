@@ -260,8 +260,8 @@ jobs:
       - name: Start migrated APIs, workers, and edge
         run: docker compose -f infrastructure/compose/docker-compose.yml up -d --build --wait
 
-      - name: Execute cross-service E2E workflow
-        run: RUN_E2E=1 E2E_BASE_URL=https://127.0.0.1 uv run --all-packages pytest tests/e2e/test_phase6_checkout_notification.py tests/e2e/test_phase7_realtime_chat.py tests/e2e/test_phase8_search.py tests/e2e/test_edge_gateway.py -q
+      - name: Execute cross-service and resilience E2E workflows
+        run: RUN_E2E=1 E2E_BASE_URL=https://127.0.0.1 uv run --all-packages pytest tests/e2e/test_phase6_checkout_notification.py tests/e2e/test_phase7_realtime_chat.py tests/e2e/test_phase8_search.py tests/e2e/test_edge_gateway.py tests/e2e/test_phase12_resilience.py -q
 
       - name: Collect Compose logs on failure
         if: failure()

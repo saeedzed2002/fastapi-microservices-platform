@@ -3,6 +3,7 @@
 import os
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 import boto3
@@ -13,6 +14,12 @@ from platform_auth import encode_access_token
 LOCAL_SECRET = "local-development-jwt-secret-change-me-32-bytes"
 ISSUER = "fastapi-platform.identity"
 AUDIENCE = "fastapi-platform"
+
+
+@dataclass(frozen=True)
+class CheckoutWorkflowResult:
+    order_id: UUID
+    new_mail_messages: int
 
 
 def _token(*, subject: str, roles: tuple[str, ...]) -> str:
@@ -42,7 +49,9 @@ def _service_base_url(service: str) -> str:
     ).rstrip("/")
 
 
-def run_checkout_workflow() -> None:
+def run_checkout_workflow(
+    *, before_invoice_wait: Callable[[UUID], None] | None = None
+) -> CheckoutWorkflowResult:
     """Exercise checkout, stock commit, invoice generation, and email delivery."""
     customer_base_url = _service_base_url("customer")
     catalog_base_url = _service_base_url("catalog")
@@ -161,6 +170,8 @@ def run_checkout_workflow() -> None:
         assert stock_payload["on_hand"] == 1
         assert stock_payload["reserved"] == 0
         assert stock_payload["available"] == 1
+        if before_invoice_wait is not None:
+            before_invoice_wait(UUID(order_id))
         object_store = boto3.client(
             "s3",
             endpoint_url=os.environ.get("E2E_S3_ENDPOINT", "http://localhost:9000"),
@@ -182,7 +193,14 @@ def run_checkout_workflow() -> None:
             )
 
         _wait_for(invoice_and_email_are_ready, timeout_seconds=timeout_seconds)
-    print(f"checkout E2E succeeded for order {order_id}")
+        new_mail_messages = (
+            len(client.get(f"{mailpit_base_url}/api/v1/messages").json()["messages"])
+            - previous_messages
+        )
+        assert new_mail_messages == 1
+    result = CheckoutWorkflowResult(order_id=UUID(order_id), new_mail_messages=new_mail_messages)
+    print(f"checkout E2E succeeded for order {result.order_id}")
+    return result
 
 
 if __name__ == "__main__":

@@ -58,4 +58,9 @@ Add relevant cases with each feature:
 
 Safe behavior means durable truth is preserved, repeated effects are prevented, degradation is bounded, recovery is observable, and an operator has a documented path.
 
-Phase 12 adds prolonged outage, chaos, disruption, and cross-platform recovery testing to the feature-level suite already accumulated.
+Phase 12 adds bounded dependency outage, disruption, and recovery testing to
+the feature-level suite already accumulated. Its first implementation runs
+only inside the isolated Compose integration topology, uses explicit service
+allow-lists and `finally` recovery, and proves durable outbox/task-intent and
+database fallback behavior. Kubernetes disruption is deferred until a reviewed
+cluster recovery controller and target operational boundary exist.

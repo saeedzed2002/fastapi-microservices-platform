@@ -4,12 +4,15 @@ FastAPI Microservices Platform is a backend-only, production-oriented e-commerce
 
 ## Project status
 
-The repository has completed **Phase 10 — Helm**. Raw `Kustomize` resources
-remain the reviewable workload baseline, while two Helm charts package the
-controlled foundation and application-release sequence. The `main`-branch/
-manual CI workflow installs those charts in a disposable `Kind` cluster,
-waits for controlled migrations and workloads, then proves in-cluster API
-readiness and the checkout-to-invoice-to-email workflow.
+The repository has completed **Phase 11 — Observability**. The local
+`observability` profile collects bounded platform metrics, JSON logs, and
+traces through Prometheus, Loki, Tempo, and Grafana. **Phase 12 — Resilience**
+adds bounded Compose recovery evidence for Kafka, RabbitMQ, and Redis outages.
+Raw `Kustomize` resources remain the reviewable workload baseline, while two
+Helm charts package the controlled foundation and application-release sequence.
+The `main`-branch/manual CI workflow installs those charts in a disposable
+`Kind` cluster, waits for controlled migrations and workloads, then proves
+in-cluster API readiness and the checkout-to-invoice-to-email workflow.
 A real target environment still must provide pinned release images, secrets,
 ingress/TLS, external durable services, and environment-specific egress policy
 before public deployment.
@@ -112,6 +115,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Phase 9 plan](docs/development/phase-9-plan.md)
 - [Phase 10 plan](docs/development/phase-10-plan.md)
 - [Phase 11 plan](docs/development/phase-11-plan.md)
+- [Phase 12 plan](docs/development/phase-12-plan.md)
 
 ## Roadmap
 

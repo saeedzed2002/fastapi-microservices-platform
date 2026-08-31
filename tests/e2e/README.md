@@ -24,3 +24,7 @@ Job supplies individual `E2E_*_BASE_URL` values for the in-cluster
 `order-service` `ClusterIP` services. The test therefore remains the same
 business workflow in both environments without pretending that the Kind test
 exercises public ingress or TLS.
+
+`test_phase12_resilience.py` is additionally limited to the disposable Compose
+topology because it controls Docker Compose service lifecycle. It never runs
+inside the Kind E2E Pod or against a remote environment.
