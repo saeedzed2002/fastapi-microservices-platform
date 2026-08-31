@@ -23,7 +23,10 @@ COPY services/chat-service/src ./src
 COPY services/chat-service/migrations ./migrations
 COPY services/chat-service/alembic.ini ./alembic.ini
 COPY libs/platform-auth/src/platform_auth ./src/platform_auth
-RUN useradd --create-home --uid 10001 appuser
+# Runtime packages are supplied by the copied uv environment. Remove pip and
+# its vendored libraries from the pinned base image; they are not needed here.
+RUN rm -rf /usr/local/lib/python3.14/site-packages/pip /usr/local/lib/python3.14/site-packages/pip-*.dist-info /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.14 \
+    && useradd --create-home --uid 10001 appuser
 
 USER appuser
 EXPOSE 8000

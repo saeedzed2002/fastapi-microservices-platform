@@ -79,6 +79,10 @@ The signing algorithm, JWKS/key-distribution mechanism, claim set, and service-t
   gate.
 - Use minimal CI permissions and immutable action references.
 - Build non-root, minimal runtime images and retain artifact provenance when delivery is implemented.
+- Runtime images use the copied locked `uv` environment and remove the unused
+  global `pip` installation from the pinned Python base. This excludes its
+  vendored packages from the runtime attack surface; rebuild and scan every
+  image after changing the pinned Python image or the cleanup path.
 
 ## Required failure-policy decisions
 
