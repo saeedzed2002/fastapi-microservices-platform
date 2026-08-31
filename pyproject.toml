@@ -31,6 +31,7 @@ members = [
   "services/order-service",
   "services/payment-service",
   "services/notification-service",
+  "libs/platform-observability",
   "libs/platform-auth",
   "libs/platform-messaging",
   "services/customer-service",
@@ -44,6 +45,7 @@ target-version = "py314"
 line-length = 100
 src = [
   "libs/platform-auth/src",
+  "libs/platform-observability/src",
   "libs/platform-messaging/src",
   "services/catalog-service/src",
   "services/cart-service/src",
@@ -66,6 +68,7 @@ ignore = ["B008"]
 [tool.pytest.ini_options]
 testpaths = [
   "libs/platform-auth/tests",
+  "libs/platform-observability/tests",
   "libs/platform-messaging/tests",
   "services/catalog-service/tests",
   "services/cart-service/tests",
@@ -90,6 +93,7 @@ python_version = "3.14"
 strict = true
 files = [
   "libs/platform-auth/src",
+  "libs/platform-observability/src",
   "libs/platform-messaging/src",
   "services/catalog-service/src",
   "services/cart-service/src",

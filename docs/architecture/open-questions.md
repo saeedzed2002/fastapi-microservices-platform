@@ -99,7 +99,10 @@ Event schema version is authoritative in event names. Define when a topic suffix
 
 ### Observability operations
 
-Before production-style deployment, define collector topology, propagation carriers, sampling, retention, cardinality limits, SLOs, alert ownership, and handling of exporter failure.
+`ADR-030` defines the local Collector topology, W3C propagation carrier,
+low-cardinality metric convention, initial alert owner, and fail-open exporter
+behavior. Before target-environment deployment, define measured SLOs, sampling,
+retention, backend access, high availability, pager routing, and capacity.
 
 ### Delivery and migration rollback
 

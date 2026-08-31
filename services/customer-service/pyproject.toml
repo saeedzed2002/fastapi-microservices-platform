@@ -11,6 +11,7 @@ dependencies = [
   "fastapi>=0.141.1,<0.142",
   "platform-auth",
   "platform-messaging",
+  "platform-observability",
   "pydantic-settings>=2.15,<3",
   "PyJWT[crypto]>=2.13,<3",
   "SQLAlchemy[asyncio]>=2.0.52,<2.1",
@@ -27,3 +28,4 @@ package = true
 [tool.uv.sources]
 platform-auth = { workspace = true }
 platform-messaging = { workspace = true }
+platform-observability = { workspace = true }

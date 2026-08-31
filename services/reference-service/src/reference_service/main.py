@@ -3,13 +3,12 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 
+from platform_observability import configure_application, metrics_response
 from reference_service.config import get_settings
-from reference_service.observability import RequestContextMiddleware, configure_logging
 
 settings = get_settings()
-configure_logging(settings.log_level)
 logger = logging.getLogger(settings.service_name)
 
 
@@ -21,7 +20,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Reference Service", version=settings.service_version, lifespan=lifespan)
-app.add_middleware(RequestContextMiddleware)
+configure_application(
+    app,
+    service_name=settings.service_name,
+    service_version=settings.service_version,
+    environment=settings.environment,
+    log_level=settings.log_level,
+)
 
 
 @app.get("/health/live", tags=["health"])
@@ -35,12 +40,8 @@ async def readiness() -> dict[str, str]:
 
 
 @app.get("/metrics", tags=["observability"])
-async def metrics() -> str:
-    return (
-        "# HELP reference_service_up Service availability\n"
-        "# TYPE reference_service_up gauge\n"
-        "reference_service_up 1\n"
-    )
+async def metrics() -> Response:
+    return metrics_response()
 
 
 @app.get("/api/v1/reference", tags=["reference"])

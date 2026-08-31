@@ -12,6 +12,7 @@ dependencies = [
   "httpx>=0.28.1,<0.29",
   "platform-auth",
   "platform-messaging",
+  "platform-observability",
   "pydantic-settings>=2.15,<3",
   "SQLAlchemy[asyncio]>=2.0.52,<2.1",
   "uvicorn[standard]>=0.52.3,<0.53",
@@ -27,3 +28,4 @@ package = true
 [tool.uv.sources]
 platform-auth = { workspace = true }
 platform-messaging = { workspace = true }
+platform-observability = { workspace = true }

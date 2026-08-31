@@ -1,8 +1,14 @@
 from celery import Celery  # type: ignore[import-untyped]
 
 from notification_service.config import get_settings
+from platform_observability import configure_runtime
 
 settings = get_settings()
+configure_runtime(
+    service_name=settings.service_name,
+    service_version=settings.service_version,
+    environment=settings.environment,
+)
 celery_app = Celery(
     "notification_service",
     broker=settings.rabbitmq_url,

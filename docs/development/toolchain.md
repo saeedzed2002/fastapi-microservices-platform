@@ -33,16 +33,16 @@ Phase 1 selects the minimum executable platform profile. Direct package constrai
 | Redis Python client | 4 | 8.1.0 | Python/server compatibility, async cache commands and failure behavior |
 | S3 Python client | 1 | Not selected | Signing, checksum, multipart and presigned-request behavior |
 | MinIO image | 1 | locally built from `minio/minio` `RELEASE.2025-10-15T17-29-55Z` at `9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a` | Latest upstream security release; MinIO no longer publishes a matching official container image, so Compose builds the official release source with its required `Go` `1.24.8` toolchain. The Dockerfile verifies that the checked-out tag resolves to the recorded commit; builder and runtime base images are digest-pinned and the runtime is non-root. |
-| OpenTelemetry API/SDK | 1 | Not selected | Python support and semantic-convention compatibility |
-| OpenTelemetry instrumentation/exporters | 1 | Not selected | FastAPI, HTTPX, SQLAlchemy, Kafka, Celery and OTLP compatibility |
-| OpenTelemetry Collector image | 1 | Not selected | Stable distribution, component set, configuration compatibility and digest |
+| OpenTelemetry API/SDK | 11 | 1.44.0 | Stable Python core, OTLP compatibility and semantic conventions |
+| OpenTelemetry instrumentation/exporters | 11 | OTLP gRPC exporter 1.44.0; manual instrumentation | Automatic integration packages are prerelease and rejected |
+| OpenTelemetry Collector image | 11 | Contrib 0.159.0 | OTLP receiver, batching, memory limiter, and backend export compatibility |
 | Testcontainers | 1 | Not selected | Python/Docker compatibility and required infrastructure modules |
 | Docker Engine/CLI | 1 | Not selected | Supported stable release, BuildKit/Compose compatibility and host constraints |
 | Docker Compose | 1 | Not selected | Stable plugin release, specification support and local topology behavior |
-| Prometheus | 1/11 | Not selected | Phase 1 minimal profile and Phase 11 production topology, image digest |
-| Grafana | 1/11 | Not selected | Datasource/dashboard compatibility, image digest and security review |
-| Loki | 1/11 | Not selected | Collector/export path, storage model, image digest and security review |
-| Tempo | 1/11 | Not selected | OTLP/Collector compatibility, storage model and image digest |
+| Prometheus | 11 | 3.14.0; client 0.26.0 | API scrape, alert rule, dashboard compatibility, and local retention |
+| Grafana | 11 | 13.1.0 | Provisioned datasource/dashboard compatibility and local access control |
+| Loki | 11 | 3.7.6 | OTLP Collector export, filesystem storage, and local retention |
+| Tempo | 11 | 2.9.4 | OTLP Collector export, local trace storage, and compatibility review |
 | Kubernetes | 9 | `v1.36.1` Kind conformance control-plane target; reviewed `2026-08-30` | Stable Kind node image availability, API lifecycle, target-cluster compatibility, and managed-provider support |
 | `kubectl` | 9 | `v1.36.1` CI/release client target; SHA-256 verified download | Kubernetes client-version skew policy, reproducible official distribution, and target-cluster compatibility |
 | Kind | 9 | `v0.32.0`; exact `kindest/node:v1.36.1` digest in the conformance config | Official release, Kubernetes-node compatibility, ephemeral CI support, and image-loading behavior |
@@ -362,3 +362,61 @@ source for the workspace.
   [Helm 3 end-of-life notice](https://docs.helm.sh/blog/helm-v3-end-of-life/).
   Owner: platform engineering. Next review: before a target environment uses
   Helm, before a Helm major upgrade, or `2026-09-30`, whichever occurs first.
+
+## Phase 11 observability selection evidence
+
+- Review date: `2026-08-31`. OpenTelemetry Python API, SDK, and OTLP gRPC
+  exporter `1.44.0` are the selected stable core line. They support the
+  repository's Python `3.14` baseline and use the same OTLP protocol as the
+  selected Collector. The packages are Apache-2.0 licensed, are constrained
+  to the reviewed `1.44` line in `platform-observability`, and their exact
+  transitive resolution is in `uv.lock`.
+- Automatic Python instrumentation was rejected. The official FastAPI
+  instrumentation line was `0.65b0`, a prerelease, at review time. The
+  repository instead uses manual stable APIs for HTTP and SQLAlchemy spans so
+  the platform does not introduce unreviewed monkey patching or a prerelease
+  production dependency.
+- The upstream Python logging signal remains developmental. The selected
+  stable core package line is used only behind an optional bounded OTLP log
+  handler; JSON stdout remains the canonical application-log output and is not
+  contingent on the experimental signal's delivery behavior.
+- Prometheus client `0.26.0` is the selected Apache-2.0 Python client. It
+  supplies only bounded metric primitives; route templates, operation classes,
+  and bounded outcome values are enforced by the shared library rather than by
+  caller-supplied labels.
+- OpenTelemetry Collector Contrib `0.159.0`, Prometheus `3.14.0`, Grafana
+  `13.1.0`, Loki `3.7.6`, and Tempo `2.9.4` were the selected released stable
+  local components. The Collector accepts OTLP gRPC, batches and limits memory,
+  exposes Prometheus-format telemetry, and exports to the selected Tempo and
+  Loki HTTP receivers. Prometheus is Apache-2.0; Grafana, Loki, and Tempo are
+  AGPL-3.0 components. Their source and image licenses are acceptable for this
+  local proof only and must be re-reviewed with target-environment procurement
+  and distribution obligations.
+- Image tags are intentionally exact local-development selections, not
+  immutable artifact references. No `latest` tag is used. Before promotion,
+  platform engineering must record the official image digest, run the existing
+  image vulnerability policy against that digest, select retention/storage and
+  access controls, and review release/security notices again. This local static
+  validation does not claim that a container image was pulled or scanned.
+- All twelve application Dockerfiles use the pinned `uv` builder and
+  `uv sync --locked --no-dev --no-editable --package`. Their pinned Python and
+  `uv` source-image digests are the same reviewed digests used by the existing
+  Chat and Media images. This prevents a production image build from resolving
+  a different transitive Python dependency graph than `uv.lock`.
+- Compatibility and failure review: all application exporters are optional;
+  disabling `PLATFORM_OBSERVABILITY_ENABLED` retains JSON stdout and request
+  processing. The Collector uses the documented OTLP receiver and bounded
+  batch/memory processors. Grafana datasources and alert/dashboard assets are
+  provisioned from Git, while target Kubernetes backend topology, SSO,
+  Alertmanager routing, and high availability remain intentionally unselected.
+- Official sources reviewed: [OpenTelemetry Python SDK](https://pypi.org/project/opentelemetry-sdk/),
+  [OpenTelemetry Python instrumentation](https://opentelemetry.io/docs/languages/python/instrumentation/),
+  [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/),
+  [Collector releases](https://github.com/open-telemetry/opentelemetry-collector/releases),
+  [Prometheus Python client](https://pypi.org/project/prometheus-client/),
+  [Prometheus releases](https://github.com/prometheus/prometheus/releases),
+  [Grafana releases](https://github.com/grafana/grafana/releases),
+  [Loki releases](https://github.com/grafana/loki/releases), and
+  [Tempo releases](https://github.com/grafana/tempo/releases).
+- Owner: platform engineering. Next review: before target-environment
+  deployment, a backend major upgrade, or `2026-09-30`, whichever occurs first.

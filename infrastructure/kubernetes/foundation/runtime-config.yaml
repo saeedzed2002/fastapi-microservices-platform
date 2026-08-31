@@ -7,6 +7,8 @@ metadata:
     app.kubernetes.io/part-of: fastapi-microservices-platform
 data:
   PLATFORM_ENVIRONMENT: production
+  PLATFORM_OBSERVABILITY_ENABLED: "false"
+  PLATFORM_OTLP_GRPC_ENDPOINT: 127.0.0.1:4317
   PLATFORM_LOG_LEVEL: INFO
   IDENTITY_ENVIRONMENT: production
   CUSTOMER_ENVIRONMENT: production

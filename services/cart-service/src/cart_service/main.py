@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, status
+from fastapi import Depends, FastAPI, Response, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +21,7 @@ from cart_service.config import get_settings
 from cart_service.db import dispose_engine, get_session
 from cart_service.schemas import CartConsumeRequest, CartItemCreate, CartItemUpdate, CartResponse
 from platform_auth import AuthClaims
+from platform_observability import configure_application, metrics_response
 
 settings = get_settings()
 logger = logging.getLogger(settings.service_name)
@@ -37,6 +38,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Cart Service", version=settings.service_version, lifespan=lifespan)
+configure_application(
+    app,
+    service_name=settings.service_name,
+    service_version=settings.service_version,
+    environment=settings.environment,
+)
 
 
 @app.get("/health/live", tags=["health"])
@@ -108,9 +115,5 @@ async def consume_my_cart_items(
 
 
 @app.get("/metrics", tags=["observability"])
-async def metrics() -> str:
-    return (
-        "# HELP cart_service_up Service availability\n"
-        "# TYPE cart_service_up gauge\n"
-        "cart_service_up 1\n"
-    )
+async def metrics() -> Response:
+    return metrics_response()

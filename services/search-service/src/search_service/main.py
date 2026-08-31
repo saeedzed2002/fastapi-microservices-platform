@@ -5,10 +5,11 @@ from contextlib import asynccontextmanager
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from platform_observability import configure_application, metrics_response
 from search_service.application import search_products
 from search_service.config import get_settings
 from search_service.db import dispose_engine, get_session
@@ -50,6 +51,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Search Service", version=settings.service_version, lifespan=lifespan)
+configure_application(
+    app,
+    service_name=settings.service_name,
+    service_version=settings.service_version,
+    environment=settings.environment,
+    log_level=settings.log_level,
+)
 
 
 @app.get("/health/live", tags=["health"])
@@ -109,9 +117,5 @@ async def search_products_endpoint(
 
 
 @app.get("/metrics", tags=["observability"])
-async def metrics() -> str:
-    return (
-        "# HELP search_service_up Service availability\n"
-        "# TYPE search_service_up gauge\n"
-        "search_service_up 1\n"
-    )
+async def metrics() -> Response:
+    return metrics_response()

@@ -5,6 +5,7 @@ description = "Dependency-light non-domain service used to validate the platform
 requires-python = ">=3.14,<3.15"
 dependencies = [
   "fastapi>=0.141.1,<0.142",
+  "platform-observability",
   "pydantic-settings>=2.15,<3",
   "uvicorn[standard]>=0.52.3,<0.53",
 ]
@@ -15,3 +16,6 @@ build-backend = "uv_build"
 
 [tool.uv]
 package = true
+
+[tool.uv.sources]
+platform-observability = { workspace = true }

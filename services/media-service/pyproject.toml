@@ -12,6 +12,7 @@ dependencies = [
   "fastapi>=0.141.1,<0.142",
   "Pillow>=12.3,<13",
   "platform-auth",
+  "platform-observability",
   "pydantic-settings>=2.15,<3",
   "PyJWT[crypto]>=2.13,<3",
   "SQLAlchemy[asyncio]>=2.0.52,<2.1",
@@ -27,3 +28,4 @@ package = true
 
 [tool.uv.sources]
 platform-auth = { workspace = true }
+platform-observability = { workspace = true }

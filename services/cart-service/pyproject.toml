@@ -8,6 +8,7 @@ dependencies = [
   "asyncpg>=0.31,<0.32",
   "fastapi>=0.141.1,<0.142",
   "platform-auth",
+  "platform-observability",
   "pydantic-settings>=2.15,<3",
   "PyJWT[crypto]>=2.13,<3",
   "redis>=8.1.0,<9",
@@ -24,3 +25,4 @@ package = true
 
 [tool.uv.sources]
 platform-auth = { workspace = true }
+platform-observability = { workspace = true }

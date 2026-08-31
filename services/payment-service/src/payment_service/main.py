@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +39,7 @@ from payment_service.zarinpal import (
     ZarinpalUnavailable,
 )
 from platform_auth import AuthClaims
+from platform_observability import configure_application, metrics_response
 
 settings = get_settings()
 logger = logging.getLogger(settings.service_name)
@@ -66,6 +67,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Payment Service", version=settings.service_version, lifespan=lifespan)
+configure_application(
+    app,
+    service_name=settings.service_name,
+    service_version=settings.service_version,
+    environment=settings.environment,
+)
 
 
 @app.get("/health/live", tags=["health"])
@@ -214,9 +221,5 @@ async def zarinpal_callback(
 
 
 @app.get("/metrics", tags=["observability"])
-async def metrics() -> str:
-    return (
-        "# HELP payment_service_up Service availability\n"
-        "# TYPE payment_service_up gauge\n"
-        "payment_service_up 1\n"
-    )
+async def metrics() -> Response:
+    return metrics_response()

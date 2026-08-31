@@ -1,0 +1,33 @@
+groups:
+  - name: fastapi-platform-observability
+    rules:
+      - alert: PlatformApiScrapeUnavailable
+        expr: up{job="platform-apis"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          owner: platform-engineering
+        annotations:
+          summary: A platform API is not being scraped.
+          runbook_url: https://github.com/saeedzed2002/fastapi-microservices-platform/blob/main/docs/runbooks/observability.md
+      - alert: PlatformHttpErrorRatioHigh
+        expr: |
+          sum by (service) (rate(platform_http_requests_total{status=~"5.."}[5m]))
+            /
+          clamp_min(sum by (service) (rate(platform_http_requests_total[5m])), 1) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          owner: platform-engineering
+        annotations:
+          summary: A platform API has a sustained 5xx ratio above 5 percent.
+          runbook_url: https://github.com/saeedzed2002/fastapi-microservices-platform/blob/main/docs/runbooks/observability.md
+      - alert: PlatformKafkaDeadLettered
+        expr: increase(platform_kafka_dead_letter_records_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          owner: platform-engineering
+        annotations:
+          summary: A Kafka consumer moved one or more records to the DLQ.
+          runbook_url: https://github.com/saeedzed2002/fastapi-microservices-platform/blob/main/docs/runbooks/kafka-dlq.md

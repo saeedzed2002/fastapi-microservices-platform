@@ -10,7 +10,12 @@ Observability is part of service behavior from the first executable implementati
 - Loki centralizes structured logs.
 - Tempo stores distributed traces.
 
-The OpenTelemetry Collector topology, sampling, retention, and exporter-failure policy are selected when the implementation stack is officially verified.
+`ADR-030` selects the initial local Collector topology and fail-open exporter
+policy. It sends optional OTLP traces and logs to a Collector, Prometheus
+scrapes application metrics, and Grafana queries Prometheus, Loki, and Tempo.
+The profile is not a target-environment deployment. Sampling, retention,
+access, high availability, and alert routing for a target environment remain
+explicit owner decisions.
 
 ## Signal semantics
 
@@ -60,4 +65,7 @@ Chat traces cover authentication, membership validation, database commit, sender
 
 ## Operability
 
-Dashboards require owned alerts and runbooks. Before production-style deployment, define SLOs, sampling, retention, cardinality budgets, alert thresholds, escalation, and telemetry-backend failure behavior.
+Dashboards require owned alerts and runbooks. Initial local alert thresholds are
+provisional. Before production-style deployment, define measured SLOs,
+sampling, retention, cardinality budgets, alert thresholds, escalation, and
+telemetry-backend failure behavior.

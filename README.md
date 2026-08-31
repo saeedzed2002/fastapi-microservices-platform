@@ -111,6 +111,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Phase 8 plan](docs/development/phase-8-plan.md)
 - [Phase 9 plan](docs/development/phase-9-plan.md)
 - [Phase 10 plan](docs/development/phase-10-plan.md)
+- [Phase 11 plan](docs/development/phase-11-plan.md)
 
 ## Roadmap
 
@@ -150,6 +151,10 @@ or `-f` argument is needed.
     pwsh -File .\scripts\platform.ps1 -Task test
     pwsh -NoProfile -File .\scripts\new_local_edge_certificate.ps1
     docker compose up -d --build
+
+For the optional local telemetry stack, follow the
+[observability profile](infrastructure/observability/README.md). It is not a
+production deployment.
     docker compose stop
     docker compose start
     docker compose up -d --force-recreate

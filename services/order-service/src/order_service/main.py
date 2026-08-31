@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -55,6 +55,7 @@ from order_service.schemas import (
 from order_service.workers.kafka import consume_invoice_events, consume_saga_events, publish_outbox
 from order_service.workers.task_dispatcher import run_task_dispatcher
 from platform_auth import AuthClaims
+from platform_observability import configure_application, metrics_response
 
 settings = get_settings()
 logger = logging.getLogger(settings.service_name)
@@ -84,6 +85,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Order Service", version=settings.service_version, lifespan=lifespan)
+configure_application(
+    app,
+    service_name=settings.service_name,
+    service_version=settings.service_version,
+    environment=settings.environment,
+)
 
 
 @app.get("/health/live", tags=["health"])
@@ -369,9 +376,5 @@ async def checkout_cart_with_zarinpal(
 
 
 @app.get("/metrics", tags=["observability"])
-async def metrics() -> str:
-    return (
-        "# HELP order_service_up Service availability\n"
-        "# TYPE order_service_up gauge\n"
-        "order_service_up 1\n"
-    )
+async def metrics() -> Response:
+    return metrics_response()

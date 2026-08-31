@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from platform_observability.database import instrument_async_engine
 from search_service.config import get_settings
 
 _engine: AsyncEngine | None = None
@@ -17,6 +18,7 @@ def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         _engine = create_async_engine(get_settings().database_url, pool_pre_ping=True)
+        instrument_async_engine(_engine, service_name=get_settings().service_name)
     return _engine
 
 

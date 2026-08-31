@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,6 +49,7 @@ from catalog_service.schemas import (
 )
 from catalog_service.workers.kafka import publish_outbox
 from platform_auth import AuthClaims
+from platform_observability import configure_application, metrics_response
 
 settings = get_settings()
 logger = logging.getLogger(settings.service_name)
@@ -73,6 +74,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Catalog Service", version=settings.service_version, lifespan=lifespan)
+configure_application(
+    app,
+    service_name=settings.service_name,
+    service_version=settings.service_version,
+    environment=settings.environment,
+)
 
 
 @app.get("/health/live", tags=["health"])
@@ -261,9 +268,5 @@ async def checkout_variants_endpoint(
 
 
 @app.get("/metrics", tags=["observability"])
-async def metrics() -> str:
-    return (
-        "# HELP catalog_service_up Service availability\n"
-        "# TYPE catalog_service_up gauge\n"
-        "catalog_service_up 1\n"
-    )
+async def metrics() -> Response:
+    return metrics_response()

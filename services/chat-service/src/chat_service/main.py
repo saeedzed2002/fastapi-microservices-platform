@@ -37,6 +37,7 @@ from chat_service.schemas import (
     SupportQueuePage,
 )
 from platform_auth import AuthClaims
+from platform_observability import configure_application, metrics_response
 
 settings = get_settings()
 logger = logging.getLogger(settings.service_name)
@@ -63,6 +64,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Chat Service", version=settings.service_version, lifespan=lifespan)
+configure_application(
+    app,
+    service_name=settings.service_name,
+    service_version=settings.service_version,
+    environment=settings.environment,
+    log_level=settings.log_level,
+)
 
 
 @app.get("/health/live", tags=["health"])
@@ -235,5 +243,5 @@ async def chat_websocket(websocket: WebSocket) -> None:
 
 
 @app.get("/metrics", tags=["observability"])
-async def metrics() -> str:
-    return realtime.render_metrics()
+async def metrics() -> Response:
+    return metrics_response(extra=realtime.render_metrics())

@@ -11,6 +11,8 @@ from typing import Any, Protocol
 
 from aiokafka.structs import OffsetAndMetadata, TopicPartition  # type: ignore[import-untyped]
 
+from platform_observability.metrics import record_kafka_dead_letter, record_kafka_record
+
 logger = logging.getLogger(__name__)
 
 
@@ -95,6 +97,11 @@ async def process_record_with_dead_letter(
         except asyncio.CancelledError:
             raise
         except Exception as exc:
+            record_kafka_record(
+                service=_service_name(policy.consumer_name),
+                consumer=policy.consumer_name,
+                outcome="failed_attempt",
+            )
             failure = FailureAttempt(
                 attempt=attempt,
                 occurred_at=_utc_now(),
@@ -120,6 +127,11 @@ async def process_record_with_dead_letter(
                 continue
         else:
             await _commit_record(consumer, record)
+            record_kafka_record(
+                service=_service_name(policy.consumer_name),
+                consumer=policy.consumer_name,
+                outcome="processed",
+            )
             return True
         break
 
@@ -149,6 +161,13 @@ async def process_record_with_dead_letter(
             continue
 
         await _commit_record(consumer, record)
+        service_name = _service_name(policy.consumer_name)
+        record_kafka_record(
+            service=service_name,
+            consumer=policy.consumer_name,
+            outcome="dead_lettered",
+        )
+        record_kafka_dead_letter(service=service_name, consumer=policy.consumer_name)
         logger.error(
             "kafka_record_dead_lettered",
             extra={
@@ -233,3 +252,7 @@ def _base64(value: bytes | None) -> str | None:
 
 def _utc_now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _service_name(consumer_name: str) -> str:
+    return consumer_name.split(".", maxsplit=1)[0]

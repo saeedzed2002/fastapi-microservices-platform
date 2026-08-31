@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
@@ -49,6 +49,7 @@ from identity_service.staff_login_rate_limit import (
 )
 from identity_service.workers.outbox_publisher import run_outbox_publisher
 from platform_auth import AuthClaims, TokenError, decode_access_token, encode_access_token
+from platform_observability import configure_application, metrics_response
 
 settings = get_settings()
 logger = logging.getLogger(settings.service_name)
@@ -82,6 +83,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Identity Service", version=settings.service_version, lifespan=lifespan)
+configure_application(
+    app,
+    service_name=settings.service_name,
+    service_version=settings.service_version,
+    environment=settings.environment,
+    log_level=settings.log_level,
+)
 
 
 def require_internal_otp_token(token: str | None) -> None:
@@ -418,12 +426,8 @@ async def me(
 
 
 @app.get("/metrics", tags=["observability"])
-async def metrics() -> str:
-    return (
-        "# HELP identity_service_up Service availability\n"
-        "# TYPE identity_service_up gauge\n"
-        "identity_service_up 1\n"
-    )
+async def metrics() -> Response:
+    return metrics_response()
 
 
 @app.get("/api/v1/auth/context", include_in_schema=False)

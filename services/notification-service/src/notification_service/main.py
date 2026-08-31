@@ -4,7 +4,7 @@ import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +14,7 @@ from notification_service.db import dispose_engine, get_session
 from notification_service.schemas import OtpSmsDeliveryRequest, OtpSmsDeliveryResponse
 from notification_service.workers.kafka import consume_invoice_events
 from notification_service.workers.task_dispatcher import run_task_dispatcher
+from platform_observability import configure_application, metrics_response
 
 settings = get_settings()
 logger = logging.getLogger(settings.service_name)
@@ -39,6 +40,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Notification Service", version=settings.service_version, lifespan=lifespan)
+configure_application(
+    app,
+    service_name=settings.service_name,
+    service_version=settings.service_version,
+    environment=settings.environment,
+)
 
 
 def require_internal_otp_token(token: str | None) -> None:
@@ -91,9 +98,5 @@ async def enqueue_otp_delivery(
 
 
 @app.get("/metrics", tags=["observability"])
-async def metrics() -> str:
-    return (
-        "# HELP notification_service_up Service availability\n"
-        "# TYPE notification_service_up gauge\n"
-        "notification_service_up 1\n"
-    )
+async def metrics() -> Response:
+    return metrics_response()

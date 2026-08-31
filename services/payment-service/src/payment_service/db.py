@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from payment_service.config import get_settings
+from platform_observability.database import instrument_async_engine
 
 _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
@@ -17,6 +18,7 @@ def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         _engine = create_async_engine(get_settings().database_url, pool_pre_ping=True)
+        instrument_async_engine(_engine, service_name=get_settings().service_name)
     return _engine
 
 
