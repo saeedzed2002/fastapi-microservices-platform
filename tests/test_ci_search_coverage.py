@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-def test_search_service_is_covered_by_every_ci_delivery_stage() -> None:
+def test_search_service_is_covered_by_every_ci_validation_stage() -> None:
     workflow = (
         Path(__file__).resolve().parents[1] / ".github" / "workflows" / "platform-ci.yml"
     ).read_text(encoding="utf-8")
@@ -13,7 +13,4 @@ def test_search_service_is_covered_by_every_ci_delivery_stage() -> None:
     assert "          - search-service" in workflow
     assert "services/search-service/alembic.ini upgrade head" in workflow
     assert "tests/e2e/test_phase8_search.py" in workflow
-    publish_job = workflow.split("  publish-ghcr:\n", maxsplit=1)[1]
-    assert "matrix:\n        service:" in publish_job
-    assert "          - search-service" in publish_job
-    assert "Scan exact publish image for high and critical vulnerabilities" in publish_job
+    assert "  kubernetes-conformance:" in workflow

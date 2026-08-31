@@ -6,6 +6,9 @@ This runbook deploys the Phase 10 Helm charts. The Phase 9 raw resources remain
 the reviewed baseline but are not the environment delivery command. This runbook does not create a cluster,
 an ingress controller, TLS issuer, secret manager, cluster metrics provider,
 node autoscaler, or managed stateful service.
+The portfolio workflow also does not publish deployable registry images; an
+environment owner must supply separately built, scanned, and immutable image
+digests before using this runbook.
 Do not treat a successful `helm upgrade` as proof of a target environment's
 external dependencies or public routing. The disposable CI conformance job
 does prove foundation-chart installation, migration hooks, workloads, and
@@ -47,13 +50,14 @@ environment hostnames or credentials to the shared repository.
 ## Release images
 
 The application chart has no default image digest and intentionally fails to
-render until a private release values file sets every service's published
-immutable digest from one validated `publish-ghcr` workflow. The same digest
-must be used by its API, event worker, Celery worker, and migration hook. The
-foundation configuration disables asynchronous-loop flags in API Pods; each
-event-worker Deployment overrides only the flags it owns. Do not manually
-enable those flags in API release values, because API `HPA` and rolling updates
-would then alter Kafka consumer ownership and task-dispatch throughput.
+render until a private release values file sets every service's independently
+built, scanned, immutable digest. The current portfolio workflow does not
+provide those images. The same digest must be used by its API, event worker,
+Celery worker, and migration hook. The foundation configuration disables
+asynchronous-loop flags in API Pods; each event-worker Deployment overrides
+only the flags it owns. Do not manually enable those flags in API release
+values, because API `HPA` and rolling updates would then alter Kafka consumer
+ownership and task-dispatch throughput.
 
 Verify that every rendered image is digest-addressed before applying:
 

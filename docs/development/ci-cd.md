@@ -43,16 +43,14 @@ production delivery environment: it has no real provider credentials, public
 ingress, certificate, external managed-state dependency, multi-node capacity,
 or a synthetic HPA scale-out load test.
 
-Only a validated push to `main` can run `publish-ghcr`. Its per-service matrix
-builds the checked-out source revision into a local tag, scans that exact tag
-with the `HIGH`/`CRITICAL` Trivy gate, and only after the scan passes receives
-`packages: write` registry authentication through the workflow-scoped
-`GITHUB_TOKEN`. It then publishes one image per service to
-`ghcr.io/saeedzed2002/fastapi-microservices-platform/<service>`. Images receive
-`sha-<full-git-sha>` and `<service-version>-<short-git-sha>` tags plus OCI
-source, revision, and version labels. No `latest` tag is published and the
-workflow summary records the resulting digest. A pull-request scan or a
-separately rebuilt main image is not treated as a delivery scan gate.
+The repository is a portfolio project, so a validated push to `main` does not
+authenticate to `GHCR`, publish images, or request `packages: write`.
+`kubernetes-conformance` builds local images from the checked-out revision and
+destroys them with the disposable cluster. This is real chart and business-flow
+evidence, but it is not registry-release or production-deployment evidence.
+Any later release workflow must build, scan with the `HIGH`/`CRITICAL` gate,
+attest, and publish the same image artifact only after explicit release scope
+and environment controls are approved.
 
 `pip-audit 2.10.1` and `Trivy Action 0.36.0` were selected from their official
 releases on `2026-08-25`; the former supports Python `3.14` and is locked as a
@@ -77,27 +75,20 @@ All actions are officially verified and immutably pinned. Workflow permissions a
 
 Initially all applicable checks run. Later affected-service detection may optimize CI, but changes to root dependency metadata, locks, shared libraries, contracts, infrastructure, or workflows trigger all relevant consumers. A required workflow is not silently skipped by fragile path filters.
 
-## Main-branch delivery target
+## Main-branch validation boundary
 
 ```text
 validated commit
-  -> build the exact validated source revision
-  -> scan that exact local image
-  -> tag with service version and Git SHA
-  -> push to GHCR
-  -> promote immutable digest
-  -> controlled service migration step
-  -> Kubernetes rollout
-  -> readiness and rollout validation
-  -> smoke tests
-  -> explicit rollback or incident path
+  -> service migrations and integration workflow
+  -> disposable Kind chart installation
+  -> readiness, HPA-metrics, smoke, and business E2E proof
+  -> destroy local images and disposable cluster
 ```
 
-The current phase rebuilds the exact validated Git revision in the publish job;
-it does not yet promote images between environments because Kubernetes delivery
-environments do not exist. When those environments are introduced, the release
-workflow must build and attest once, then promote the same digest after explicit
-approval rather than rebuilding it per environment.
+The current phase has no registry release. When an environment is introduced,
+a separate release workflow must build and attest once, scan that exact image,
+and promote the same immutable digest after explicit approval rather than
+rebuilding it per environment.
 
 ## Migrations and rollback
 
@@ -112,9 +103,9 @@ approval rather than rebuilding it per environment.
 
 CD is introduced only after Kubernetes deployment exists and its raw resources are stable. It is not an uncontrolled `kubectl apply` command. Environments, approvals, credentials, migration gates, readiness, smoke scope, rollback triggers, and audit history must be defined first.
 
-The current delivery boundary remains the verified immutable `GHCR` digest,
-not an automatic runtime deployment. Phase 10 supplies Helm migration hooks
-and release values; a later promotion workflow must consume a previously
+The current validation boundary ends after successful `Kind` conformance, not
+at a registry digest or runtime deployment. Phase 10 supplies Helm migration
+hooks and release values; a later promotion workflow must consume a previously
 published digest, require explicit environment approval, execute a controlled
 chart upgrade, validate rollout/readiness and bounded smoke tests, and permit
 rollback only when the schema remains compatible.
@@ -123,10 +114,10 @@ rollback only when the schema remains compatible.
 
 Before relying on delivery, protect `main`: require pull requests, require the
 `quality`, `migration-heads`, `image-build`, `integration`, and
-`kubernetes-conformance` checks, require
-up-to-date branches, restrict direct pushes, and prohibit required-check
-bypass. Configure Actions with read-only defaults and permit `GITHUB_TOKEN`
-package writes for this repository. Enable Dependency Graph, Dependabot alerts,
+`kubernetes-conformance` checks, require up-to-date branches, restrict direct
+pushes, and prohibit required-check bypass. Configure Actions with read-only
+defaults; this portfolio repository does not require `GITHUB_TOKEN` package
+writes. Enable Dependency Graph, Dependabot alerts,
 Dependabot security updates, and Dependabot version updates; the committed
 configuration checks `uv`, GitHub Actions, Docker Compose, and service
 Dockerfiles weekly.

@@ -23,6 +23,7 @@ ADRs record decisions that materially affect service ownership, contracts, durab
 
 | ADR | Status | Decision |
 |---|---|---|
+| [ADR-037](ADR-037-portfolio-ci-excludes-automatic-registry-publication.md) | Accepted | Portfolio CI excludes automatic registry publication |
 | [ADR-036](ADR-036-browser-origin-and-token-boundary.md) | Accepted | Secure runtime defaults and browser token boundary |
 | [ADR-035](ADR-035-separate-api-and-asynchronous-runtime-workloads.md) | Accepted | Separate API and asynchronous runtime workloads |
 | [ADR-034](ADR-034-online-payment-provider-routing.md) | Accepted | Online payment provider routing and safe fallback |
