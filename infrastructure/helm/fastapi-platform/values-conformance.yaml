@@ -1,3 +1,9 @@
+api:
+  # The disposable Kind proof has one node. Production delivery keeps the
+  # default of two replicas per API; this isolated override preserves the
+  # previously proven one-replica resource envelope.
+  replicas: 1
+
 images:
   repositoryPrefix: fastapi-platform
   pullPolicy: Never

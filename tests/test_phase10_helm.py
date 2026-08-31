@@ -61,6 +61,8 @@ def test_delivery_images_require_digests_and_conformance_tags_are_explicit() -> 
 
     assert "allowMutableTags: false" in values
     assert "allowMutableTags: true" in conformance_values
+    assert "api:\n  # The disposable Kind proof has one node." in conformance_values
+    assert "replicas: 1" in conformance_values
     assert "@sha256:%s" in helper
     assert "must contain exactly 64 lowercase hexadecimal characters" in helper
     assert "tag is forbidden; use an immutable digest for delivery" in helper
