@@ -117,6 +117,8 @@ def test_kind_conformance_installs_charts_and_ci_pins_helm() -> None:
     assert "dependencies.yaml" in harness
     assert workflow.count("Install verified Helm v4.2.4") == 2
     assert workflow.count(HELM_SHA256) == 2
+    assert workflow.count('helm_tmp_dir="$(mktemp -d)"') == 2
+    assert workflow.count('tar --extract --gzip --file "$archive" --directory "$helm_tmp_dir"') == 2
     assert "helm lint infrastructure/helm/fastapi-platform --strict" in workflow
     assert "The delivery chart rendered without immutable image digests." in workflow
     assert 'grep --fixed-strings "immutable release digest"' in workflow

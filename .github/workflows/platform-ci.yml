@@ -42,11 +42,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          archive=helm-v4.2.4-linux-amd64.tar.gz
-          curl --fail --location --retry 3 --output "$archive" "https://get.helm.sh/$archive"
+          helm_tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$helm_tmp_dir"' EXIT
+          archive_name=helm-v4.2.4-linux-amd64.tar.gz
+          archive="$helm_tmp_dir/$archive_name"
+          curl --fail --location --retry 3 --output "$archive" "https://get.helm.sh/$archive_name"
           echo "c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3  $archive" | sha256sum --check
-          tar --extract --gzip --file "$archive"
-          install --mode=0755 linux-amd64/helm "$HOME/.local/bin/helm"
+          tar --extract --gzip --file "$archive" --directory "$helm_tmp_dir"
+          install --mode=0755 "$helm_tmp_dir/linux-amd64/helm" "$HOME/.local/bin/helm"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           helm version
 
@@ -310,11 +313,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          archive=helm-v4.2.4-linux-amd64.tar.gz
-          curl --fail --location --retry 3 --output "$archive" "https://get.helm.sh/$archive"
+          helm_tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$helm_tmp_dir"' EXIT
+          archive_name=helm-v4.2.4-linux-amd64.tar.gz
+          archive="$helm_tmp_dir/$archive_name"
+          curl --fail --location --retry 3 --output "$archive" "https://get.helm.sh/$archive_name"
           echo "c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3  $archive" | sha256sum --check
-          tar --extract --gzip --file "$archive"
-          install --mode=0755 linux-amd64/helm "$HOME/.local/bin/helm"
+          tar --extract --gzip --file "$archive" --directory "$helm_tmp_dir"
+          install --mode=0755 "$helm_tmp_dir/linux-amd64/helm" "$HOME/.local/bin/helm"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           helm version
 
