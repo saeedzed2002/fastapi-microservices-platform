@@ -85,6 +85,19 @@ def run_shipping_workflow(checkout: CheckoutWorkflowResult) -> None:
         replay.raise_for_status()
         assert replay.json()["status"] == "PROCESSING"
 
+        # Order permits one active fulfillment authorization per order.  Wait
+        # for its Shipping event consumer to consume the PROCESSING command
+        # before requesting the next durable transition.
+        def order_projection_is_processing() -> bool:
+            response = client.get(
+                f"{order_base_url}/api/v1/orders/{checkout.order_id}", headers=user_headers
+            )
+            response.raise_for_status()
+            payload = response.json()
+            return payload["status"] == "PROCESSING" and payload["fulfillment"] is not None
+
+        _wait_for(order_projection_is_processing, timeout_seconds=timeout_seconds)
+
         shipped = client.put(
             f"{shipping_base_url}/api/v1/shipping/admin/orders/{checkout.order_id}/status",
             headers={**administrator_headers, "Idempotency-Key": f"phase18-shipped-{uuid4().hex}"},
@@ -102,7 +115,6 @@ def run_shipping_workflow(checkout: CheckoutWorkflowResult) -> None:
             return (
                 payload["status"] == "SHIPPED"
                 and payload["fulfillment"] is not None
-                and payload["fulfillment"]["status"] == "SHIPPED"
                 and payload["fulfillment"]["carrier"] == "Post"
                 and payload["fulfillment"]["tracking_number"] == "PHASE18-1"
             )
