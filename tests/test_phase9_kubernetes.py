@@ -15,6 +15,7 @@ DATABASE_SERVICES = (
     "cart-service",
     "order-service",
     "payment-service",
+    "shipping-service",
     "notification-service",
     "chat-service",
 )
@@ -28,6 +29,7 @@ ENVIRONMENT_KEYS = (
     "CART_ENVIRONMENT",
     "ORDER_ENVIRONMENT",
     "PAYMENT_ENVIRONMENT",
+    "SHIPPING_ENVIRONMENT",
     "NOTIFICATION_ENVIRONMENT",
     "CHAT_ENVIRONMENT",
 )
@@ -54,7 +56,7 @@ def test_workloads_are_digest_pinned_and_have_no_mutable_tag() -> None:
     )
     images = re.findall(r"image: (ghcr\.io/[^\s]+)", "\n".join(documents))
 
-    assert len(images) == 29
+    assert len(images) == 31
     assert all(f"@{DIGEST_PLACEHOLDER}" in image for image in images)
     assert all(":latest" not in image for image in images)
 

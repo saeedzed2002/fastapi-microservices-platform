@@ -16,6 +16,7 @@ def test_local_edge_resolves_compose_service_upstreams_at_request_time() -> None
         "cart-service",
         "order-service",
         "payment-service",
+        "shipping-service",
         "notification-service",
         "chat-service",
     ):
@@ -31,6 +32,7 @@ def test_local_edge_resolves_compose_service_upstreams_at_request_time() -> None
         "cart_upstream",
         "order_upstream",
         "payment_upstream",
+        "shipping_upstream",
         "notification_upstream",
         "chat_upstream",
     ):
@@ -44,6 +46,15 @@ def test_local_edge_routes_identity_staff_operations() -> None:
 
     assert "location ^~ /api/v1/admin/" in config
     assert "proxy_pass http://$identity_upstream;" in config
+
+
+def test_local_edge_routes_shipping_administration() -> None:
+    root = Path(__file__).resolve().parents[1]
+    config = (root / "infrastructure" / "edge" / "nginx.conf").read_text(encoding="utf-8")
+
+    assert "location ^~ /api/v1/shipping/" in config
+    assert "proxy_pass http://$shipping_upstream;" in config
+    assert "location = /docs/shipping" in config
 
 
 def test_local_edge_keeps_websocket_and_login_rate_buckets_separate() -> None:

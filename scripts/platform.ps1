@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("install", "lint", "format-check", "typecheck", "test", "migrate-identity", "migrate-customer", "migrate-catalog", "migrate-search", "migrate-media", "migrate-inventory", "migrate-cart", "migrate-order", "migrate-payment", "migrate-notification", "migrate-chat", "provision-admin", "dev-up", "dev-start", "dev-stop", "dev-recreate", "dev-down", "logs")]
+    [ValidateSet("install", "lint", "format-check", "typecheck", "test", "migrate-identity", "migrate-customer", "migrate-catalog", "migrate-search", "migrate-media", "migrate-inventory", "migrate-cart", "migrate-order", "migrate-payment", "migrate-shipping", "migrate-notification", "migrate-chat", "provision-admin", "dev-up", "dev-start", "dev-stop", "dev-recreate", "dev-down", "logs")]
     [string]$Task,
     [string]$AdminEmail
 )
@@ -32,6 +32,7 @@ try {
         "migrate-cart" { & $uvPath run --package cart-service alembic -c services/cart-service/alembic.ini upgrade head }
         "migrate-order" { & $uvPath run --package order-service alembic -c services/order-service/alembic.ini upgrade head }
         "migrate-payment" { & $uvPath run --package payment-service alembic -c services/payment-service/alembic.ini upgrade head }
+        "migrate-shipping" { & $uvPath run --package shipping-service alembic -c services/shipping-service/alembic.ini upgrade head }
         "migrate-notification" { & $uvPath run --package notification-service alembic -c services/notification-service/alembic.ini upgrade head }
         "migrate-chat" { & $uvPath run --package chat-service alembic -c services/chat-service/alembic.ini upgrade head }
         "provision-admin" {

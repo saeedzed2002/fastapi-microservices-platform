@@ -332,11 +332,14 @@ services:
       ORDER_CUSTOMER_BASE_URL: http://customer-service:8000
       ORDER_CART_BASE_URL: http://cart-service:8000
       ORDER_PAYMENT_BASE_URL: http://payment-service:8000
+      ORDER_SHIPPING_BASE_URL: http://shipping-service:8000
+      ORDER_SHIPPING_INTERNAL_ACCESS_SECRET: local-development-order-shipping-access-secret-change-me-32-bytes
       ORDER_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      ORDER_KAFKA_PUBLISHER_ENABLED: "true"
-      ORDER_KAFKA_CONSUMER_ENABLED: "true"
-      ORDER_INVOICE_CONSUMER_ENABLED: "true"
-      ORDER_TASK_DISPATCHER_ENABLED: "true"
+      ORDER_KAFKA_PUBLISHER_ENABLED: "false"
+      ORDER_KAFKA_CONSUMER_ENABLED: "false"
+      ORDER_INVOICE_CONSUMER_ENABLED: "false"
+      ORDER_SHIPPING_CONSUMER_ENABLED: "false"
+      ORDER_TASK_DISPATCHER_ENABLED: "false"
       ORDER_RABBITMQ_URL: amqp://platform:platform-local-only@rabbitmq:5672//
       ORDER_S3_ENDPOINT_URL: http://minio:9000
     depends_on:
@@ -383,6 +386,32 @@ services:
       PAYMENT_ZIBAL_REQUEST_TIMEOUT_SECONDS: ${ZIBAL_REQUEST_TIMEOUT_SECONDS:-10}
       PAYMENT_RESERVATION_MINUTES: ${PAYMENT_RESERVATION_MINUTES:-15}
       PAYMENT_EXPIRY_WORKER_ENABLED: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  shipping-service:
+    build:
+      context: ../..
+      dockerfile: services/shipping-service/Dockerfile
+    image: fastapi-microservices-platform-shipping-service:0.1.0-local
+    environment:
+      <<: *observability-environment
+      SHIPPING_ENVIRONMENT: local
+      SHIPPING_DATABASE_URL: postgresql+asyncpg://shipping_service:shipping-local-only@postgres:5432/shipping_service
+      SHIPPING_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
+      SHIPPING_ORDER_BASE_URL: http://order-service:8000
+      SHIPPING_ORDER_INTERNAL_ACCESS_SECRET: local-development-order-shipping-access-secret-change-me-32-bytes
+      SHIPPING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       postgres:
         condition: service_healthy
@@ -492,6 +521,8 @@ services:
         condition: service_healthy
       payment-service:
         condition: service_healthy
+      shipping-service:
+        condition: service_healthy
       chat-service:
         condition: service_healthy
     healthcheck:
@@ -516,6 +547,59 @@ services:
       rabbitmq:
         condition: service_healthy
       minio:
+        condition: service_healthy
+
+  order-event-worker:
+    image: fastapi-microservices-platform-order-service:0.9.0-local
+    pull_policy: never
+    command: ["python", "-m", "order_service.workers.runtime_main"]
+    environment:
+      <<: *observability-environment
+      ORDER_ENVIRONMENT: local
+      ORDER_DATABASE_URL: postgresql+asyncpg://order_service:order-local-only@postgres:5432/order_service
+      ORDER_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
+      ORDER_CATALOG_BASE_URL: http://catalog-service:8000
+      ORDER_CUSTOMER_BASE_URL: http://customer-service:8000
+      ORDER_CART_BASE_URL: http://cart-service:8000
+      ORDER_PAYMENT_BASE_URL: http://payment-service:8000
+      ORDER_SHIPPING_BASE_URL: http://shipping-service:8000
+      ORDER_SHIPPING_INTERNAL_ACCESS_SECRET: local-development-order-shipping-access-secret-change-me-32-bytes
+      ORDER_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ORDER_KAFKA_PUBLISHER_ENABLED: "true"
+      ORDER_KAFKA_CONSUMER_ENABLED: "true"
+      ORDER_INVOICE_CONSUMER_ENABLED: "true"
+      ORDER_SHIPPING_CONSUMER_ENABLED: "true"
+      ORDER_TASK_DISPATCHER_ENABLED: "true"
+      ORDER_RABBITMQ_URL: amqp://platform:platform-local-only@rabbitmq:5672//
+      ORDER_S3_ENDPOINT_URL: http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  shipping-event-worker:
+    image: fastapi-microservices-platform-shipping-service:0.1.0-local
+    pull_policy: never
+    command: ["python", "-m", "shipping_service.workers.runtime_main"]
+    environment:
+      <<: *observability-environment
+      SHIPPING_ENVIRONMENT: local
+      SHIPPING_DATABASE_URL: postgresql+asyncpg://shipping_service:shipping-local-only@postgres:5432/shipping_service
+      SHIPPING_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
+      SHIPPING_ORDER_BASE_URL: http://order-service:8000
+      SHIPPING_ORDER_INTERNAL_ACCESS_SECRET: local-development-order-shipping-access-secret-change-me-32-bytes
+      SHIPPING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SHIPPING_KAFKA_CONSUMER_ENABLED: "true"
+      SHIPPING_KAFKA_PUBLISHER_ENABLED: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
 
   notification-worker:

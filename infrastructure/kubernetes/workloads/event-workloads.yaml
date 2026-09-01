@@ -205,6 +205,7 @@ spec:
             - {name: ORDER_KAFKA_PUBLISHER_ENABLED, value: "true"}
             - {name: ORDER_KAFKA_CONSUMER_ENABLED, value: "true"}
             - {name: ORDER_INVOICE_CONSUMER_ENABLED, value: "true"}
+            - {name: ORDER_SHIPPING_CONSUMER_ENABLED, value: "true"}
             - {name: ORDER_TASK_DISPATCHER_ENABLED, value: "true"}
           securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
           volumeMounts: [{name: tmp, mountPath: /tmp}]
@@ -242,6 +243,42 @@ spec:
           env:
             - {name: PAYMENT_KAFKA_PUBLISHER_ENABLED, value: "true"}
             - {name: PAYMENT_KAFKA_CONSUMER_ENABLED, value: "true"}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shipping-event-worker
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: shipping-event-worker, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app.kubernetes.io/name: shipping-event-worker}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: shipping-event-worker
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: event-worker
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      terminationGracePeriodSeconds: 60
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: shipping-event-worker
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/shipping-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          command: [python, -m, shipping_service.workers.runtime_main]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          env:
+            - {name: SHIPPING_KAFKA_CONSUMER_ENABLED, value: "true"}
+            - {name: SHIPPING_KAFKA_PUBLISHER_ENABLED, value: "true"}
           securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
           volumeMounts: [{name: tmp, mountPath: /tmp}]
           resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}

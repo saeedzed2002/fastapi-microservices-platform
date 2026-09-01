@@ -15,6 +15,7 @@ SERVICES = (
     "cart-service",
     "order-service",
     "payment-service",
+    "shipping-service",
     "notification-service",
     "chat-service",
 )
@@ -31,6 +32,7 @@ WORKERS = (
     "inventory-event-worker",
     "order-event-worker",
     "payment-event-worker",
+    "shipping-event-worker",
     "media-event-worker",
     "notification-event-worker",
 )
@@ -44,6 +46,7 @@ DATABASE_MIGRATIONS = (
     "cart",
     "order",
     "payment",
+    "shipping",
     "notification",
     "chat",
 )

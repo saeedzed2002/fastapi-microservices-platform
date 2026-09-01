@@ -48,6 +48,9 @@ spec:
           - path: /api/v1/payments
             pathType: Prefix
             backend: {service: {name: payment-service, port: {name: http}}}
+          - path: /api/v1/shipping
+            pathType: Prefix
+            backend: {service: {name: shipping-service, port: {name: http}}}
           - path: /api/v1/chat
             pathType: Prefix
             backend: {service: {name: chat-service, port: {name: http}}}

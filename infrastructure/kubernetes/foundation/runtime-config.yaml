@@ -55,9 +55,11 @@ data:
   ORDER_CUSTOMER_BASE_URL: http://customer-service.fastapi-platform.svc.cluster.local
   ORDER_CART_BASE_URL: http://cart-service.fastapi-platform.svc.cluster.local
   ORDER_PAYMENT_BASE_URL: http://payment-service.fastapi-platform.svc.cluster.local
+  ORDER_SHIPPING_BASE_URL: http://shipping-service.fastapi-platform.svc.cluster.local
   ORDER_KAFKA_PUBLISHER_ENABLED: "false"
   ORDER_KAFKA_CONSUMER_ENABLED: "false"
   ORDER_INVOICE_CONSUMER_ENABLED: "false"
+  ORDER_SHIPPING_CONSUMER_ENABLED: "false"
   ORDER_TASK_DISPATCHER_ENABLED: "false"
   ORDER_S3_BUCKET: fastapi-platform-invoices
   ORDER_S3_REGION: us-east-1
@@ -70,6 +72,12 @@ data:
   PAYMENT_ZARINPAL_SANDBOX: "false"
   PAYMENT_ZARINPAL_CALLBACK_URL: https://replace-with-public-origin.example/api/v1/payments/zarinpal/callback
   PAYMENT_ZIBAL_CALLBACK_URL: https://replace-with-public-origin.example/api/v1/payments/zibal/callback
+  SHIPPING_ENVIRONMENT: production
+  SHIPPING_JWT_ISSUER: fastapi-platform.identity
+  SHIPPING_JWT_AUDIENCE: fastapi-platform
+  SHIPPING_ORDER_BASE_URL: http://order-service.fastapi-platform.svc.cluster.local
+  SHIPPING_KAFKA_CONSUMER_ENABLED: "false"
+  SHIPPING_KAFKA_PUBLISHER_ENABLED: "false"
   NOTIFICATION_KAFKA_CONSUMER_ENABLED: "false"
   NOTIFICATION_TASK_DISPATCHER_ENABLED: "false"
   NOTIFICATION_IDENTITY_OTP_BASE_URL: http://identity-service.fastapi-platform.svc.cluster.local

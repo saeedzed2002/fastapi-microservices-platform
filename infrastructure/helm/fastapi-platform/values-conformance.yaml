@@ -25,6 +25,7 @@ apiServices:
   cart-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
   order-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
   payment-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
+  shipping-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
   notification-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
   chat-service: {resources: {requests: {cpu: 50m, memory: 128Mi}}}
 
@@ -41,6 +42,7 @@ workers:
   inventory-event-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
   order-event-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
   payment-event-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
+  shipping-event-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
   media-event-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
   notification-event-worker: {resources: {requests: {cpu: 25m, memory: 128Mi}}}
 
@@ -60,5 +62,6 @@ images:
     cart-service: {tag: conformance}
     order-service: {tag: conformance}
     payment-service: {tag: conformance}
+    shipping-service: {tag: conformance}
     notification-service: {tag: conformance}
     chat-service: {tag: conformance}

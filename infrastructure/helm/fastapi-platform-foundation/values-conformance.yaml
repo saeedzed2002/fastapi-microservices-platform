@@ -9,6 +9,7 @@ runtimeConfig:
   CART_ENVIRONMENT: conformance
   ORDER_ENVIRONMENT: conformance
   PAYMENT_ENVIRONMENT: conformance
+  SHIPPING_ENVIRONMENT: conformance
   NOTIFICATION_ENVIRONMENT: conformance
   CHAT_ENVIRONMENT: conformance
   NOTIFICATION_SMTP_PORT: "1025"

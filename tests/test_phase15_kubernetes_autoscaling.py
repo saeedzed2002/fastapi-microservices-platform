@@ -16,6 +16,7 @@ SERVICES = (
     "cart-service",
     "order-service",
     "payment-service",
+    "shipping-service",
     "notification-service",
     "chat-service",
 )

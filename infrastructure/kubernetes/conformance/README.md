@@ -20,8 +20,9 @@ is not a production overlay and must never be promoted to an environment.
    and Mailpit, then installs the application chart;
 5. runs `platform-health-smoke` from the restricted application namespace;
 6. runs `platform-checkout-e2e` from that same restricted namespace. The Job
-   uses service DNS names to execute the existing successful checkout,
-   inventory commit, invoice, and notification workflow. It proves in-cluster
+   uses service DNS names to execute checkout, inventory commit, invoice,
+   notification, and the Shipping-owned transition whose Kafka fact updates
+   the Order customer projection. It proves in-cluster
    service behavior and network-policy ingress, not public `Ingress` routing;
 7. confirms Helm migration hooks and workload rollout, exports diagnostics on
    failure, and deletes the cluster in all cases.

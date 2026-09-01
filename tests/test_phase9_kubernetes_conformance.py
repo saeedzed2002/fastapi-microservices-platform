@@ -16,6 +16,7 @@ SERVICES = (
     "cart-service",
     "order-service",
     "payment-service",
+    "shipping-service",
     "notification-service",
     "chat-service",
 )
@@ -56,6 +57,7 @@ def test_conformance_uses_loaded_images_not_production_registry_credentials() ->
     assert "fastapi-platform/checkout-e2e:conformance" in checkout_e2e
     assert "E2E_CUSTOMER_BASE_URL" in checkout_e2e
     assert "E2E_ORDER_BASE_URL" in checkout_e2e
+    assert "E2E_SHIPPING_BASE_URL" in checkout_e2e
     assert "E2E_S3_ENDPOINT" in checkout_e2e
     assert "readOnlyRootFilesystem: true" in checkout_e2e
 
@@ -69,9 +71,11 @@ def test_checkout_e2e_reuses_the_compose_workflow_without_test_dependencies() ->
     assert "run_checkout_workflow()" in compose_test
     assert "FROM fastapi-platform/order-service:conformance" in runner
     assert "COPY tests/e2e/checkout_workflow.py /app/checkout_workflow.py" in runner
+    assert "COPY tests/e2e/shipping_workflow.py /app/shipping_workflow.py" in runner
     assert "pytest" not in runner
     assert 'payment_method": "test_success"' in workflow
     assert "invoice.pdf" in workflow
+    assert "run_shipping_workflow(checkout)" in workflow
 
 
 def test_conformance_dependencies_and_secrets_are_isolated_test_inputs() -> None:
@@ -87,6 +91,7 @@ def test_conformance_dependencies_and_secrets_are_isolated_test_inputs() -> None
     assert "smtp://" not in secrets
     assert "fastapi-platform-dependencies.svc.cluster.local" in secrets
     assert "ORDER_SHIPPING_INTERNAL_ACCESS_SECRET" in secrets
+    assert "SHIPPING_ORDER_INTERNAL_ACCESS_SECRET" in secrets
 
     # These values use YAML flow mappings.  Kafka listener values contain
     # commas and colons, so they must remain quoted or Kubernetes will decode

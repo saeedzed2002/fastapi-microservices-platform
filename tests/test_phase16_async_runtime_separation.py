@@ -31,12 +31,17 @@ EVENT_WORKERS = {
             "ORDER_KAFKA_PUBLISHER_ENABLED",
             "ORDER_KAFKA_CONSUMER_ENABLED",
             "ORDER_INVOICE_CONSUMER_ENABLED",
+            "ORDER_SHIPPING_CONSUMER_ENABLED",
             "ORDER_TASK_DISPATCHER_ENABLED",
         ),
     ),
     "payment-event-worker": (
         "payment_service.workers.runtime_main",
         ("PAYMENT_KAFKA_PUBLISHER_ENABLED", "PAYMENT_KAFKA_CONSUMER_ENABLED"),
+    ),
+    "shipping-event-worker": (
+        "shipping_service.workers.runtime_main",
+        ("SHIPPING_KAFKA_CONSUMER_ENABLED", "SHIPPING_KAFKA_PUBLISHER_ENABLED"),
     ),
     "media-event-worker": (
         "media_service.workers.runtime_main",

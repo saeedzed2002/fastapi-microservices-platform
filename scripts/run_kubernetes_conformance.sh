@@ -25,6 +25,7 @@ readonly SERVICE_IMAGES=(
   cart-service
   order-service
   payment-service
+  shipping-service
   notification-service
   chat-service
 )
@@ -39,6 +40,7 @@ readonly API_DEPLOYMENTS=(
   cart-service
   order-service
   payment-service
+  shipping-service
   notification-service
   chat-service
 )
@@ -50,6 +52,7 @@ readonly WORKER_DEPLOYMENTS=(
   inventory-event-worker
   order-event-worker
   payment-event-worker
+  shipping-event-worker
   media-event-worker
   notification-event-worker
   order-invoice-worker

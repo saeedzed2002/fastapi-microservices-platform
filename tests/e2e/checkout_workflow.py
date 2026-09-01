@@ -19,6 +19,8 @@ AUDIENCE = "fastapi-platform"
 @dataclass(frozen=True)
 class CheckoutWorkflowResult:
     order_id: UUID
+    customer_id: UUID
+    administrator_id: UUID
     new_mail_messages: int
 
 
@@ -198,10 +200,19 @@ def run_checkout_workflow(
             - previous_messages
         )
         assert new_mail_messages == 1
-    result = CheckoutWorkflowResult(order_id=UUID(order_id), new_mail_messages=new_mail_messages)
+    result = CheckoutWorkflowResult(
+        order_id=UUID(order_id),
+        customer_id=UUID(user_id),
+        administrator_id=UUID(admin_id),
+        new_mail_messages=new_mail_messages,
+    )
     print(f"checkout E2E succeeded for order {result.order_id}")
     return result
 
 
 if __name__ == "__main__":
-    run_checkout_workflow()
+    checkout = run_checkout_workflow()
+    if os.environ.get("E2E_SHIPPING_BASE_URL"):
+        from shipping_workflow import run_shipping_workflow
+
+        run_shipping_workflow(checkout)

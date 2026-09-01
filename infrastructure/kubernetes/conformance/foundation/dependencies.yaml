@@ -34,6 +34,8 @@ data:
     CREATE DATABASE order_service OWNER order_service;
     CREATE USER payment_service WITH PASSWORD 'payment-conformance-only';
     CREATE DATABASE payment_service OWNER payment_service;
+    CREATE USER shipping_service WITH PASSWORD 'shipping-conformance-only';
+    CREATE DATABASE shipping_service OWNER shipping_service;
     CREATE USER notification_service WITH PASSWORD 'notification-conformance-only';
     CREATE DATABASE notification_service OWNER notification_service;
     CREATE USER chat_service WITH PASSWORD 'chat-conformance-only';

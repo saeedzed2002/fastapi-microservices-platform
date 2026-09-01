@@ -200,6 +200,56 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: shipping-service
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: shipping-service, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  minReadySeconds: 5
+  progressDeadlineSeconds: 300
+  strategy: {type: RollingUpdate, rollingUpdate: {maxUnavailable: 0, maxSurge: 1}}
+  selector: {matchLabels: {app.kubernetes.io/name: shipping-service}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: shipping-service
+        app.kubernetes.io/part-of: fastapi-microservices-platform
+        platform.fastapi.io/workload: api
+    spec:
+      serviceAccountName: platform-runtime
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: ghcr-pull}]
+      terminationGracePeriodSeconds: 30
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: shipping-service
+          image: ghcr.io/saeedzed2002/fastapi-microservices-platform/shipping-service@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8000}]
+          envFrom: [{configMapRef: {name: platform-runtime-config}}, {secretRef: {name: platform-runtime-secrets}}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          startupProbe: {httpGet: {path: /health/live, port: http}, periodSeconds: 5, failureThreshold: 12}
+          livenessProbe: {httpGet: {path: /health/live, port: http}, periodSeconds: 10, timeoutSeconds: 3, failureThreshold: 3}
+          readinessProbe: {httpGet: {path: /health/ready, port: http}, periodSeconds: 5, timeoutSeconds: 3, failureThreshold: 3}
+          resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shipping-service
+  namespace: fastapi-platform
+  labels: {app.kubernetes.io/name: shipping-service, app.kubernetes.io/part-of: fastapi-microservices-platform}
+spec:
+  type: ClusterIP
+  selector: {app.kubernetes.io/name: shipping-service}
+  ports: [{name: http, port: 80, targetPort: http, appProtocol: http}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
   name: notification-service
   namespace: fastapi-platform
   labels: {app.kubernetes.io/name: notification-service, app.kubernetes.io/part-of: fastapi-microservices-platform}

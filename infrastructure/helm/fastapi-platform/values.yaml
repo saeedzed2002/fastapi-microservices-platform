@@ -26,6 +26,7 @@ images:
     cart-service: {digest: "", tag: ""}
     order-service: {digest: "", tag: ""}
     payment-service: {digest: "", tag: ""}
+    shipping-service: {digest: "", tag: ""}
     notification-service: {digest: "", tag: ""}
     chat-service: {digest: "", tag: ""}
 
@@ -77,6 +78,11 @@ apiServices:
     resources: {requests: {cpu: 200m, memory: 384Mi}, limits: {cpu: "1", memory: 768Mi}}
   payment-service:
     image: payment-service
+    terminationGracePeriodSeconds: 30
+    appProtocol: http
+    resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  shipping-service:
+    image: shipping-service
     terminationGracePeriodSeconds: 30
     appProtocol: http
     resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
@@ -136,6 +142,7 @@ migrations:
     - {name: cart, image: cart-service}
     - {name: order, image: order-service}
     - {name: payment, image: payment-service}
+    - {name: shipping, image: shipping-service}
     - {name: notification, image: notification-service}
     - {name: chat, image: chat-service}
 
@@ -199,13 +206,19 @@ workers:
     image: order-service
     terminationGracePeriodSeconds: 90
     command: [python, -m, order_service.workers.runtime_main]
-    env: {ORDER_KAFKA_PUBLISHER_ENABLED: "true", ORDER_KAFKA_CONSUMER_ENABLED: "true", ORDER_INVOICE_CONSUMER_ENABLED: "true", ORDER_TASK_DISPATCHER_ENABLED: "true"}
+    env: {ORDER_KAFKA_PUBLISHER_ENABLED: "true", ORDER_KAFKA_CONSUMER_ENABLED: "true", ORDER_INVOICE_CONSUMER_ENABLED: "true", ORDER_SHIPPING_CONSUMER_ENABLED: "true", ORDER_TASK_DISPATCHER_ENABLED: "true"}
     resources: {requests: {cpu: 200m, memory: 384Mi}, limits: {cpu: "1", memory: 768Mi}}
   payment-event-worker:
     image: payment-service
     terminationGracePeriodSeconds: 60
     command: [python, -m, payment_service.workers.runtime_main]
     env: {PAYMENT_KAFKA_PUBLISHER_ENABLED: "true", PAYMENT_KAFKA_CONSUMER_ENABLED: "true"}
+    resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+  shipping-event-worker:
+    image: shipping-service
+    terminationGracePeriodSeconds: 60
+    command: [python, -m, shipping_service.workers.runtime_main]
+    env: {SHIPPING_KAFKA_CONSUMER_ENABLED: "true", SHIPPING_KAFKA_PUBLISHER_ENABLED: "true"}
     resources: {requests: {cpu: 150m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
   media-event-worker:
     image: media-service
@@ -248,5 +261,6 @@ ingress:
     - {path: /api/v1/carts, pathType: Prefix, service: cart-service}
     - {path: /api/v1/orders, pathType: Prefix, service: order-service}
     - {path: /api/v1/payments, pathType: Prefix, service: payment-service}
+    - {path: /api/v1/shipping, pathType: Prefix, service: shipping-service}
     - {path: /api/v1/chat, pathType: Prefix, service: chat-service}
     - {path: /api/v1/reference, pathType: Exact, service: reference-service}

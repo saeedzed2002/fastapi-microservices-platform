@@ -35,6 +35,9 @@ images:
   - name: ghcr.io/saeedzed2002/fastapi-microservices-platform/payment-service
     newName: fastapi-platform/payment-service
     newTag: conformance
+  - name: ghcr.io/saeedzed2002/fastapi-microservices-platform/shipping-service
+    newName: fastapi-platform/shipping-service
+    newTag: conformance
   - name: ghcr.io/saeedzed2002/fastapi-microservices-platform/notification-service
     newName: fastapi-platform/notification-service
     newTag: conformance
@@ -62,6 +65,8 @@ replicas:
   - name: order-service
     count: 1
   - name: payment-service
+    count: 1
+  - name: shipping-service
     count: 1
   - name: notification-service
     count: 1
