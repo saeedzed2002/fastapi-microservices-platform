@@ -1,5 +1,6 @@
 import asyncio
 from datetime import UTC, datetime
+from importlib.metadata import requires
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
@@ -17,6 +18,12 @@ from platform_auth import encode_access_token
 
 async def _session_override() -> object:
     yield object()
+
+
+def test_runtime_manifest_declares_catalog_gateway_http_client() -> None:
+    declared_requirements = requires("media-service") or []
+
+    assert any(requirement.startswith("httpx") for requirement in declared_requirements)
 
 
 def _customer_headers() -> dict[str, str]:
