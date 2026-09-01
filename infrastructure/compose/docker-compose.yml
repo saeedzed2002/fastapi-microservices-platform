@@ -642,7 +642,7 @@ services:
       - observability-loki-data:/loki
 
   tempo:
-    image: grafana/tempo:2.9.4
+    image: grafana/tempo:3.0.3
     profiles: [observability]
     command: ["-config.file=/etc/tempo/config.yaml"]
     ports:
