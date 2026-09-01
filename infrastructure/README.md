@@ -1,15 +1,16 @@
 # Infrastructure
 
-Infrastructure is introduced incrementally and remains separate from application business logic.
+Infrastructure remains separate from application business logic. The current
+delivery assets provide:
 
-Planned concerns include:
-
-- `compose/` and root `docker-compose.yml` for Phase 1 local development;
+- local Compose topology in `compose/docker-compose.yml`, selected by the
+  ignored root `.env` through `COMPOSE_FILE`;
 - PostgreSQL, Kafka, RabbitMQ, Redis, and MinIO configuration;
-- OpenTelemetry, Prometheus, Grafana, Loki, and Tempo configuration;
-- raw Kubernetes resources in Phase 9;
-- Helm charts only after those resources stabilize in Phase 10;
-- controlled migration Jobs and network policies.
+- opt-in OpenTelemetry, Prometheus, Grafana, Loki, and Tempo observability;
+- raw Kubernetes resources, controlled migration Jobs, network policies, and
+  disposable `Kind` conformance; and
+- Helm charts that package the reviewed foundation and application-release
+  sequence.
 
 Phase 9 adds executable raw Kubernetes resources under `kubernetes/`. They are
 applied in controlled foundation, migration, and workload stages; see

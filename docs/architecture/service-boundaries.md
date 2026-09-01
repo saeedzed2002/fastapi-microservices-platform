@@ -61,10 +61,13 @@ Owns checkout acceptance, orders, immutable purchase snapshots, order items, sta
 
 Does not own catalog truth, inventory reservations, provider-facing payment truth, notification delivery, user-upload media lifecycle, or file bytes in PostgreSQL. Order does own the invoice business lifecycle, metadata, and storage key for generated invoices; the bytes live in object storage through its `ObjectStorage` adapter.
 
-It exposes customer-owned checkout/history APIs and a separate administrator
-order-review, fulfillment, and refund-request API, writes critical events through an outbox,
-consumes Inventory/Payment results, and owns invoice-generation intent after
-confirmation.
+It exposes customer-owned checkout/history and full-order return APIs, plus
+separate administrator order-review, fulfillment, refund-request, return-decision,
+and receipt APIs. Physical receipt atomically writes the Order-owned
+`order.return_received.v1` and `order.refund_requested.v1` handoffs; Inventory
+and Payment own their independent outcomes. Order writes critical events through
+an outbox, consumes Inventory/Payment results, and owns invoice-generation
+intent after confirmation.
 
 ### Payment Service
 
@@ -76,7 +79,10 @@ It reacts to the payment stage of the Saga, calls provider adapters, accepts
 verified provider callbacks, and emits payment facts through its outbox. A
 browser-return callback may be public, but Payment accepts only a locally
 issued authority and verifies it with the provider before it becomes a durable
-payment fact.
+payment fact. For a delivered return, it consumes Order's refund request only
+after physical receipt; a Zibal or otherwise unsupported reversal produces an
+auditable `payment.refund_failed.v1`, not an automatic retry or fabricated
+success.
 
 ### Notification Service
 
@@ -115,7 +121,7 @@ Owns a rebuildable, eventually consistent search projection/index. It does not o
 
 Owns shipments, carrier adapters/references, carrier tracking numbers, shipping status, and fulfilment lifecycle. It does not own the platform order tracking code, payment truth, or inventory truth.
 
-Shipping is being extracted incrementally in the approved Phase 18 milestone. It owns idempotent creation of a `READY` shipment from `order.confirmed.v1`, administrator shipment commands, state-change audit rows, and a no-PII `shipping.status_updated.v1` fact. Before a local transition commits, Shipping obtains an HMAC-authenticated, administrator-attributed, short-lived Order authorization. Order consumes the fact only after matching that authorization and retains `OrderFulfillment` as a customer-facing projection. The legacy Order fulfillment route is a forwarding compatibility facade; it never performs a second local fulfillment mutation. Compose and `Kind` register Shipping's API, migration, and dedicated event worker; their shared checkout-to-shipping workflow validates the asynchronous Order projection without routing public customer reads through Shipping.
+The completed Phase 18 extraction gives Shipping ownership of idempotent creation of a `READY` shipment from `order.confirmed.v1`, administrator shipment commands, state-change audit rows, and a no-PII `shipping.status_updated.v1` fact. Before a local transition commits, Shipping obtains an HMAC-authenticated, administrator-attributed, short-lived Order authorization. Order consumes the fact only after matching that authorization and retains `OrderFulfillment` as a customer-facing projection. The legacy Order fulfillment route is a forwarding compatibility facade; it never performs a second local fulfillment mutation. Compose and `Kind` register Shipping's API, migration, and dedicated event worker; their shared checkout-to-shipping workflow validates the asynchronous Order projection without routing public customer reads through Shipping.
 
 ## Boundary enforcement
 

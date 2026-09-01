@@ -16,3 +16,19 @@ retrieves the still-valid code from Identity immediately before using the
 configured `SMS.ir` Bulk adapter; it persists provider acceptance, not carrier
 delivery. `NOTIFICATION_SMSIR_*` values and the shared internal secret are
 deployment secrets and must never be committed.
+
+## Internal API and operations
+
+Identity invokes `POST /internal/v1/otp-deliveries` and
+`POST /internal/v1/password-reset-email-deliveries`. Both require
+`X-Platform-Internal-Token`, return `202 Accepted`, and persist the delivery
+intent before task dispatch. They are excluded from the public OpenAPI schema.
+
+`GET /health/live`, `GET /health/ready`, and `GET /metrics` are available for
+operations. Apply the local schema with
+`pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-notification` and
+run focused checks with
+`uv run --package notification-service pytest services/notification-service/tests -q`.
+The API process, Kafka consumer, task dispatcher, and Celery worker have
+separate responsibilities; API readiness alone does not prove that queued
+deliveries are being consumed or sent.

@@ -36,12 +36,30 @@ an independent consumer group. It owns the Invoice metadata, deterministic PDF
 object key, task intent, and `invoice.generated.v1` Outbox record. It does not
 own email delivery.
 
-During the Phase 18 Shipping extraction, Order also owns a short-lived
-fulfillment-transition authorization record. A still-valid authorization blocks
-both a new refund and the legacy fulfillment mutation; an expired authorization
-is marked `EXPIRED` lazily by either path and no longer blocks recovery. The
-future Shipping command endpoint will obtain this authorization before its
-local shipment transition; Order never exposes its database to Shipping.
+Order owns a short-lived fulfillment-transition authorization record. Shipping
+obtains that authorization before it commits a local shipment transition. A
+still-valid authorization blocks a new refund and the forwarding fulfillment
+facade. After expiry, Order obtains the definitive command state from Shipping:
+it releases the fence only for `NOT_COMMITTED` and applies the matching
+committed fact before rejecting a refund. An unavailable, malformed, or
+mismatched recovery response leaves the fence in place and returns a temporary
+outcome. Order never exposes its database to Shipping.
+
+## Post-delivery returns
+
+Order owns one full-order `ReturnRequest` for a delivered order. The customer
+creates it idempotently; an administrator approves or rejects it, then records
+physical receipt only after approval. Receipt writes both
+`order.return_received.v1` and `order.refund_requested.v1` with the same local
+Order transaction. Inventory independently restores the received SKU snapshot
+once, and Payment independently performs the provider-owned reversal.
+
+For a delivered return, a `payment.refund_failed.v1` outcome restores the
+customer-visible delivered status and marks the return `REFUND_FAILED`; it must
+be reconciled through the provider settlement process, not retried by replaying
+an Order command or manually changing Order/Payment rows. A successful outcome
+marks the return `REFUNDED`. The existing administrator refund endpoint remains
+for the compatible confirmed-but-undelivered path.
 
 ## API
 
@@ -54,5 +72,26 @@ local shipment transition; Order never exposes its database to Shipping.
 - `GET /api/v1/orders/admin/{order_id}`
 - `PATCH /api/v1/orders/admin/{order_id}/fulfillment`
 - `POST /api/v1/orders/admin/{order_id}/refund` with `Idempotency-Key`
+- `POST /api/v1/orders/{order_id}/returns` with `Idempotency-Key`
+- `GET /api/v1/orders/admin/returns`
+- `POST /api/v1/orders/admin/returns/{return_request_id}/decision` with `Idempotency-Key`
+- `POST /api/v1/orders/admin/returns/{return_request_id}/receipt` with `Idempotency-Key`
 - `GET /health/live`
 - `GET /health/ready`
+- `GET /metrics`
+
+`POST /api/internal/v1/orders/{order_id}/fulfillment-authorizations` is the
+Shipping-only authorization boundary. It is not a browser endpoint and
+requires Shipping's short-lived access proof as well as the administrator
+bearer token that owns the proposed transition.
+
+## Operations and verification
+
+Apply the Order schema with
+`pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-order` and run
+focused checks with
+`uv run --package order-service pytest services/order-service/tests -q`.
+`GET /health/ready` verifies local PostgreSQL; the API process, Kafka
+consumer/publisher, invoice dispatcher, and Celery invoice worker are separate
+runtime responsibilities. API readiness is not proof that an invoice or an
+asynchronous projection has completed.

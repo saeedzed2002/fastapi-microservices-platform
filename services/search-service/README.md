@@ -36,3 +36,13 @@ pwsh -NoProfile -File scripts/platform.ps1 -Task migrate-search
 The isolated `search_service` database is created by the Compose PostgreSQL
 initialization for new local volumes. Existing local volumes need the one-time
 database creation command documented in the runbook before running Alembic.
+
+## Operations and verification
+
+`GET /health/live` checks the process. `GET /health/ready` checks both the
+local projection database and the Redis rate-limit dependency, because a public
+search endpoint without its abuse control must not be declared ready.
+`GET /metrics` exposes Prometheus metrics. Run focused checks with
+`uv run --package search-service pytest services/search-service/tests -q`.
+The API process and Catalog Kafka consumer are separate processes; API
+readiness is not evidence that the projection is current.

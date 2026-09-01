@@ -19,9 +19,26 @@ It stores only opaque media asset identifiers. It never queries the Media Servic
 - GET /api/v1/catalog/admin/reviews and POST /api/v1/catalog/admin/reviews/{review_id}/moderation for administrators
 - GET /api/v1/catalog/categories
 - GET /api/v1/catalog/categories/{slug}
-- Catalog administrator endpoints under /api/v1/catalog/products
-- Catalog administrator endpoints under /api/v1/catalog/categories
+- `POST`, `PATCH`, and `DELETE` under `/api/v1/catalog/products`, plus
+  `/publish`, `/media`, and `/variants`
+- `POST`, `PATCH`, and `DELETE` under `/api/v1/catalog/categories`
+- POST /api/v1/catalog/checkout/variants for the authenticated checkout
+  snapshot used by Order
 
 The administrator endpoints require an access token with `admin`.
 Category writes validate the parent hierarchy and reject deleting a category that
 still has child categories or assigned products.
+
+## Operations and verification
+
+`GET /health/live`, `GET /health/ready`, and `GET /metrics` are the service
+operational endpoints. Apply the local schema with
+`pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-catalog` and run
+focused checks with
+`uv run --package catalog-service pytest services/catalog-service/tests -q`.
+
+Product media attachment is an administrator operation. Catalog validates the
+opaque asset reference through Media's authenticated internal contract; it
+never reads Media's database or object storage. Catalog product lifecycle
+changes publish the versioned facts consumed by Search through its local
+transactional outbox.

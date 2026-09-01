@@ -30,10 +30,15 @@ or write directly to a service database.
        pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-identity
        pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-customer
        pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-catalog
+       pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-search
+       pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-media
        pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-inventory
+       pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-cart
        pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-order
        pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-payment
+       pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-shipping
        pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-notification
+       pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-chat
 
 The supplied local callback works only when the browser returns on the same
 machine. A remotely used sandbox environment needs a deployed public `HTTPS`

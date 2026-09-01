@@ -31,3 +31,20 @@ The Phase 3 active event has no consumer yet. It is intentionally durable and re
 - GET /api/v1/media/assets/{asset_id}
 
 Only the owner identified by the access token can complete or inspect an asset.
+
+The two `/api/internal/v1/media/...` endpoints are not browser APIs. Chat uses
+the chat-attachment download endpoint with a short-lived `X-Chat-Access-Proof`;
+Catalog uses the catalog-asset availability endpoint with its corresponding
+short-lived proof. Those proofs authorize a narrow operation and never replace
+the caller's ownership or membership checks.
+
+## Operations and verification
+
+`GET /health/live`, `GET /health/ready`, and `GET /metrics` are available for
+operations. Apply the Media schema with
+`pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-media` and run
+focused checks with
+`uv run --package media-service pytest services/media-service/tests -q`.
+The API process, task dispatcher, and Celery worker are separate Compose
+processes; a ready API alone is not evidence that pending media work is being
+processed.

@@ -4,25 +4,29 @@ FastAPI Microservices Platform is a backend-only, production-oriented e-commerce
 
 ## Project status
 
-The repository has completed **Phase 18 — Shipping ownership extraction**. It
-is intentionally a portfolio repository, not a deployed public environment.
-Its CI publishes immutable, scanned container images as build artifacts and
-proves the platform in a disposable `Kind` cluster; neither operation is a
-target-environment deployment.
+The repository has completed **Phase 19 — Post-delivery returns and refund
+lifecycle**. It is intentionally a portfolio repository, not a deployed public
+environment. Its CI publishes immutable, scanned container images as build
+artifacts and proves the platform in a disposable `Kind` cluster; neither
+operation is a target-environment deployment.
 The local
 `observability` profile collects bounded platform metrics, JSON logs, and
 traces through Prometheus, Loki, Tempo, and Grafana. Resilience, staff account
 recovery/device sessions, moderated catalog reviews, bounded Kubernetes
-autoscaling, and Shipping-owned fulfilment transitions have durable contracts,
-tests, and runbooks. Raw `Kustomize` resources remain the reviewable workload
-baseline, while two Helm charts package the controlled foundation and
-application-release sequence. The `main`-branch/manual CI workflow installs
-those charts in a disposable `Kind` cluster, waits for controlled migrations
-and workloads, then proves in-cluster API readiness and the
-checkout-to-invoice-to-email and Shipping-to-Order projection workflows.
-A real target environment still must provide pinned release images, secrets,
-ingress/TLS, external durable services, and environment-specific egress policy
-before public deployment.
+autoscaling, Shipping-owned fulfilment transitions, and receipt-gated
+post-delivery returns have durable contracts, tests, and runbooks. Raw
+`Kustomize` resources remain the reviewable workload baseline, while two Helm
+charts package the controlled foundation and application-release sequence. The
+`main`-branch/manual CI workflow installs those charts in a disposable `Kind`
+cluster, waits for controlled migrations and workloads, then proves in-cluster
+API readiness and the checkout-to-invoice-to-email, Shipping-to-Order
+projection, and post-delivery return workflows. The `Kind` Job sets
+`E2E_RUN_RETURNS=1`, so its portable checkout runner also creates, approves,
+receives, and settles a delivered-order return. It still does not exercise
+public ingress, a real payment provider, or merchant settlement. A real target
+environment must provide pinned release images, secrets, ingress/TLS, external
+durable services, and environment-specific egress policy before public
+deployment.
 
 ## Review this repository
 
@@ -61,7 +65,11 @@ The platform follows these non-negotiable rules:
 - API, event schema, and service/container versions evolve independently.
 - Application workloads must be designed Kubernetes-first even while local development uses Docker Compose.
 
-## Planned services
+## Implemented services
+
+`reference-service` is a non-domain foundation probe. It proves the shared
+HTTP observability, health, metrics, configuration, image, and delivery path;
+it owns no business state or database.
 
 Core bounded contexts:
 
@@ -77,7 +85,7 @@ Core bounded contexts:
 - `media-service`
 - `chat-service`
 
-Incremental bounded-context extraction:
+Shipping is an implemented bounded context:
 
 - `shipping-service` — owns a `READY` shipment created idempotently from `order.confirmed.v1`, administrator lifecycle commands, its own transition audit, and its own `Outbox`. Every command obtains an Order-owned short-lived authorization; an expired authorization is reconciled from Shipping before a refund can proceed. `Compose` and `Kind` register its API, migration, and dedicated event worker; the shared checkout-to-Shipping workflow proves the asynchronous Order projection.
 
@@ -120,6 +128,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Kubernetes deployment runbook](docs/runbooks/kubernetes-deployment.md)
 - [Helm delivery charts](infrastructure/helm/README.md)
 - [Online payment provider routing runbook](docs/runbooks/online-payment-provider-routing.md)
+- [Post-delivery returns runbook](docs/runbooks/post-delivery-returns.md)
 - [Phase 0 plan](docs/development/phase-0-plan.md)
 - [Phase 1 plan](docs/development/phase-1-plan.md)
 - [Phase 2 plan](docs/development/phase-2-plan.md)
@@ -163,7 +172,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 | 16 | Online payment provider routing |
 | 17 | Portfolio evidence and reviewer guide |
 | 18 | Shipping ownership extraction |
-| 19 | In progress: Post-delivery returns and refund lifecycle |
+| 19 | Post-delivery returns and refund lifecycle |
 
 ## Local development
 
@@ -174,9 +183,12 @@ they are not a production ingress feature.
 Generate its ignored self-signed certificate once before `dev-up` with
 `pwsh -NoProfile -File .\\scripts\\new_local_edge_certificate.ps1`. The HTTP
 listener `http://localhost` redirects to TLS. API services no longer publish host ports;
-MinIO `9000` and the Mailpit UI `8025` remain direct local development endpoints.
-`dev-up` first builds API images and then starts Compose; this lets
-the Invoice and Notification workers consume the same built service images.
+MinIO `9000` (S3 API) and `9001` (console), plus the Mailpit UI `8025`, remain
+direct local development endpoints.
+`dev-up` first builds API images and then starts Compose; this lets the Invoice
+and Notification workers consume the same built service images. It does not
+run Alembic migrations automatically: migrations remain explicit,
+service-owned commands.
 Run Docker Compose directly from the repository root. The ignored root `.env`
 sets `COMPOSE_FILE` to the canonical Compose configuration, so no `--env-file`
 or `-f` argument is needed.
@@ -195,11 +207,13 @@ production deployment.
     pwsh -File .\scripts\platform.ps1 -Task migrate-identity
     pwsh -File .\scripts\platform.ps1 -Task migrate-customer
     pwsh -File .\scripts\platform.ps1 -Task migrate-catalog
+    pwsh -File .\scripts\platform.ps1 -Task migrate-search
     pwsh -File .\scripts\platform.ps1 -Task migrate-media
     pwsh -File .\scripts\platform.ps1 -Task migrate-inventory
     pwsh -File .\scripts\platform.ps1 -Task migrate-cart
     pwsh -File .\scripts\platform.ps1 -Task migrate-order
     pwsh -File .\scripts\platform.ps1 -Task migrate-payment
+    pwsh -File .\scripts\platform.ps1 -Task migrate-shipping
     pwsh -File .\scripts\platform.ps1 -Task migrate-notification
     pwsh -File .\scripts\platform.ps1 -Task migrate-chat
     $env:RUN_E2E = "1"; uv run pytest tests/e2e/test_phase6_checkout_notification.py

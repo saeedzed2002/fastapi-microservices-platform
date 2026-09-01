@@ -9,8 +9,13 @@ database.
 - POST /api/v1/auth/login
 - POST /api/v1/auth/otp/request
 - POST /api/v1/auth/otp/verify
+- POST /api/v1/auth/password-reset/request
+- POST /api/v1/auth/password-reset/confirm
 - POST /api/v1/auth/refresh
 - POST /api/v1/auth/logout
+- GET /api/v1/auth/sessions
+- DELETE /api/v1/auth/sessions/{session_id}
+- POST /api/v1/auth/sessions/revoke-all
 - GET /api/v1/auth/me
 - GET /health/live
 - GET /health/ready
@@ -49,3 +54,12 @@ Successful first customer OTP verification writes the customer user and an
 `identity.user_registered.v2` outbox record in one transaction. The background
 publisher retries broker failures and leaves the record pending until Kafka
 accepts it. Raw OTP values are never published to Kafka.
+
+## Verification
+
+Run focused checks with
+`uv run --package identity-service pytest services/identity-service/tests -q`.
+The delivery-code and password-reset-delivery lookup routes under
+`/internal/v1` are service-to-service interfaces for Notification and are
+excluded from the public API schema. They require the configured shared
+internal secret; they are not browser endpoints.

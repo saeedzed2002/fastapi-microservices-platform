@@ -35,3 +35,11 @@ primary key.
 Every profile and address endpoint requires the `customer` role. The optional
 contact email is normalized locally and is not an Identity login credential.
 Order obtains it only through the authenticated checkout snapshot contract.
+
+## Verification
+
+Run focused checks with
+`uv run --package customer-service pytest services/customer-service/tests -q`.
+The service exposes `GET /health/live`, `GET /health/ready`, and `GET /metrics`;
+readiness checks its local PostgreSQL database only. Customer has no Celery
+worker in this phase.

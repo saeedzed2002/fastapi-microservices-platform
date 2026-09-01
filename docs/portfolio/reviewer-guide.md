@@ -22,7 +22,12 @@ Use the following path for a focused review:
 5. Trace the [Shipping ownership ADR](../adr/ADR-039-shipping-ownership-extraction.md)
    through the [Shipping command contract](../../contracts/openapi/shipping-commands.v1.openapi.json)
    and [Shipping E2E workflow](../../tests/e2e/test_phase18_shipping.py).
-6. Inspect the [Kubernetes conformance ADR](../adr/ADR-028-kubernetes-conformance-ci.md)
+6. Trace the [post-delivery return ADR](../adr/ADR-040-post-delivery-returns-and-refund-gating.md)
+   through the [return contract](../../contracts/openapi/order-returns.v1.openapi.json),
+   [reconciliation runbook](../runbooks/post-delivery-returns.md), the
+   [portable return workflow](../../tests/e2e/returns_workflow.py), and its
+   [Kind Job](../../infrastructure/kubernetes/conformance/e2e/checkout-e2e.yaml).
+7. Inspect the [Kubernetes conformance ADR](../adr/ADR-028-kubernetes-conformance-ci.md)
    and the [platform workflow](../../.github/workflows/platform-ci.yml).
 
 ## Evidence map
@@ -35,6 +40,7 @@ Use the following path for a focused review:
 | Customers can open support requests without exposing history to every agent | [Support assignment ADR](../adr/ADR-019-chat-support-queue-assignment.md), [Chat support contract](../../contracts/openapi/chat-support.v1.openapi.json), and [support runbook](../runbooks/chat-support-queue.md) | One eligible agent claims a durable Chat-owned request atomically; queue readers see metadata only. |
 | Product feedback is bounded and moderated | [Catalog review ADR](../adr/ADR-032-catalog-product-review-moderation.md), [review contract](../../contracts/openapi/catalog-reviews.v1.openapi.json), and [moderation runbook](../runbooks/catalog-review-moderation.md) | Reviews have a one-level reply limit and explicit administrator moderation. |
 | Shipment lifecycle is independently owned without opening a refund race | [Shipping ownership ADR](../adr/ADR-039-shipping-ownership-extraction.md), [Shipping command contract](../../contracts/openapi/shipping-commands.v1.openapi.json), and [Shipping E2E](../../tests/e2e/test_phase18_shipping.py) | Shipping commits an authorization-bound transition and emits a no-PII fact; Order applies the customer-facing projection only after its local fence matches. |
+| A delivered return cannot restore stock before physical receipt or silently retry a provider reversal | [Return ADR](../adr/ADR-040-post-delivery-returns-and-refund-gating.md), [return contract](../../contracts/openapi/order-returns.v1.openapi.json), [reconciliation runbook](../runbooks/post-delivery-returns.md), and [portable Compose/Kind E2E](../../tests/e2e/returns_workflow.py) | Receipt writes independent Inventory and Payment handoffs atomically in Order; Inventory restores once and an unsupported provider outcome remains an auditable failure. |
 | Kubernetes resources are executable rather than documentation-only | [Kubernetes conformance ADR](../adr/ADR-028-kubernetes-conformance-ci.md), [conformance script](../../scripts/run_kubernetes_conformance.sh), and [workflow](../../.github/workflows/platform-ci.yml) | CI creates a disposable `Kind` cluster, applies the release path, and proves API and checkout workflow behavior in-cluster. |
 | Published images pass the same security gate | [single-job publication ADR](../adr/ADR-038-single-job-ghcr-publication.md), [delivery scan-gate test](../../tests/test_ci_delivery_scan_gate.py), and [runtime image hardening test](../../tests/test_runtime_image_hardening.py) | Every exact image is built and scanned for `HIGH`/`CRITICAL` findings before one registry login or push. |
 
@@ -67,8 +73,10 @@ one sequential `GHCR` job only after every scan succeeds.
 - The Zarinpal and Zibal integrations use local/test configuration only; no
   claim is made that a real merchant transaction has run.
 - Shipping owns the implemented shipment lifecycle, but carrier labels,
-  webhooks, rate shopping, delivery estimates, address validation, returns,
-  and third-party carrier integration remain out of scope.
+  webhooks, rate shopping, delivery estimates, address validation,
+  carrier-managed reverse logistics, and third-party carrier integration remain
+  out of scope. Order owns the implemented full-order return request and
+  physical-receipt workflow.
 - License selection is intentionally left to the repository owner because it
   is a legal/product decision.
 

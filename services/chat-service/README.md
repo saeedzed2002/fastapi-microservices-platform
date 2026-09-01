@@ -71,3 +71,8 @@ services/chat-service/tests -q`; run the opt-in platform flow with `RUN_E2E=1
 uv run pytest tests/e2e/test_phase7_realtime_chat.py -q`. Migration and
 operational recovery guidance is in
 [`chat-realtime.md`](../../docs/runbooks/chat-realtime.md).
+
+`GET /health/live` checks the API process; `GET /health/ready` checks Chat's
+local PostgreSQL database; and `GET /metrics` includes the HTTP and realtime
+metrics. Apply the local schema with
+`pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-chat`.

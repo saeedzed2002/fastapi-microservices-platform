@@ -7,6 +7,19 @@ customer payment credentials.
 It consumes `inventory.reserved.v1`. The deterministic `test_success` and
 `test_failure` methods remain available for automated checkout coverage.
 
+## API
+
+- `POST /api/v1/payments/orders/{order_id}/zarinpal` starts an authenticated
+  Zarinpal checkout.
+- `POST /api/v1/payments/orders/{order_id}/online` starts provider-routed
+  checkout.
+- `GET /api/v1/payments/zarinpal/callback` and
+  `GET /api/v1/payments/zibal/callback` are browser-return callbacks. They
+  verify only a persisted provider authority/track ID and provider result;
+  neither trusts a browser-declared success.
+- `GET /health/live`, `GET /health/ready`, and `GET /metrics` provide
+  operational endpoints.
+
 ## Provider-routed online workflow
 
 The additive `online` method starts at
@@ -17,10 +30,13 @@ leaves the first attempt in `REQUESTING`; it never creates a second payable
 request. `GET /api/v1/payments/zibal/callback?trackId=...` always verifies the
 persisted track ID before emitting a success fact.
 
-Configure `ZIBAL_MERCHANT_ID` and its registered edge callback URL in addition
-to the Zarinpal values. Both routed providers require whole `IRT` amounts. A
-routed Zarinpal success remains eligible for the documented short reversal;
-Zibal refunds require a separate settlement design and are not fabricated.
+For local Compose, configure `ZIBAL_MERCHANT_ID`, `ZIBAL_CALLBACK_URL`, and
+`ZIBAL_REQUEST_TIMEOUT_SECONDS` in the ignored root `.env`; Compose maps them
+to the service's `PAYMENT_ZIBAL_*` process variables. A direct runtime that
+does not use this Compose mapping must supply `PAYMENT_ZIBAL_*` itself. Both
+routed providers require whole `IRT` amounts. A routed Zarinpal success remains
+eligible for the documented short reversal; Zibal refunds require a separate
+settlement design and are not fabricated.
 
 ## Zarinpal sandbox workflow
 
@@ -48,10 +64,12 @@ short-window reverse endpoint outside a database transaction. It emits either
 are deliberately not implemented because they require Zarinpal's separate
 GraphQL access-token/session workflow and settlement reconciliation.
 
-Configure `ZARINPAL_MERCHANT_ID`, `ZARINPAL_SANDBOX`, and the edge callback URL
-through the ignored `.env` file. Payment validates the merchant identifier
-before persisting a payment request, so a missing local configuration cannot
-leave an order in `REQUESTING`. Apply Payment migrations from the workspace:
+For local Compose, configure `ZARINPAL_MERCHANT_ID`, `ZARINPAL_SANDBOX`, and
+`ZARINPAL_CALLBACK_URL` through the ignored root `.env`; Compose maps them to
+`PAYMENT_ZARINPAL_*` inside Payment. A direct runtime uses
+`PAYMENT_ZARINPAL_*` values. Payment validates the merchant identifier before
+persisting a payment request, so a missing local configuration cannot leave an
+order in `REQUESTING`. Apply Payment migrations from the workspace:
 
     pwsh -NoProfile -File .\scripts\platform.ps1 -Task migrate-payment
 
@@ -59,3 +77,20 @@ See `docs/adr/ADR-022-zarinpal-payment-adapter-and-expiry.md` for the accepted
 design, `docs/adr/ADR-034-online-payment-provider-routing.md` for provider
 routing, and `docs/runbooks/online-payment-provider-routing.md` for testing
 and recovery.
+
+For a received delivered-order return, Payment consumes the established
+`order.refund_requested.v1` with an additive `return_request_id`. Its Inbox row
+and any `payment.refund_failed.v1` outbox fact commit together, preserving the
+incoming event as `causation_id`. A Zibal or otherwise not-ready reversal is a
+durable failure outcome, not permission to retry automatically or fabricate a
+refund. See `docs/runbooks/post-delivery-returns.md` for the operational
+boundary.
+
+## Operations and verification
+
+Run focused checks with
+`uv run --package payment-service pytest services/payment-service/tests -q`.
+`GET /health/ready` verifies Payment's local PostgreSQL database. The API
+process, Kafka consumer/publisher, and expiry worker are separate runtime
+roles, so API readiness alone is not evidence that an expired intent or a
+refund handoff has been processed.

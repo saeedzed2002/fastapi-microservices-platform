@@ -63,3 +63,16 @@ Use `POST /api/v1/orders/admin/{order_id}/refund` with a fresh
 the order becomes `REFUND_PENDING`; Payment later emits the result. Do not
 ship while it is pending and do not claim a refund is complete before the order
 reaches `REFUNDED`.
+
+## Delivered-order returns
+
+Do not use the generic refund command for a delivered order. The owning
+customer creates one full-order request at `POST /api/v1/orders/{order_id}/returns`.
+An `admin` lists `GET /api/v1/orders/admin/returns`, records an idempotent
+approval or rejection, and records receipt only after merchandise is physically
+received. Receipt dispatches the independent Inventory and Payment handoffs.
+
+For `REFUND_FAILED`, preserve the return and receipt audit, reconcile the
+provider settlement, and record the customer-support outcome. Never retry a
+receipt/refund command with a new idempotency key or alter Order, Payment, or
+Inventory rows manually. See [post-delivery return reconciliation](post-delivery-returns.md).

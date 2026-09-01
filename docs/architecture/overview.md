@@ -128,6 +128,22 @@ resurrects the Order and is reconciled manually. Duplicate events must not
 repeat reservation, payment, release, confirmation, invoice, or notification
 effects.
 
+## Post-delivery return flow
+
+```text
+Customer return request -> Order decision -> physical receipt
+   -> order.return_received.v1 -> Inventory restores stock once
+   -> order.refund_requested.v1 -> Payment provider reversal
+   -> payment.refunded.v1 | payment.refund_failed.v1 -> Order projection
+```
+
+Order owns the full-order return request and writes both receipt and refund
+handoffs in one local transaction. Inventory restores only the immutable receipt
+snapshot; a correlated financial refund never creates another stock movement.
+Payment owns the provider reversal. An unsupported or unresolved provider result
+becomes a durable failure that restores the prior delivered Order state and is
+reconciled through the provider settlement process, without automated retry.
+
 ## Realtime chat flow
 
 ```text

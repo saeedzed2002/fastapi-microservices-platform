@@ -46,10 +46,10 @@ reversal: an unresolved or unsupported provider outcome becomes an auditable
    refund behavior.
 4. Completed: add the Inventory receipt consumer and one-return-one-restock
    movement guard.
-5. Completed: contract and unit failure evidence and the full Compose E2E
-   return workflow passed in CI. Disposable-Kind conformance also passed and
-   validates the deployment, HPA metrics path, and checkout E2E; it does not
-   yet run the post-receipt return workflow inside the Kind cluster.
+5. Completed: contract and unit failure evidence, the full Compose E2E return
+   workflow, and the portable post-receipt return workflow in disposable-Kind
+   conformance passed in CI. The Kind Job sets `E2E_RUN_RETURNS=1` after its
+   checkout path.
 
 ## Acceptance evidence
 
@@ -62,6 +62,6 @@ reversal: an unresolved or unsupported provider outcome becomes an auditable
   customer-visible pre-refund delivery state; an administrator must use the
   relevant provider's settlement workflow rather than retrying automatically;
 - all service boundaries, API/event contracts, and migrations have reviewable
-  local, Compose, and Kind evidence; the post-receipt return E2E is currently
-  exercised in Compose, while Kind exercises deployment, HPA metrics, and the
-  checkout path.
+  local, Compose, and Kind evidence; the portable post-receipt return workflow
+  is exercised after checkout in both Compose and Kind, while Kind additionally
+  proves deployment and the HPA metrics path.
