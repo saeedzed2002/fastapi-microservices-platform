@@ -632,7 +632,7 @@ services:
       - observability-prometheus-data:/prometheus
 
   loki:
-    image: grafana/loki:3.7.6
+    image: grafana/loki:3.7.7
     profiles: [observability]
     command: ["-config.file=/etc/loki/config.yaml"]
     ports:
