@@ -1183,6 +1183,7 @@ async def process_zarinpal_refund_request(
             order_id=order_id,
             refund_request_id=refund_request_id,
             return_request_id=return_request_id,
+            causation_id=event_id,
         )
     else:
         try:
@@ -1201,6 +1202,7 @@ async def process_zarinpal_refund_request(
                 order_id=order_id,
                 refund_request_id=refund_request_id,
                 return_request_id=return_request_id,
+                causation_id=event_id,
             )
         except PaymentReversalRejected:
             # The rejection and compensating domain event are already durable.
@@ -1330,6 +1332,7 @@ async def _record_refund_not_ready(
     order_id: UUID,
     refund_request_id: UUID,
     return_request_id: UUID | None,
+    causation_id: UUID,
 ) -> None:
     intent = await db.scalar(
         select(PaymentIntent).where(PaymentIntent.order_id == order_id).with_for_update()
@@ -1351,10 +1354,9 @@ async def _record_refund_not_ready(
                 else {}
             ),
         },
-        causation_id=None,
+        causation_id=causation_id,
         trace_id=uuid4().hex,
     )
-    await db.commit()
 
 
 async def expire_due_payment_intents(db: AsyncSession, *, now: datetime | None = None) -> int:

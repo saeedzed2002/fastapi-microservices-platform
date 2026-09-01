@@ -55,7 +55,11 @@ Order. A routed Zarinpal success can use the existing short-window reversal.
 For a Zibal success, do not claim a local refund: the current administrator
 refund command emits the durable refund-failed outcome and the provider's
 settlement workflow requires manual handling until a dedicated refund design
-is approved.
+is approved. The same applies after a delivered-order return: receipt and
+stock restoration remain auditable, but `REFUND_FAILED` is terminal for the
+current API. Do not retry the Order command or modify Order/Payment rows
+manually; reconcile through the provider's settlement workflow and record the
+customer-support outcome.
 
 ## Verification
 

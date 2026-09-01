@@ -6,6 +6,9 @@ Add a durable, full-order return workflow after delivery. Customers request a
 return, administrators make the commercial decision and record physical
 receipt, Inventory restores stock exactly once after receipt, and Payment
 performs the existing provider-owned reversal with an auditable correlation.
+The current financial boundary remains the existing Zarinpal short-window
+reversal: an unresolved or unsupported provider outcome becomes an auditable
+`REFUND_FAILED` result, never an automatic retry or fabricated success.
 
 ## Scope
 
@@ -25,6 +28,9 @@ performs the existing provider-owned reversal with an auditable correlation.
   carrier webhooks, warehouse management, or customer return tracking;
 - automatic Zibal refunds, settlement reporting, or fabricated provider
   reversal success;
+- an administrator retry command for a failed provider reversal; it needs a
+  provider-specific reconciliation decision and is not safe to infer from an
+  Order return alone;
 - cross-service database access, distributed transactions, or a network call
   while holding an Order transaction open;
 - restocking merchandise merely because a financial provider refund succeeds.
@@ -40,9 +46,10 @@ performs the existing provider-owned reversal with an auditable correlation.
    refund behavior.
 4. Completed: add the Inventory receipt consumer and one-return-one-restock
    movement guard.
-5. In progress: contract and unit failure evidence plus the clean full Compose
-   E2E suite are complete. The same portable return workflow is wired into
-   disposable-Kind conformance; its CI proof remains before release evidence.
+5. Completed: contract and unit failure evidence and the full Compose E2E
+   return workflow passed in CI. Disposable-Kind conformance also passed and
+   validates the deployment, HPA metrics path, and checkout E2E; it does not
+   yet run the post-receipt return workflow inside the Kind cluster.
 
 ## Acceptance evidence
 
@@ -52,6 +59,9 @@ performs the existing provider-owned reversal with an auditable correlation.
 - Inventory restores full-order stock only after one durable receipt fact;
 - a correlated payment success never causes a second physical restock;
 - payment failure preserves the received-return audit and restores the
-  customer-visible pre-refund delivery state;
-- all service boundaries, API/event contracts, migrations, and cross-service
-  workflows have reviewable local, Compose, and Kind evidence.
+  customer-visible pre-refund delivery state; an administrator must use the
+  relevant provider's settlement workflow rather than retrying automatically;
+- all service boundaries, API/event contracts, and migrations have reviewable
+  local, Compose, and Kind evidence; the post-receipt return E2E is currently
+  exercised in Compose, while Kind exercises deployment, HPA metrics, and the
+  checkout path.
