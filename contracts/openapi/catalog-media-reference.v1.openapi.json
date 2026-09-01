@@ -1,0 +1,24 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Catalog Media Reference Internal API",
+    "version": "v1",
+    "description": "Media uses this narrow, HMAC-authenticated read to prevent deletion of a product-image asset that Catalog still references. It is not a browser API."
+  },
+  "paths": {
+    "/api/internal/v1/catalog/media-assets/{asset_id}/reference-status": {
+      "get": {
+        "summary": "Read whether any Catalog product-media relation references an asset",
+        "parameters": [
+          {"name": "asset_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+          {"name": "expires_at", "in": "query", "required": true, "schema": {"type": "integer", "minimum": 1}},
+          {"name": "X-Media-Access-Proof", "in": "header", "required": true, "schema": {"type": "string", "minLength": 64, "maxLength": 64}}
+        ],
+        "responses": {
+          "200": {"description": "Catalog-owned reference status", "content": {"application/json": {"schema": {"type": "object", "required": ["referenced"], "properties": {"referenced": {"type": "boolean"}}, "additionalProperties": false}}}},
+          "403": {"description": "Proof is invalid or expired"}
+        }
+      }
+    }
+  }
+}

@@ -9,7 +9,7 @@ with a short-lived HMAC proof. The endpoint verifies the proof, the ready asset,
 and its thumbnail derivative before it creates a short-lived URL. It never
 queries Chat data or accepts a client-issued proof.
 
-Media owns upload authorization, object metadata, completion verification, image-processing lifecycle, derivatives, and storage cleanup orchestration. Binary bytes are stored in S3-compatible object storage, not PostgreSQL.
+Media owns upload authorization, object metadata, completion verification, image-processing lifecycle, derivatives, and storage cleanup orchestration. Binary bytes are stored in S3-compatible object storage, not PostgreSQL. `product_image` is an administrator-only purpose because it can become public storefront content.
 
 ## Upload lifecycle
 
@@ -27,10 +27,13 @@ The Phase 3 active event has no consumer yet. It is intentionally durable and re
 ## API
 
 - POST /api/v1/media/uploads
+- GET /api/v1/media/assets with opaque cursor pagination
 - POST /api/v1/media/assets/{asset_id}/complete
 - GET /api/v1/media/assets/{asset_id}
+- DELETE /api/v1/media/assets/{asset_id}
+- GET /api/v1/media/public/product-images/{asset_id}
 
-Only the owner identified by the access token can complete or inspect an asset.
+Only the owner identified by the access token can complete, list, inspect, or delete an asset. A product-image upload or deletion additionally requires `admin`. Public product-image delivery accepts no caller credential but redirects only a ready, non-deleted `product_image` thumbnail to a short-lived object-store URL. Before deleting such an asset, Media asks Catalog's signed internal reference-status endpoint; an attached image returns `409` until it is detached from every product.
 
 The two `/api/internal/v1/media/...` endpoints are not browser APIs. Chat uses
 the chat-attachment download endpoint with a short-lived `X-Chat-Access-Proof`;
@@ -48,3 +51,8 @@ focused checks with
 The API process, task dispatcher, and Celery worker are separate Compose
 processes; a ready API alone is not evidence that pending media work is being
 processed.
+
+Set `MEDIA_CATALOG_BASE_URL` to Catalog's internal URL together with the
+existing matching `MEDIA_CATALOG_ACCESS_SECRET`. The object-storage public
+endpoint used to sign browser URLs must be reachable from the browser; an
+in-cluster-only endpoint is insufficient.

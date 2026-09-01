@@ -1,0 +1,65 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Media Asset API",
+    "version": "v1",
+    "description": "Owner-scoped media lifecycle API. Product-image upload and deletion additionally require the administrator role. Product-image deletion is rejected while Catalog reports a reference."
+  },
+  "paths": {
+    "/api/v1/media/uploads": {
+      "post": {
+        "summary": "Authorize a direct object-storage upload",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UploadRequest"}}}},
+        "responses": {"201": {"description": "Presigned upload authorization", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UploadAuthorization"}}}}, "403": {"description": "Product images require administrator role"}, "413": {"description": "Upload exceeds configured limit"}, "503": {"description": "Object storage unavailable"}}
+      }
+    },
+    "/api/v1/media/assets": {
+      "get": {
+        "summary": "List the caller's non-deleted assets",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20}}, {"name": "cursor", "in": "query", "schema": {"type": "string", "maxLength": 256}}],
+        "responses": {"200": {"description": "Owner-scoped asset page", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MediaAssetPage"}}}}, "401": {"description": "Authentication required"}, "422": {"description": "Invalid cursor"}}
+      }
+    },
+    "/api/v1/media/assets/{asset_id}": {
+      "get": {
+        "summary": "Read one owned asset and short-lived derivative URLs",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/assetId"}],
+        "responses": {"200": {"description": "Owned asset", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MediaAsset"}}}}, "404": {"description": "Absent, deleted, or owned by another subject"}}
+      },
+      "delete": {
+        "summary": "Start durable deletion of an owned asset",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/assetId"}],
+        "responses": {"202": {"description": "Deletion task recorded"}, "403": {"description": "Product images require administrator role"}, "404": {"description": "Absent, deleted, or owned by another subject"}, "409": {"description": "Product image remains attached in Catalog"}, "503": {"description": "Catalog unavailable for product-image reference check"}}
+      }
+    },
+    "/api/v1/media/assets/{asset_id}/complete": {
+      "post": {
+        "summary": "Verify an uploaded object and enqueue processing",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/assetId"}],
+        "responses": {"202": {"description": "Processing intent accepted"}, "404": {"description": "Absent, deleted, or owned by another subject"}, "409": {"description": "Object absent or state not completable"}, "422": {"description": "Object metadata differs from authorization"}}
+      }
+    },
+    "/api/v1/media/public/product-images/{asset_id}": {
+      "get": {
+        "summary": "Redirect to a short-lived ready product-image thumbnail URL",
+        "responses": {"307": {"description": "Object-storage redirect"}, "404": {"description": "Asset is absent, deleted, non-product, unready, or has no thumbnail"}}
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}},
+    "parameters": {"assetId": {"name": "asset_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}},
+    "schemas": {
+      "UploadRequest": {"type": "object", "required": ["purpose", "content_type", "size_bytes", "checksum_sha256"], "properties": {"purpose": {"type": "string", "enum": ["avatar", "product_image", "chat_attachment"]}, "content_type": {"type": "string", "enum": ["image/jpeg", "image/png", "image/webp"]}, "size_bytes": {"type": "integer", "minimum": 1}, "checksum_sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}}},
+      "UploadAuthorization": {"type": "object", "required": ["asset_id", "upload_url", "expires_at"], "properties": {"asset_id": {"type": "string", "format": "uuid"}, "upload_url": {"type": "string", "format": "uri"}, "expires_at": {"type": "string", "format": "date-time"}}},
+      "Derivative": {"type": "object", "required": ["kind", "content_type", "size_bytes", "width", "height", "download_url"], "properties": {"kind": {"type": "string"}, "content_type": {"type": "string"}, "size_bytes": {"type": "integer"}, "width": {"type": ["integer", "null"]}, "height": {"type": ["integer", "null"]}, "download_url": {"type": ["string", "null"], "format": "uri"}}},
+      "MediaAsset": {"type": "object", "required": ["id", "purpose", "content_type", "size_bytes", "status", "processing_error", "created_at", "ready_at", "derivatives"], "properties": {"id": {"type": "string", "format": "uuid"}, "purpose": {"type": "string"}, "content_type": {"type": "string"}, "size_bytes": {"type": "integer"}, "status": {"type": "string"}, "processing_error": {"type": ["string", "null"]}, "created_at": {"type": "string", "format": "date-time"}, "ready_at": {"type": ["string", "null"], "format": "date-time"}, "derivatives": {"type": "array", "items": {"$ref": "#/components/schemas/Derivative"}}}},
+      "MediaAssetPage": {"type": "object", "required": ["items", "next_cursor"], "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/MediaAsset"}}, "next_cursor": {"type": ["string", "null"]}}}
+    }
+  }
+}

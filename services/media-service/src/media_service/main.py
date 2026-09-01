@@ -4,7 +4,8 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,10 +14,14 @@ from media_service.application import (
     authorize_upload,
     chat_attachment_download_url,
     complete_upload,
+    list_owned_assets,
     load_owned_asset_or_404,
+    public_product_image_download_url,
+    request_asset_deletion,
     validate_catalog_attachment,
 )
-from media_service.auth import current_user
+from media_service.auth import current_user, require_administrator
+from media_service.catalog import HttpCatalogMediaGateway
 from media_service.catalog_access import verify_catalog_access_proof
 from media_service.chat_access import verify_chat_access_proof
 from media_service.config import get_settings
@@ -26,6 +31,7 @@ from media_service.schemas import (
     InternalCatalogAttachmentResponse,
     InternalChatAttachmentDownloadRequest,
     InternalChatAttachmentDownloadResponse,
+    MediaAssetListResponse,
     MediaAssetResponse,
     UploadAuthorization,
     UploadRequest,
@@ -39,6 +45,7 @@ from platform_observability import configure_application, metrics_response
 settings = get_settings()
 logger = logging.getLogger(settings.service_name)
 storage = S3ObjectStorage(settings)
+catalog_gateway = HttpCatalogMediaGateway(settings)
 
 
 @asynccontextmanager
@@ -56,6 +63,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         task.cancel()
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)
+    await catalog_gateway.close()
     await dispose_engine()
     logger.info("service_stopped")
 
@@ -87,12 +95,47 @@ async def create_upload(
     claims: AuthClaims = Depends(current_user),
     db: AsyncSession = Depends(get_session),
 ) -> UploadAuthorization:
+    if payload.purpose == "product_image":
+        require_administrator(claims)
     return await authorize_upload(
         db,
         owner_subject_id=claims.subject,
         payload=payload,
         storage=storage,
         settings=settings,
+    )
+
+
+@app.get("/api/v1/media/assets", response_model=MediaAssetListResponse)
+async def list_assets(
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = Query(default=None, max_length=256),
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> MediaAssetListResponse:
+    return await list_owned_assets(
+        db,
+        owner_subject_id=claims.subject,
+        cursor=cursor,
+        limit=limit,
+        storage=storage,
+        settings=settings,
+    )
+
+
+@app.get("/api/v1/media/public/product-images/{asset_id}")
+async def redirect_public_product_image(
+    asset_id: UUID,
+    db: AsyncSession = Depends(get_session),
+) -> RedirectResponse:
+    return RedirectResponse(
+        url=await public_product_image_download_url(
+            db,
+            asset_id=asset_id,
+            storage=storage,
+            settings=settings,
+        ),
+        status_code=status.HTTP_307_TEMPORARY_REDIRECT,
     )
 
 
@@ -115,6 +158,24 @@ async def get_asset(
 ) -> MediaAssetResponse:
     asset = await load_owned_asset_or_404(db, asset_id=asset_id, owner_subject_id=claims.subject)
     return await asset_response(db, asset=asset, storage=storage, settings=settings)
+
+
+@app.delete("/api/v1/media/assets/{asset_id}", status_code=status.HTTP_202_ACCEPTED)
+async def delete_asset(
+    asset_id: UUID,
+    claims: AuthClaims = Depends(current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    asset = await load_owned_asset_or_404(db, asset_id=asset_id, owner_subject_id=claims.subject)
+    if asset.purpose == "product_image":
+        require_administrator(claims)
+        if await catalog_gateway.is_product_image_referenced(asset_id=asset.id):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="detach product images from Catalog before deleting the media asset",
+            )
+    await request_asset_deletion(db, asset=asset)
+    return {"status": "deletion_pending"}
 
 
 @app.post(

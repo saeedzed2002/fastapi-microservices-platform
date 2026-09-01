@@ -36,6 +36,7 @@ runtimeConfig:
   MEDIA_JWT_AUDIENCE: fastapi-platform
   MEDIA_TASK_DISPATCHER_ENABLED: "false"
   MEDIA_KAFKA_PUBLISHER_ENABLED: "false"
+  MEDIA_CATALOG_BASE_URL: "http://catalog-service.{{ .Release.Namespace }}.svc.cluster.local"
   MEDIA_S3_BUCKET: fastapi-platform-media
   MEDIA_S3_REGION: us-east-1
   MEDIA_ABANDONED_UPLOAD_CLEANUP_ENABLED: "true"

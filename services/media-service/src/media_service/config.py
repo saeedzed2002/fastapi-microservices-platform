@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     )
     catalog_access_previous_secret: str | None = None
     catalog_access_proof_max_ttl_seconds: int = Field(default=60, ge=1, le=300)
+    catalog_base_url: str = "http://localhost:8000"
+    catalog_timeout_seconds: float = Field(default=3.0, gt=0, le=30)
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
     rabbitmq_url: str = "amqp://platform:platform-local-only@localhost:5672//"
     task_dispatcher_enabled: bool = False

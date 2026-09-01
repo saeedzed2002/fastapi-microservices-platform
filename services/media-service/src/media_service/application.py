@@ -1,4 +1,7 @@
 import asyncio
+import base64
+import binascii
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
@@ -12,6 +15,7 @@ from media_service.config import Settings
 from media_service.models import MediaAsset, MediaDerivative, MediaTaskIntent
 from media_service.schemas import (
     DerivativeResponse,
+    MediaAssetListResponse,
     MediaAssetResponse,
     UploadAuthorization,
     UploadRequest,
@@ -162,6 +166,114 @@ async def asset_response(
             for derivative in derivatives
         ],
     )
+
+
+def _encode_asset_cursor(asset: MediaAsset) -> str:
+    payload = {
+        "created_at": asset.created_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+        "asset_id": str(asset.id),
+    }
+    return base64.urlsafe_b64encode(json.dumps(payload).encode("utf-8")).decode("ascii").rstrip("=")
+
+
+def _decode_asset_cursor(cursor: str | None) -> tuple[datetime, UUID] | None:
+    if cursor is None:
+        return None
+    try:
+        padded = cursor + "=" * (-len(cursor) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")))
+        created_at = datetime.fromisoformat(str(payload["created_at"]).replace("Z", "+00:00"))
+        asset_id = UUID(str(payload["asset_id"]))
+    except (binascii.Error, KeyError, TypeError, UnicodeDecodeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="invalid media cursor",
+        ) from exc
+    if created_at.tzinfo is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="invalid media cursor",
+        )
+    return created_at.astimezone(UTC), asset_id
+
+
+async def list_owned_assets(
+    db: AsyncSession,
+    *,
+    owner_subject_id: UUID,
+    cursor: str | None,
+    limit: int,
+    storage: ObjectStorage,
+    settings: Settings,
+) -> MediaAssetListResponse:
+    cursor_values = _decode_asset_cursor(cursor)
+    conditions = [MediaAsset.owner_subject_id == owner_subject_id, MediaAsset.deleted_at.is_(None)]
+    if cursor_values is not None:
+        created_at, asset_id = cursor_values
+        conditions.append(
+            or_(
+                MediaAsset.created_at < created_at,
+                and_(MediaAsset.created_at == created_at, MediaAsset.id < asset_id),
+            )
+        )
+    assets = list(
+        await db.scalars(
+            select(MediaAsset)
+            .where(*conditions)
+            .order_by(MediaAsset.created_at.desc(), MediaAsset.id.desc())
+            .limit(limit + 1)
+        )
+    )
+    has_next_page = len(assets) > limit
+    if has_next_page:
+        assets = assets[:limit]
+    return MediaAssetListResponse(
+        items=[
+            await asset_response(db, asset=asset, storage=storage, settings=settings)
+            for asset in assets
+        ],
+        next_cursor=_encode_asset_cursor(assets[-1]) if has_next_page else None,
+    )
+
+
+async def public_product_image_download_url(
+    db: AsyncSession, *, asset_id: UUID, storage: ObjectStorage, settings: Settings
+) -> str:
+    asset = await db.scalar(
+        select(MediaAsset).where(
+            MediaAsset.id == asset_id,
+            MediaAsset.purpose == "product_image",
+            MediaAsset.status == "ready",
+            MediaAsset.deleted_at.is_(None),
+        )
+    )
+    if asset is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="product image not found")
+    derivative = await db.scalar(
+        select(MediaDerivative).where(
+            MediaDerivative.media_asset_id == asset.id,
+            MediaDerivative.kind == "thumbnail",
+        )
+    )
+    if derivative is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="product image not found")
+    return storage.create_download_url(
+        object_key=derivative.object_key,
+        expires_in=settings.upload_url_ttl_seconds,
+    )
+
+
+async def request_asset_deletion(db: AsyncSession, *, asset: MediaAsset) -> None:
+    if asset.status in {"deleted", "deletion_pending"}:
+        return
+    asset.status = "deletion_pending"
+    db.add(
+        MediaTaskIntent(
+            task_name="media.delete_asset.v1",
+            payload={"media_asset_id": str(asset.id)},
+        )
+    )
+    await db.commit()
 
 
 async def chat_attachment_download_url(

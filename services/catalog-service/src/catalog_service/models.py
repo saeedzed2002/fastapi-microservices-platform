@@ -13,6 +13,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -63,6 +64,7 @@ class Product(Base):
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class ProductVariant(Base):
@@ -80,6 +82,7 @@ class ProductVariant(Base):
 
 class ProductMedia(Base):
     __tablename__ = "product_media"
+    __table_args__ = (UniqueConstraint("product_id", "media_asset_id"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"))

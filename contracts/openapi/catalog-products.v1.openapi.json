@@ -3,7 +3,7 @@
   "info": {
     "title": "Catalog Product Query API",
     "version": "v1",
-    "description": "Public, cursor-paginated listing of published Catalog products."
+    "description": "Public, cursor-paginated listing of published Catalog products. media_urls contains same-origin public Media redirect paths in the same order as media_asset_ids."
   },
   "paths": {
     "/api/v1/catalog/products": {
@@ -38,7 +38,7 @@
     "schemas": {
       "Product": {
         "type": "object",
-        "required": ["id", "name", "slug", "description", "status", "price_amount", "currency", "attributes", "media_asset_ids", "created_at", "updated_at", "published_at"],
+        "required": ["id", "name", "slug", "description", "status", "price_amount", "currency", "attributes", "media_asset_ids", "media_urls", "created_at", "updated_at", "published_at", "archived_at"],
         "properties": {
           "id": {"type": "string", "format": "uuid"},
           "name": {"type": "string"},
@@ -51,9 +51,11 @@
           "currency": {"type": "string"},
           "attributes": {"type": "object", "additionalProperties": {"type": "string"}},
           "media_asset_ids": {"type": "array", "items": {"type": "string", "format": "uuid"}},
+          "media_urls": {"type": "array", "items": {"type": "string", "format": "uri-reference"}},
           "created_at": {"type": "string", "format": "date-time"},
           "updated_at": {"type": "string", "format": "date-time"},
-          "published_at": {"type": "string", "format": "date-time"}
+          "published_at": {"type": "string", "format": "date-time"},
+          "archived_at": {"type": ["string", "null"], "format": "date-time"}
         }
       }
     }

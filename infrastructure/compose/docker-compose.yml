@@ -249,6 +249,7 @@ services:
       MEDIA_JWT_SECRET: local-development-jwt-secret-change-me-32-bytes
       MEDIA_CHAT_ACCESS_SECRET: local-development-chat-media-access-secret-change-me-32-bytes
       MEDIA_CATALOG_ACCESS_SECRET: local-development-catalog-media-access-secret-change-me-32-bytes
+      MEDIA_CATALOG_BASE_URL: http://catalog-service:8000
       MEDIA_S3_ENDPOINT_URL: http://minio:9000
       MEDIA_S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
       MEDIA_RABBITMQ_URL: amqp://platform:platform-local-only@rabbitmq:5672//

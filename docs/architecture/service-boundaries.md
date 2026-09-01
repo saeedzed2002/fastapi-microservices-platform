@@ -37,7 +37,14 @@ Owns products, variants, categories, brands, attributes, prices, metadata, produ
 
 Does not own stock, reservations, carts, orders, binary files, or the search index as source of truth.
 
-It exposes product/admin APIs, references Media assets through contracts, and emits versioned catalog facts for Search and other projections. Public review responses expose only generic author labels; Catalog stores opaque Identity subjects for moderation but never queries Identity or Customer databases for profile data.
+It exposes public published-product reads and administrator-only management APIs,
+references Media assets through contracts, and emits versioned catalog facts for
+Search and other projections. Product deletion archives instead of erasing
+Catalog history; variant deletion retires the variant. Public product responses
+contain Media-owned same-origin redirect URLs, not object-store keys. Public
+review responses expose only generic author labels; Catalog stores opaque
+Identity subjects for moderation but never queries Identity or Customer
+databases for profile data.
 
 ### Inventory Service
 
@@ -101,7 +108,15 @@ Owns upload authorization, media metadata, presigned URLs, completion verificati
 
 Does not own product, customer, chat, or invoice business relationships. It does not store binary objects in PostgreSQL.
 
-Clients transfer bytes directly to object storage. Media workers validate and transform files, then publish lifecycle facts such as `media.ready.v1`. Media also reaps abandoned pending uploads through durable task intents and exposes a short-lived, HMAC-authenticated internal readiness check so Catalog can persist only owner-scoped ready product-image references without reading Media's database.
+Clients transfer bytes directly to object storage. Media workers validate and
+transform files, then publish lifecycle facts such as `media.ready.v1`. Media
+also reaps abandoned pending uploads through durable task intents and exposes a
+short-lived, HMAC-authenticated internal readiness check so Catalog can persist
+only owner-scoped ready product-image references without reading Media's
+database. `product_image` uploads and deletion are administrator operations.
+Before deletion of a product image, Media reads Catalog's signed
+reference-status API; Catalog remains the authority for whether a product still
+uses the opaque asset identifier.
 
 ### Chat Service
 

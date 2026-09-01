@@ -50,6 +50,11 @@ class MediaAssetResponse(BaseModel):
     derivatives: list[DerivativeResponse] = Field(default_factory=list)
 
 
+class MediaAssetListResponse(BaseModel):
+    items: list[MediaAssetResponse]
+    next_cursor: str | None
+
+
 class InternalChatAttachmentDownloadRequest(BaseModel):
     subject_id: UUID
     conversation_id: UUID

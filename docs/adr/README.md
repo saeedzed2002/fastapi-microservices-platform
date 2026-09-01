@@ -23,6 +23,7 @@ ADRs record decisions that materially affect service ownership, contracts, durab
 
 | ADR | Status | Decision |
 |---|---|---|
+| [ADR-041](ADR-041-catalog-management-and-public-product-media.md) | Accepted | Administrator-only Catalog management and public product-media delivery |
 | [ADR-040](ADR-040-post-delivery-returns-and-refund-gating.md) | Accepted | Post-delivery returns and physical-stock refund gating |
 | [ADR-039](ADR-039-shipping-ownership-extraction.md) | Accepted | Shipping ownership extraction with refund-safe fulfillment fence |
 | [ADR-038](ADR-038-single-job-ghcr-publication.md) | Accepted | Single-job GHCR publication |

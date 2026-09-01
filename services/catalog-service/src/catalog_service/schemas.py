@@ -28,6 +28,25 @@ class CategoryResponse(BaseModel):
     created_at: datetime
 
 
+class BrandCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    slug: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=140)
+
+
+class BrandUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    slug: str | None = Field(default=None, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=140)
+
+
+class BrandResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    slug: str
+    created_at: datetime
+
+
 class ProductCreate(BaseModel):
     name: str = Field(min_length=1, max_length=240)
     slug: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=260)
@@ -46,6 +65,7 @@ class ProductCreate(BaseModel):
 
 class ProductUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=240)
+    slug: str | None = Field(default=None, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=260)
     description: str | None = Field(default=None, max_length=20_000)
     brand_id: UUID | None = None
     category_id: UUID | None = None
@@ -66,9 +86,30 @@ class VariantCreate(BaseModel):
     attributes: dict[str, str] = Field(default_factory=dict)
 
 
+class VariantUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    price_amount: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
+    attributes: dict[str, str] | None = None
+    is_active: bool | None = None
+
+
 class ProductMediaAttach(BaseModel):
     media_asset_id: UUID
     sort_order: int = Field(default=0, ge=0, le=1000)
+
+
+class ProductMediaUpdate(BaseModel):
+    sort_order: int = Field(ge=0, le=1000)
+
+
+class ProductMediaResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    product_id: UUID
+    media_asset_id: UUID
+    sort_order: int
+    created_at: datetime
 
 
 class ProductReviewCreate(BaseModel):
@@ -187,9 +228,11 @@ class ProductResponse(BaseModel):
     currency: str
     attributes: dict[str, str]
     media_asset_ids: list[UUID]
+    media_urls: list[str]
     created_at: datetime
     updated_at: datetime
     published_at: datetime | None
+    archived_at: datetime | None
 
 
 class ProductListResponse(BaseModel):

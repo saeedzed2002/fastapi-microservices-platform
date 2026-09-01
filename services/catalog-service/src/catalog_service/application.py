@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from catalog_service.models import (
+    Brand,
     Category,
     OutboxMessage,
     Product,
@@ -21,12 +22,16 @@ from catalog_service.models import (
 from catalog_service.schemas import (
     AdminProductReviewListResponse,
     AdminProductReviewResponse,
+    BrandCreate,
+    BrandResponse,
+    BrandUpdate,
     CategoryCreate,
     CategoryResponse,
     CategoryUpdate,
     CheckoutVariantResponse,
     ProductCreate,
     ProductMediaAttach,
+    ProductMediaUpdate,
     ProductResponse,
     ProductReviewCreate,
     ProductReviewListResponse,
@@ -37,6 +42,7 @@ from catalog_service.schemas import (
     ProductUpdate,
     VariantCreate,
     VariantResponse,
+    VariantUpdate,
 )
 
 
@@ -52,6 +58,20 @@ async def load_category_by_slug_or_404(db: AsyncSession, slug: str) -> Category:
     if category is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="category not found")
     return category
+
+
+async def load_brand_or_404(db: AsyncSession, brand_id: UUID) -> Brand:
+    brand = await db.get(Brand, brand_id)
+    if brand is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="brand not found")
+    return brand
+
+
+async def load_brand_by_slug_or_404(db: AsyncSession, slug: str) -> Brand:
+    brand = await db.scalar(select(Brand).where(Brand.slug == slug))
+    if brand is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="brand not found")
+    return brand
 
 
 async def _validate_category_parent(
@@ -96,6 +116,54 @@ async def category_response(category: Category) -> CategoryResponse:
 async def list_categories(db: AsyncSession) -> list[CategoryResponse]:
     categories = await db.scalars(select(Category).order_by(Category.name, Category.created_at))
     return [await category_response(category) for category in categories]
+
+
+async def brand_response(brand: Brand) -> BrandResponse:
+    return BrandResponse.model_validate(brand)
+
+
+async def list_brands(db: AsyncSession) -> list[BrandResponse]:
+    brands = await db.scalars(select(Brand).order_by(Brand.name, Brand.created_at))
+    return [await brand_response(brand) for brand in brands]
+
+
+async def create_brand(db: AsyncSession, payload: BrandCreate) -> Brand:
+    brand = Brand(**payload.model_dump())
+    db.add(brand)
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="brand name or slug exists"
+        ) from exc
+    await db.refresh(brand)
+    return brand
+
+
+async def update_brand(db: AsyncSession, brand: Brand, payload: BrandUpdate) -> Brand:
+    updates = payload.model_dump(exclude_unset=True)
+    for field, value in updates.items():
+        setattr(brand, field, value)
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="brand name or slug exists"
+        ) from exc
+    await db.refresh(brand)
+    return brand
+
+
+async def delete_brand(db: AsyncSession, brand: Brand) -> None:
+    product_id = await db.scalar(select(Product.id).where(Product.brand_id == brand.id).limit(1))
+    if product_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="brand is assigned to products"
+        )
+    await db.delete(brand)
+    await db.commit()
 
 
 async def create_category(db: AsyncSession, payload: CategoryCreate) -> Category:
@@ -196,9 +264,11 @@ async def product_response(db: AsyncSession, product: Product) -> ProductRespons
         currency=product.currency,
         attributes=product.attributes,
         media_asset_ids=media_ids,
+        media_urls=[f"/api/v1/media/public/product-images/{media_id}" for media_id in media_ids],
         created_at=product.created_at,
         updated_at=product.updated_at,
         published_at=product.published_at,
+        archived_at=product.archived_at,
     )
 
 
@@ -261,6 +331,67 @@ async def list_published_products(
     return products, next_cursor
 
 
+def encode_admin_product_cursor(product: Product) -> str:
+    payload = {
+        "updated_at": _utc_timestamp(product.updated_at),
+        "product_id": str(product.id),
+    }
+    return base64.urlsafe_b64encode(json.dumps(payload).encode("utf-8")).decode("ascii").rstrip("=")
+
+
+def decode_admin_product_cursor(cursor: str | None) -> tuple[datetime, UUID] | None:
+    if cursor is None:
+        return None
+    try:
+        padded = cursor + "=" * (-len(cursor) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")))
+        updated_at = datetime.fromisoformat(str(payload["updated_at"]).replace("Z", "+00:00"))
+        product_id = UUID(str(payload["product_id"]))
+    except (binascii.Error, KeyError, TypeError, UnicodeDecodeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="invalid administrator product cursor",
+        ) from exc
+    if updated_at.tzinfo is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="invalid administrator product cursor",
+        )
+    return updated_at.astimezone(UTC), product_id
+
+
+async def list_administrator_products(
+    db: AsyncSession,
+    *,
+    status_filter: str | None,
+    limit: int,
+    cursor: str | None,
+) -> tuple[list[Product], str | None]:
+    cursor_values = decode_admin_product_cursor(cursor)
+    conditions = [Product.status == status_filter] if status_filter is not None else []
+    if cursor_values is not None:
+        updated_at, product_id = cursor_values
+        conditions.append(
+            or_(
+                Product.updated_at < updated_at,
+                and_(Product.updated_at == updated_at, Product.id < product_id),
+            )
+        )
+    products = list(
+        await db.scalars(
+            select(Product)
+            .where(*conditions)
+            .order_by(desc(Product.updated_at), desc(Product.id))
+            .limit(limit + 1)
+        )
+    )
+    has_next_page = len(products) > limit
+    if has_next_page:
+        products = products[:limit]
+    next_cursor = encode_admin_product_cursor(products[-1]) if has_next_page else None
+    return products, next_cursor
+
+
 def _utc_timestamp(value: datetime | None) -> str | None:
     if value is None:
         return None
@@ -316,6 +447,8 @@ def _record_product_deletion(db: AsyncSession, *, product_id: UUID) -> None:
 
 
 async def create_product(db: AsyncSession, payload: ProductCreate) -> Product:
+    if payload.brand_id is not None:
+        await load_brand_or_404(db, payload.brand_id)
     if payload.category_id is not None:
         await load_category_or_404(db, payload.category_id)
     product = Product(**payload.model_dump())
@@ -335,18 +468,39 @@ async def create_product(db: AsyncSession, payload: ProductCreate) -> Product:
 
 async def update_product(db: AsyncSession, product: Product, payload: ProductUpdate) -> Product:
     updates = payload.model_dump(exclude_unset=True)
+    if updates.get("brand_id") is not None:
+        await load_brand_or_404(db, updates["brand_id"])
     if updates.get("category_id") is not None:
         await load_category_or_404(db, updates["category_id"])
+    if "slug" in updates:
+        existing = await db.scalar(
+            select(Product.id).where(Product.slug == updates["slug"], Product.id != product.id)
+        )
+        if existing is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="product slug exists")
     for field, value in updates.items():
         setattr(product, field, value)
-    await db.flush()
-    _record_product_event(db, event_type="product.updated.v1", product=product)
-    await db.commit()
+    try:
+        await db.flush()
+        _record_product_event(db, event_type="product.updated.v1", product=product)
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="product could not be saved"
+        ) from exc
     await db.refresh(product)
     return product
 
 
 async def publish_product(db: AsyncSession, product: Product) -> Product:
+    if product.status == "archived":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="restore an archived product before publishing it",
+        )
+    if product.status == "published":
+        return product
     product.status = "published"
     product.published_at = datetime.now(UTC)
     await db.flush()
@@ -357,10 +511,25 @@ async def publish_product(db: AsyncSession, product: Product) -> Product:
 
 
 async def delete_product(db: AsyncSession, product: Product) -> None:
-    product_id = product.id
-    await db.delete(product)
-    _record_product_deletion(db, product_id=product_id)
+    if product.status == "archived":
+        return
+    product.status = "archived"
+    product.archived_at = datetime.now(UTC)
+    _record_product_deletion(db, product_id=product.id)
     await db.commit()
+
+
+async def restore_product(db: AsyncSession, product: Product) -> Product:
+    if product.status != "archived":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="product is not archived")
+    product.status = "draft"
+    product.archived_at = None
+    product.published_at = None
+    await db.flush()
+    _record_product_event(db, event_type="product.updated.v1", product=product)
+    await db.commit()
+    await db.refresh(product)
+    return product
 
 
 async def attach_media(
@@ -381,6 +550,34 @@ async def attach_media(
     return relation
 
 
+async def load_product_media_or_404(
+    db: AsyncSession, *, product_id: UUID, media_asset_id: UUID
+) -> ProductMedia:
+    relation = await db.scalar(
+        select(ProductMedia).where(
+            ProductMedia.product_id == product_id,
+            ProductMedia.media_asset_id == media_asset_id,
+        )
+    )
+    if relation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="product media not found")
+    return relation
+
+
+async def update_product_media(
+    db: AsyncSession, relation: ProductMedia, payload: ProductMediaUpdate
+) -> ProductMedia:
+    relation.sort_order = payload.sort_order
+    await db.commit()
+    await db.refresh(relation)
+    return relation
+
+
+async def detach_product_media(db: AsyncSession, relation: ProductMedia) -> None:
+    await db.delete(relation)
+    await db.commit()
+
+
 async def add_variant(db: AsyncSession, product: Product, payload: VariantCreate) -> ProductVariant:
     variant = ProductVariant(product_id=product.id, **payload.model_dump())
     db.add(variant)
@@ -395,11 +592,45 @@ async def add_variant(db: AsyncSession, product: Product, payload: VariantCreate
     return variant
 
 
-async def list_variants(db: AsyncSession, product_id: UUID) -> list[VariantResponse]:
+async def load_product_variant_or_404(
+    db: AsyncSession, *, product_id: UUID, variant_id: UUID
+) -> ProductVariant:
+    variant = await db.scalar(
+        select(ProductVariant).where(
+            ProductVariant.product_id == product_id,
+            ProductVariant.id == variant_id,
+        )
+    )
+    if variant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="product variant not found"
+        )
+    return variant
+
+
+async def update_variant(
+    db: AsyncSession, variant: ProductVariant, payload: VariantUpdate
+) -> ProductVariant:
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(variant, field, value)
+    await db.commit()
+    await db.refresh(variant)
+    return variant
+
+
+async def retire_variant(db: AsyncSession, variant: ProductVariant) -> None:
+    variant.is_active = False
+    await db.commit()
+
+
+async def list_variants(
+    db: AsyncSession, product_id: UUID, *, active_only: bool = False
+) -> list[VariantResponse]:
+    conditions = [ProductVariant.product_id == product_id]
+    if active_only:
+        conditions.append(ProductVariant.is_active.is_(True))
     variants = await db.scalars(
-        select(ProductVariant)
-        .where(ProductVariant.product_id == product_id)
-        .order_by(ProductVariant.created_at)
+        select(ProductVariant).where(*conditions).order_by(ProductVariant.created_at)
     )
     return [VariantResponse.model_validate(variant) for variant in variants]
 

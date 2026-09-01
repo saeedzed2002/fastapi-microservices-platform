@@ -16,6 +16,32 @@ def build_catalog_access_proof(
     return hmac.new(secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
 
 
+def build_media_reference_proof(*, secret: str, asset_id: UUID, expires_at: int) -> str:
+    canonical = "\n".join(("media-reference-status.v1", str(asset_id), str(expires_at)))
+    return hmac.new(secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
+
+
+def verify_media_reference_proof(
+    *, secret: str, provided_proof: str, asset_id: UUID, expires_at: int
+) -> None:
+    now = int(time.time())
+    if expires_at <= now or expires_at > now + 60:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="invalid media reference proof",
+        )
+    expected_proof = build_media_reference_proof(
+        secret=secret,
+        asset_id=asset_id,
+        expires_at=expires_at,
+    )
+    if not hmac.compare_digest(expected_proof, provided_proof):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="invalid media reference proof",
+        )
+
+
 class HttpMediaCatalogGateway:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings

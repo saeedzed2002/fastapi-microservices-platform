@@ -103,8 +103,16 @@
       "kind": "service-openapi",
       "owner": "catalog-service",
       "status": "active",
-      "notes": "Public cursor-paginated listing of canonical published Catalog products.",
+      "notes": "Public cursor-paginated listing of canonical published Catalog products, including same-origin public product-media URLs.",
       "schema": "openapi/catalog-products.v1.openapi.json"
+    },
+    {
+      "name": "catalog.management.v1",
+      "kind": "service-openapi",
+      "owner": "catalog-service",
+      "status": "active",
+      "notes": "Administrator-only management of products, categories, brands, variants, and product-media relations. Product deletion archives and variant deletion retires.",
+      "schema": "openapi/catalog-management.v1.openapi.json"
     },
     {
       "name": "catalog.reviews.v1",
@@ -121,6 +129,22 @@
       "status": "active",
       "notes": "Internal, HMAC-authenticated readiness and ownership validation before Catalog persists an opaque product-image reference.",
       "schema": "openapi/media-catalog-attachment.v1.openapi.json"
+    },
+    {
+      "name": "media.assets.v1",
+      "kind": "service-openapi",
+      "owner": "media-service",
+      "status": "active",
+      "notes": "Owner-scoped upload, inspection, deletion, and public ready product-image redirect API. Product-image mutations require an administrator.",
+      "schema": "openapi/media-assets.v1.openapi.json"
+    },
+    {
+      "name": "catalog.media_reference.v1",
+      "kind": "service-openapi",
+      "owner": "catalog-service",
+      "status": "active",
+      "notes": "Internal HMAC-authenticated Media read of Catalog-owned product-image references before an asset deletion starts.",
+      "schema": "openapi/catalog-media-reference.v1.openapi.json"
     },
     {
       "name": "event-envelope.v1",

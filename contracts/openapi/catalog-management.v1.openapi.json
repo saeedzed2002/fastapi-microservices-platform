@@ -1,0 +1,115 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Catalog Management API",
+    "version": "v1",
+    "description": "Administrator-only Catalog management commands and reads. Customer tokens are forbidden. Product deletion archives, variant deletion retires, and product-media deletion detaches the Catalog relation."
+  },
+  "paths": {
+    "/api/v1/catalog/admin/products": {
+      "get": {
+        "summary": "List draft, published, or archived products for an administrator",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {"name": "status", "in": "query", "schema": {"type": "string", "enum": ["draft", "published", "archived"]}},
+          {"$ref": "#/components/parameters/limit"},
+          {"$ref": "#/components/parameters/cursor"}
+        ],
+        "responses": {"200": {"description": "Product page", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProductPage"}}}}, "403": {"description": "Administrator role required"}, "422": {"description": "Invalid cursor"}}
+      }
+    },
+    "/api/v1/catalog/admin/products/{product_id}": {
+      "get": {
+        "summary": "Read one product regardless of lifecycle state",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/productId"}],
+        "responses": {"200": {"description": "Product", "content": {"application/json": {"schema": {"$ref": "catalog-products.v1.openapi.json#/components/schemas/Product"}}}}, "403": {"description": "Administrator role required"}, "404": {"description": "Product absent"}}
+      }
+    },
+    "/api/v1/catalog/products": {
+      "post": {
+        "summary": "Create a draft product",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProductCreate"}}}},
+        "responses": {"201": {"description": "Draft product"}, "403": {"description": "Administrator role required"}, "404": {"description": "Brand or category absent"}, "409": {"description": "Slug already exists"}}
+      }
+    },
+    "/api/v1/catalog/products/{product_id}": {
+      "patch": {
+        "summary": "Update a product",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/productId"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProductUpdate"}}}},
+        "responses": {"200": {"description": "Updated product"}, "403": {"description": "Administrator role required"}, "404": {"description": "Product, brand, or category absent"}, "409": {"description": "Slug conflict"}}
+      },
+      "delete": {
+        "summary": "Archive a product",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/productId"}],
+        "responses": {"204": {"description": "Product archived or already archived"}, "403": {"description": "Administrator role required"}, "404": {"description": "Product absent"}}
+      }
+    },
+    "/api/v1/catalog/products/{product_id}/publish": {
+      "post": {"summary": "Publish a draft product", "security": [{"bearerAuth": []}], "parameters": [{"$ref": "#/components/parameters/productId"}], "responses": {"200": {"description": "Published product"}, "403": {"description": "Administrator role required"}, "404": {"description": "Product absent"}, "409": {"description": "Product is archived"}}}
+    },
+    "/api/v1/catalog/products/{product_id}/restore": {
+      "post": {"summary": "Restore an archived product to draft", "security": [{"bearerAuth": []}], "parameters": [{"$ref": "#/components/parameters/productId"}], "responses": {"200": {"description": "Restored draft product"}, "403": {"description": "Administrator role required"}, "404": {"description": "Product absent"}, "409": {"description": "Product is not archived"}}}
+    },
+    "/api/v1/catalog/categories": {
+      "get": {"summary": "List categories", "responses": {"200": {"description": "Categories"}}},
+      "post": {"summary": "Create a category", "security": [{"bearerAuth": []}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CategoryCreate"}}}}, "responses": {"201": {"description": "Category"}, "403": {"description": "Administrator role required"}, "404": {"description": "Parent absent"}, "409": {"description": "Slug conflict"}}}
+    },
+    "/api/v1/catalog/categories/{category_id}": {
+      "patch": {"summary": "Update category name, slug, or parent", "security": [{"bearerAuth": []}], "parameters": [{"$ref": "#/components/parameters/categoryId"}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CategoryUpdate"}}}}, "responses": {"200": {"description": "Category"}, "403": {"description": "Administrator role required"}, "404": {"description": "Category or parent absent"}, "409": {"description": "Conflict or hierarchy inconsistency"}, "422": {"description": "Cycle"}}},
+      "delete": {"summary": "Delete unused category", "security": [{"bearerAuth": []}], "parameters": [{"$ref": "#/components/parameters/categoryId"}], "responses": {"204": {"description": "Category deleted"}, "403": {"description": "Administrator role required"}, "404": {"description": "Category absent"}, "409": {"description": "Has child or assigned product"}}}
+    },
+    "/api/v1/catalog/brands": {
+      "get": {"summary": "List brands", "responses": {"200": {"description": "Brands"}}},
+      "post": {"summary": "Create a brand", "security": [{"bearerAuth": []}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/BrandCreate"}}}}, "responses": {"201": {"description": "Brand"}, "403": {"description": "Administrator role required"}, "409": {"description": "Name or slug conflict"}}}
+    },
+    "/api/v1/catalog/brands/{brand_id}": {
+      "patch": {"summary": "Update a brand", "security": [{"bearerAuth": []}], "parameters": [{"$ref": "#/components/parameters/brandId"}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/BrandUpdate"}}}}, "responses": {"200": {"description": "Brand"}, "403": {"description": "Administrator role required"}, "404": {"description": "Brand absent"}, "409": {"description": "Name or slug conflict"}}},
+      "delete": {"summary": "Delete an unused brand", "security": [{"bearerAuth": []}], "parameters": [{"$ref": "#/components/parameters/brandId"}], "responses": {"204": {"description": "Brand deleted"}, "403": {"description": "Administrator role required"}, "404": {"description": "Brand absent"}, "409": {"description": "Assigned product exists"}}}
+    },
+    "/api/v1/catalog/products/{product_id}/media": {
+      "post": {"summary": "Attach a ready owner-scoped product image", "security": [{"bearerAuth": []}], "parameters": [{"$ref": "#/components/parameters/productId"}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProductMediaAttach"}}}}, "responses": {"201": {"description": "Product-media relation"}, "403": {"description": "Administrator role required"}, "409": {"description": "Asset is not attachable"}, "503": {"description": "Media unavailable"}}}
+    },
+    "/api/v1/catalog/products/{product_id}/media/{media_asset_id}": {
+      "patch": {"summary": "Change product-image sort order", "security": [{"bearerAuth": []}], "parameters": [{"$ref": "#/components/parameters/productId"}, {"$ref": "#/components/parameters/mediaAssetId"}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProductMediaUpdate"}}}}, "responses": {"200": {"description": "Product-media relation"}, "403": {"description": "Administrator role required"}, "404": {"description": "Relation absent"}}},
+      "delete": {"summary": "Detach a product image", "security": [{"bearerAuth": []}], "parameters": [{"$ref": "#/components/parameters/productId"}, {"$ref": "#/components/parameters/mediaAssetId"}], "responses": {"204": {"description": "Relation detached"}, "403": {"description": "Administrator role required"}, "404": {"description": "Relation absent"}}}
+    },
+    "/api/v1/catalog/products/{product_id}/variants": {
+      "post": {"summary": "Create a product variant", "security": [{"bearerAuth": []}], "parameters": [{"$ref": "#/components/parameters/productId"}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/VariantCreate"}}}}, "responses": {"201": {"description": "Variant"}, "403": {"description": "Administrator role required"}, "404": {"description": "Product absent"}, "409": {"description": "SKU conflict"}}}
+    },
+    "/api/v1/catalog/products/{product_id}/variants/{variant_id}": {
+      "patch": {"summary": "Update a variant without changing SKU", "security": [{"bearerAuth": []}], "parameters": [{"$ref": "#/components/parameters/productId"}, {"$ref": "#/components/parameters/variantId"}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/VariantUpdate"}}}}, "responses": {"200": {"description": "Variant"}, "403": {"description": "Administrator role required"}, "404": {"description": "Variant absent"}}},
+      "delete": {"summary": "Retire a variant", "security": [{"bearerAuth": []}], "parameters": [{"$ref": "#/components/parameters/productId"}, {"$ref": "#/components/parameters/variantId"}], "responses": {"204": {"description": "Variant retired"}, "403": {"description": "Administrator role required"}, "404": {"description": "Variant absent"}}}
+    }
+  },
+  "components": {
+    "securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}},
+    "parameters": {
+      "limit": {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20}},
+      "cursor": {"name": "cursor", "in": "query", "schema": {"type": "string", "maxLength": 256}},
+      "productId": {"name": "product_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+      "categoryId": {"name": "category_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+      "brandId": {"name": "brand_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+      "variantId": {"name": "variant_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+      "mediaAssetId": {"name": "media_asset_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
+    },
+    "schemas": {
+      "ProductPage": {"type": "object", "required": ["items", "next_cursor"], "properties": {"items": {"type": "array", "items": {"$ref": "catalog-products.v1.openapi.json#/components/schemas/Product"}}, "next_cursor": {"type": ["string", "null"]}}},
+      "Slug": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+      "CategoryCreate": {"type": "object", "required": ["name", "slug"], "properties": {"name": {"type": "string", "minLength": 1, "maxLength": 120}, "slug": {"$ref": "#/components/schemas/Slug"}, "parent_id": {"type": ["string", "null"], "format": "uuid"}}},
+      "CategoryUpdate": {"type": "object", "properties": {"name": {"type": "string", "minLength": 1, "maxLength": 120}, "slug": {"$ref": "#/components/schemas/Slug"}, "parent_id": {"type": ["string", "null"], "format": "uuid"}}},
+      "BrandCreate": {"type": "object", "required": ["name", "slug"], "properties": {"name": {"type": "string", "minLength": 1, "maxLength": 120}, "slug": {"$ref": "#/components/schemas/Slug"}}},
+      "BrandUpdate": {"type": "object", "properties": {"name": {"type": "string", "minLength": 1, "maxLength": 120}, "slug": {"$ref": "#/components/schemas/Slug"}}},
+      "ProductCreate": {"type": "object", "required": ["name", "slug", "price_amount", "currency"], "properties": {"name": {"type": "string", "minLength": 1, "maxLength": 240}, "slug": {"$ref": "#/components/schemas/Slug"}, "description": {"type": "string", "maxLength": 20000}, "brand_id": {"type": ["string", "null"], "format": "uuid"}, "category_id": {"type": ["string", "null"], "format": "uuid"}, "price_amount": {"type": "string", "pattern": "^\\d+(?:\\.\\d{1,2})?$"}, "currency": {"type": "string", "minLength": 3, "maxLength": 3}, "attributes": {"type": "object", "additionalProperties": {"type": "string"}}}},
+      "ProductUpdate": {"type": "object", "properties": {"name": {"type": "string", "minLength": 1, "maxLength": 240}, "slug": {"$ref": "#/components/schemas/Slug"}, "description": {"type": "string", "maxLength": 20000}, "brand_id": {"type": ["string", "null"], "format": "uuid"}, "category_id": {"type": ["string", "null"], "format": "uuid"}, "price_amount": {"type": "string", "pattern": "^\\d+(?:\\.\\d{1,2})?$"}, "currency": {"type": "string", "minLength": 3, "maxLength": 3}, "attributes": {"type": "object", "additionalProperties": {"type": "string"}}}},
+      "VariantCreate": {"type": "object", "required": ["sku", "name"], "properties": {"sku": {"type": "string", "minLength": 1, "maxLength": 100}, "name": {"type": "string", "minLength": 1, "maxLength": 160}, "price_amount": {"type": ["string", "null"]}, "attributes": {"type": "object", "additionalProperties": {"type": "string"}}}},
+      "VariantUpdate": {"type": "object", "properties": {"name": {"type": "string", "minLength": 1, "maxLength": 160}, "price_amount": {"type": ["string", "null"]}, "attributes": {"type": "object", "additionalProperties": {"type": "string"}}, "is_active": {"type": "boolean"}}},
+      "ProductMediaAttach": {"type": "object", "required": ["media_asset_id"], "properties": {"media_asset_id": {"type": "string", "format": "uuid"}, "sort_order": {"type": "integer", "minimum": 0, "maximum": 1000, "default": 0}}},
+      "ProductMediaUpdate": {"type": "object", "required": ["sort_order"], "properties": {"sort_order": {"type": "integer", "minimum": 0, "maximum": 1000}}}
+    }
+  }
+}

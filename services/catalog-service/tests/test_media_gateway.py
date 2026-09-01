@@ -1,4 +1,5 @@
 import asyncio
+import time
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -7,7 +8,11 @@ import pytest
 from fastapi import HTTPException
 
 from catalog_service.config import Settings
-from catalog_service.media import HttpMediaCatalogGateway
+from catalog_service.media import (
+    HttpMediaCatalogGateway,
+    build_media_reference_proof,
+    verify_media_reference_proof,
+)
 
 
 def test_catalog_media_gateway_accepts_a_matching_ready_asset() -> None:
@@ -43,3 +48,20 @@ def test_catalog_media_gateway_rejects_an_unready_asset() -> None:
         await gateway.close()
 
     asyncio.run(exercise())
+
+
+def test_catalog_accepts_only_a_signed_media_reference_query() -> None:
+    asset_id = uuid4()
+    secret = "test-catalog-media-access-secret-at-least-32-bytes"
+    expires_at = int(time.time()) + 30
+
+    verify_media_reference_proof(
+        secret=secret,
+        provided_proof=build_media_reference_proof(
+            secret=secret,
+            asset_id=asset_id,
+            expires_at=expires_at,
+        ),
+        asset_id=asset_id,
+        expires_at=expires_at,
+    )
