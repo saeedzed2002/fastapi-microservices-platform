@@ -2,7 +2,7 @@
 
 Each child directory represents one independently deployable bounded context and owns its code, migrations, tests, contracts, image, documentation, and runtime behavior.
 
-Core services are Identity, Customer, Catalog, Search, Inventory, Cart, Order, Payment, Notification, Media, and Chat. Shipping is a later context.
+Core services are Identity, Customer, Catalog, Search, Inventory, Cart, Order, Payment, Notification, Media, and Chat. Shipping is being extracted incrementally in Phase 18; its first slice owns only the idempotent creation of a `READY` shipment from an Order confirmation fact.
 
 ## Rules
 

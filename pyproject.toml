@@ -38,6 +38,7 @@ members = [
   "services/identity-service",
   "services/reference-service",
   "services/chat-service",
+  "services/shipping-service",
 ]
 
 [tool.ruff]
@@ -58,6 +59,7 @@ src = [
   "services/identity-service/src",
   "services/customer-service/src",
   "services/chat-service/src",
+  "services/shipping-service/src",
   "tests",
 ]
 
@@ -81,6 +83,7 @@ testpaths = [
   "services/identity-service/tests",
   "services/customer-service/tests",
   "services/chat-service/tests",
+  "services/shipping-service/tests",
   "tests",
 ]
 addopts = "-ra --import-mode=importlib"
@@ -106,4 +109,5 @@ files = [
   "services/identity-service/src",
   "services/customer-service/src",
   "services/chat-service/src",
+  "services/shipping-service/src",
 ]

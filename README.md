@@ -76,9 +76,9 @@ Core bounded contexts:
 - `media-service`
 - `chat-service`
 
-Later bounded contexts:
+Incremental bounded-context extraction:
 
-- `shipping-service`
+- `shipping-service` — Phase 18 first slice: a `READY` shipment is created idempotently from `order.confirmed.v1`; operational shipment commands remain deliberately out of scope until the Order-owned transition fence exists. The current `Compose` and `Kind` topologies do not register this worker yet; that rollout follows the fence and its `E2E` evidence.
 
 See [service boundaries](docs/architecture/service-boundaries.md) for ownership and non-ownership rules.
 
@@ -160,7 +160,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 | 15 | Kubernetes API autoscaling |
 | 16 | Online payment provider routing |
 | 17 | Portfolio evidence and reviewer guide |
-| 18 | Proposed: Shipping ownership extraction |
+| 18 | In progress: Shipping ownership extraction |
 
 ## Local development
 

@@ -230,11 +230,11 @@
       "name": "order.confirmed.v1",
       "kind": "domain-event",
       "owner": "order-service",
-      "consumers": ["order-service"],
+      "consumers": ["order-service", "shipping-service"],
       "status": "active",
       "topic": "fastapi-platform.order.events.v1",
       "message_key": "order_id",
-      "notes": "Order is terminally confirmed. An independent Order consumer group creates the durable invoice-generation handoff.",
+      "notes": "Order is terminally confirmed. Independent Order and Shipping consumer groups create their durable invoice-generation and READY-shipment handoffs.",
       "schema": "events/order.confirmed.v1.schema.json"
     },
     {

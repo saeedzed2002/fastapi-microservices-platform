@@ -115,7 +115,7 @@ Owns a rebuildable, eventually consistent search projection/index. It does not o
 
 Owns shipments, carrier adapters/references, carrier tracking numbers, shipping status, and fulfilment lifecycle. It does not own the platform order tracking code, payment truth, or inventory truth.
 
-Shipping is intentionally outside the current Phase 0–12 implementation roadmap until a later approved milestone. Order may eventually maintain a customer-facing projection of Shipping facts.
+Shipping is being extracted incrementally in the approved Phase 18 milestone. Its first slice owns idempotent creation of a `READY` shipment from `order.confirmed.v1`; it does not yet expose shipment transition commands or alter Order's existing fulfillment endpoint. Order will retain a customer-facing projection of Shipping facts after the transition fence and compatibility facade are proven.
 
 ## Boundary enforcement
 

@@ -20,6 +20,7 @@ members = [
     "platform-observability",
     "reference-service",
     "search-service",
+    "shipping-service",
 ]
 
 [[package]]
@@ -1970,6 +1971,35 @@ requires-dist = [
     { name = "platform-observability", editable = "libs/platform-observability" },
     { name = "pydantic-settings", specifier = ">=2.15,<3" },
     { name = "redis", specifier = ">=8.1.0,<9" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.52,<2.1" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.3,<0.53" },
+]
+
+[[package]]
+name = "shipping-service"
+version = "0.1.0"
+source = { editable = "services/shipping-service" }
+dependencies = [
+    { name = "aiokafka" },
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "fastapi" },
+    { name = "platform-messaging" },
+    { name = "platform-observability" },
+    { name = "pydantic-settings" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiokafka", specifier = ">=0.14,<0.15" },
+    { name = "alembic", specifier = ">=1.19.1,<2" },
+    { name = "asyncpg", specifier = ">=0.31,<0.32" },
+    { name = "fastapi", specifier = ">=0.141.1,<0.142" },
+    { name = "platform-messaging", editable = "libs/platform-messaging" },
+    { name = "platform-observability", editable = "libs/platform-observability" },
+    { name = "pydantic-settings", specifier = ">=2.15,<3" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.52,<2.1" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.3,<0.53" },
 ]

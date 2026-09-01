@@ -13,6 +13,7 @@ SERVICES = (
     "payment-service",
     "notification-service",
     "chat-service",
+    "shipping-service",
 )
 
 RUNTIME_PIP_PRUNING = (
