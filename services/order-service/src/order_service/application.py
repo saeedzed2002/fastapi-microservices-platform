@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.sql.elements import ColumnElement
 
 from order_service.models import (
+    FulfillmentAuthorization,
     InboxMessage,
     Invoice,
     Order,
@@ -55,6 +56,7 @@ _FULFILLMENT_TRANSITIONS = {
     ("PROCESSING", "SHIPPED"),
     ("SHIPPED", "DELIVERED"),
 }
+_ACTIVE_FULFILLMENT_AUTHORIZATION = "ACTIVE"
 
 
 class InvalidOrderCursor(ValueError):
@@ -167,6 +169,15 @@ async def update_order_fulfillment(
     order = await db.scalar(select(Order).where(Order.id == order_id).with_for_update())
     if order is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order not found")
+    active_authorization = await _load_active_fulfillment_authorization(
+        db, order_id=order.id, now=datetime.now(UTC)
+    )
+    if active_authorization is not None:
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="fulfillment transition is already in progress",
+        )
     fulfillment = await db.scalar(
         select(OrderFulfillment).where(OrderFulfillment.order_id == order.id).with_for_update()
     )
@@ -232,7 +243,9 @@ async def request_order_refund(
     order_id: UUID,
     requested_by: UUID,
     idempotency_key: str,
+    now: datetime | None = None,
 ) -> RefundRequestResponse:
+    current_time = now or datetime.now(UTC)
     order = await db.scalar(select(Order).where(Order.id == order_id).with_for_update())
     if order is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order not found")
@@ -249,6 +262,15 @@ async def request_order_refund(
             order_id=order.id,
             refund_request_id=refund_request.id,
             status="REFUND_PENDING",
+        )
+    active_authorization = await _load_active_fulfillment_authorization(
+        db, order_id=order.id, now=current_time
+    )
+    if active_authorization is not None:
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="fulfillment transition is already in progress",
         )
     key_owner = await db.scalar(
         select(OrderRefundRequest).where(OrderRefundRequest.idempotency_key == idempotency_key)
@@ -311,6 +333,125 @@ async def request_order_refund(
         refund_request_id=refund_request.id,
         status="REFUND_PENDING",
     )
+
+
+async def authorize_fulfillment_transition(
+    db: AsyncSession,
+    *,
+    order_id: UUID,
+    command_id: UUID,
+    requested_by: UUID,
+    target_status: str,
+    expires_at: datetime,
+    now: datetime | None = None,
+) -> FulfillmentAuthorization:
+    current_time = now or datetime.now(UTC)
+    if expires_at.tzinfo is None or expires_at <= current_time:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="fulfillment authorization expiry must be in the future",
+        )
+    expires_at = expires_at.astimezone(UTC)
+    order = await db.scalar(select(Order).where(Order.id == order_id).with_for_update())
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order not found")
+
+    active_authorization = await _load_active_fulfillment_authorization(
+        db, order_id=order.id, now=current_time
+    )
+    existing = await db.scalar(
+        select(FulfillmentAuthorization)
+        .where(FulfillmentAuthorization.command_id == command_id)
+        .with_for_update()
+    )
+    if existing is not None:
+        if (
+            existing.order_id == order_id
+            and existing.requested_by == requested_by
+            and existing.target_status == target_status
+            and _authorization_is_active(existing, now=current_time)
+        ):
+            await db.commit()
+            return existing
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="fulfillment command id conflict",
+        )
+    if active_authorization is not None:
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="fulfillment transition is already authorized",
+        )
+    if (order.status, target_status) not in _FULFILLMENT_TRANSITIONS:
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="order is not eligible for fulfillment",
+        )
+
+    authorization = FulfillmentAuthorization(
+        order_id=order.id,
+        command_id=command_id,
+        from_status=order.status,
+        target_status=target_status,
+        requested_by=requested_by,
+        status=_ACTIVE_FULFILLMENT_AUTHORIZATION,
+        issued_at=current_time,
+        expires_at=expires_at,
+    )
+    db.add(authorization)
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        await db.rollback()
+        recovered = cast(
+            FulfillmentAuthorization | None,
+            await db.scalar(
+                select(FulfillmentAuthorization).where(
+                    FulfillmentAuthorization.command_id == command_id
+                )
+            ),
+        )
+        if (
+            recovered is not None
+            and recovered.order_id == order_id
+            and recovered.requested_by == requested_by
+            and recovered.target_status == target_status
+            and _authorization_is_active(recovered, now=current_time)
+        ):
+            return recovered
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="fulfillment command id conflict",
+        ) from exc
+    await db.commit()
+    return authorization
+
+
+def _authorization_is_active(authorization: FulfillmentAuthorization, *, now: datetime) -> bool:
+    return (
+        authorization.status == _ACTIVE_FULFILLMENT_AUTHORIZATION and authorization.expires_at > now
+    )
+
+
+async def _load_active_fulfillment_authorization(
+    db: AsyncSession, *, order_id: UUID, now: datetime
+) -> FulfillmentAuthorization | None:
+    authorization = await db.scalar(
+        select(FulfillmentAuthorization)
+        .where(
+            FulfillmentAuthorization.order_id == order_id,
+            FulfillmentAuthorization.status == _ACTIVE_FULFILLMENT_AUTHORIZATION,
+        )
+        .with_for_update()
+    )
+    if authorization is not None and not _authorization_is_active(authorization, now=now):
+        authorization.status = "EXPIRED"
+        authorization.resolved_at = now
+        return None
+    return authorization
 
 
 def encode_order_cursor(order: Order) -> str:

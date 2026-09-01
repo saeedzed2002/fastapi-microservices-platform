@@ -39,9 +39,9 @@ becomes the authoritative shipment bounded context.
 
 ## Sequence
 
-1. Add the Shipping service skeleton, migration, `Shipment` lifecycle, and
+1. Completed: add the Shipping service skeleton, migration, `Shipment` lifecycle, and
    idempotent consumer of `order.confirmed.v1`.
-2. Add the Order-owned fulfillment-transition authorization record and its
+2. Completed: add the Order-owned fulfillment-transition authorization record and its
    bounded expiry/recovery path. Refund initiation must return a conflict while
    such an authorization is active.
 3. Add authenticated Shipping status commands. Shipping obtains an Order

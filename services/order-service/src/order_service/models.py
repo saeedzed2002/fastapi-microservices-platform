@@ -2,7 +2,18 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -85,6 +96,37 @@ class OrderRefundRequest(Base):
     idempotency_key: Mapped[str] = mapped_column(String(128), unique=True)
     requested_by: Mapped[UUID] = mapped_column(index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class FulfillmentAuthorization(Base):
+    __tablename__ = "fulfillment_authorizations"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('ACTIVE', 'CONSUMED', 'EXPIRED', 'RELEASED')",
+            name="ck_fulfillment_authorizations_status",
+        ),
+        CheckConstraint(
+            "expires_at > issued_at",
+            name="ck_fulfillment_authorizations_expiry",
+        ),
+        Index(
+            "uq_fulfillment_authorizations_active_order",
+            "order_id",
+            unique=True,
+            postgresql_where=text("status = 'ACTIVE'"),
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    order_id: Mapped[UUID] = mapped_column(ForeignKey("orders.id", ondelete="RESTRICT"), index=True)
+    command_id: Mapped[UUID] = mapped_column(unique=True)
+    from_status: Mapped[str] = mapped_column(String(32))
+    target_status: Mapped[str] = mapped_column(String(32))
+    requested_by: Mapped[UUID] = mapped_column(index=True)
+    status: Mapped[str] = mapped_column(String(16), default="ACTIVE", index=True)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class InboxMessage(Base):

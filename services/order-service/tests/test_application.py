@@ -1,5 +1,5 @@
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -10,16 +10,24 @@ from fastapi import HTTPException
 
 from order_service.application import (
     InvalidOrderCursor,
+    authorize_fulfillment_transition,
     checkout_total,
     decode_order_cursor,
     encode_order_cursor,
     process_saga_result,
+    request_order_refund,
     required_customer_email,
     transition_order,
     update_order_fulfillment,
     validate_checkout_payment,
 )
-from order_service.models import Order, OrderItem, OutboxMessage
+from order_service.models import (
+    FulfillmentAuthorization,
+    Order,
+    OrderItem,
+    OrderRefundRequest,
+    OutboxMessage,
+)
 from order_service.schemas import FulfillmentUpdateRequest
 from order_service.workers.invoice_tasks import render_invoice_pdf
 
@@ -106,7 +114,7 @@ def test_refund_pending_order_cannot_enter_fulfillment() -> None:
             status="REFUND_PENDING", tracking_code="ORD-REFUND", currency="IRT", total_amount=1
         )
         db = SimpleNamespace(
-            scalar=AsyncMock(side_effect=[order, None]),
+            scalar=AsyncMock(side_effect=[order, None, None]),
             add=Mock(),
             commit=AsyncMock(),
         )
@@ -128,6 +136,209 @@ def test_shipping_requires_both_tracking_fields() -> None:
 
     shipment = FulfillmentUpdateRequest(status="SHIPPED", carrier="Post", tracking_number="TRK-1")
     assert shipment.tracking_number == "TRK-1"
+
+
+def test_active_fulfillment_authorization_blocks_refund() -> None:
+    async def exercise() -> None:
+        now = datetime.now(UTC)
+        order = Order(
+            status="CONFIRMED",
+            tracking_code="ORD-AUTH",
+            currency="IRT",
+            total_amount=1,
+            payment_method="zarinpal",
+        )
+        order.id = uuid4()
+        authorization = FulfillmentAuthorization(
+            order_id=order.id,
+            command_id=uuid4(),
+            from_status="CONFIRMED",
+            target_status="SHIPPED",
+            requested_by=uuid4(),
+            status="ACTIVE",
+            issued_at=now - timedelta(seconds=1),
+            expires_at=now + timedelta(seconds=30),
+        )
+        db = SimpleNamespace(
+            scalar=AsyncMock(side_effect=[order, None, authorization]),
+            add=Mock(),
+            commit=AsyncMock(),
+        )
+
+        with pytest.raises(HTTPException, match="fulfillment transition is already in progress"):
+            await request_order_refund(
+                db,
+                order_id=order.id,
+                requested_by=uuid4(),
+                idempotency_key="refund-after-shipping-command",
+                now=now,
+            )
+
+        db.add.assert_not_called()
+        db.commit.assert_awaited_once()
+
+    asyncio.run(exercise())
+
+
+def test_expired_fulfillment_authorization_does_not_block_refund() -> None:
+    async def exercise() -> None:
+        now = datetime.now(UTC)
+        order = Order(
+            status="CONFIRMED",
+            tracking_code="ORD-EXPIRED-AUTH",
+            currency="IRT",
+            total_amount=1,
+            payment_method="zarinpal",
+        )
+        order.id = uuid4()
+        authorization = FulfillmentAuthorization(
+            order_id=order.id,
+            command_id=uuid4(),
+            from_status="CONFIRMED",
+            target_status="SHIPPED",
+            requested_by=uuid4(),
+            status="ACTIVE",
+            issued_at=now - timedelta(seconds=2),
+            expires_at=now - timedelta(seconds=1),
+        )
+
+        def assign_refund_identifier(value: object) -> None:
+            if isinstance(value, OrderRefundRequest):
+                value.id = uuid4()
+
+        db = SimpleNamespace(
+            scalar=AsyncMock(side_effect=[order, None, authorization, None]),
+            add=Mock(side_effect=assign_refund_identifier),
+            flush=AsyncMock(),
+            commit=AsyncMock(),
+        )
+
+        response = await request_order_refund(
+            db,
+            order_id=order.id,
+            requested_by=uuid4(),
+            idempotency_key="refund-after-expired-shipping-command",
+            now=now,
+        )
+
+        assert response.status == "REFUND_PENDING"
+        assert authorization.status == "EXPIRED"
+        assert authorization.resolved_at == now
+        db.commit.assert_awaited_once()
+
+    asyncio.run(exercise())
+
+
+def test_fulfillment_authorization_is_idempotent_for_one_command() -> None:
+    async def exercise() -> None:
+        now = datetime.now(UTC)
+        order = Order(
+            status="CONFIRMED",
+            tracking_code="ORD-COMMAND",
+            currency="IRT",
+            total_amount=1,
+        )
+        order.id = uuid4()
+        command_id = uuid4()
+        requested_by = uuid4()
+        db = SimpleNamespace(
+            scalar=AsyncMock(side_effect=[order, None, None]),
+            add=Mock(),
+            flush=AsyncMock(),
+            commit=AsyncMock(),
+        )
+
+        authorization = await authorize_fulfillment_transition(
+            db,
+            order_id=order.id,
+            command_id=command_id,
+            requested_by=requested_by,
+            target_status="SHIPPED",
+            expires_at=now + timedelta(seconds=30),
+            now=now,
+        )
+
+        assert authorization.order_id == order.id
+        assert authorization.command_id == command_id
+        assert authorization.from_status == "CONFIRMED"
+        assert authorization.target_status == "SHIPPED"
+        assert authorization.status == "ACTIVE"
+        db.flush.assert_awaited_once()
+        db.commit.assert_awaited_once()
+
+        replay_authorization = FulfillmentAuthorization(
+            order_id=order.id,
+            command_id=command_id,
+            from_status="CONFIRMED",
+            target_status="SHIPPED",
+            requested_by=requested_by,
+            status="ACTIVE",
+            issued_at=now,
+            expires_at=now + timedelta(seconds=30),
+        )
+        replay_db = SimpleNamespace(
+            scalar=AsyncMock(side_effect=[order, replay_authorization, replay_authorization]),
+            add=Mock(),
+            flush=AsyncMock(),
+            commit=AsyncMock(),
+        )
+
+        replayed = await authorize_fulfillment_transition(
+            replay_db,
+            order_id=order.id,
+            command_id=command_id,
+            requested_by=requested_by,
+            target_status="SHIPPED",
+            expires_at=now + timedelta(seconds=30),
+            now=now,
+        )
+
+        assert replayed is replay_authorization
+        replay_db.add.assert_not_called()
+        replay_db.flush.assert_not_awaited()
+        replay_db.commit.assert_awaited_once()
+
+    asyncio.run(exercise())
+
+
+def test_active_fulfillment_authorization_blocks_legacy_mutation() -> None:
+    async def exercise() -> None:
+        now = datetime.now(UTC)
+        order = Order(
+            status="CONFIRMED",
+            tracking_code="ORD-LEGACY-FENCE",
+            currency="IRT",
+            total_amount=1,
+        )
+        order.id = uuid4()
+        authorization = FulfillmentAuthorization(
+            order_id=order.id,
+            command_id=uuid4(),
+            from_status="CONFIRMED",
+            target_status="SHIPPED",
+            requested_by=uuid4(),
+            status="ACTIVE",
+            issued_at=now - timedelta(seconds=1),
+            expires_at=now + timedelta(seconds=30),
+        )
+        db = SimpleNamespace(
+            scalar=AsyncMock(side_effect=[order, authorization]),
+            add=Mock(),
+            commit=AsyncMock(),
+        )
+
+        with pytest.raises(HTTPException, match="fulfillment transition is already in progress"):
+            await update_order_fulfillment(
+                db,
+                order_id=order.id,
+                updated_by=uuid4(),
+                payload=FulfillmentUpdateRequest(status="PROCESSING"),
+            )
+
+        db.add.assert_not_called()
+        db.commit.assert_awaited_once()
+
+    asyncio.run(exercise())
 
 
 def test_invoice_pdf_is_rendered_from_order_snapshot() -> None:

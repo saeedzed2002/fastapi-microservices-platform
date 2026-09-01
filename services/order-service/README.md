@@ -36,6 +36,13 @@ an independent consumer group. It owns the Invoice metadata, deterministic PDF
 object key, task intent, and `invoice.generated.v1` Outbox record. It does not
 own email delivery.
 
+During the Phase 18 Shipping extraction, Order also owns a short-lived
+fulfillment-transition authorization record. A still-valid authorization blocks
+both a new refund and the legacy fulfillment mutation; an expired authorization
+is marked `EXPIRED` lazily by either path and no longer blocks recovery. The
+future Shipping command endpoint will obtain this authorization before its
+local shipment transition; Order never exposes its database to Shipping.
+
 ## API
 
 - `POST /api/v1/orders` with `Idempotency-Key`
