@@ -1,0 +1,36 @@
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from platform_auth import AuthClaims, TokenError, decode_access_token
+from shipping_service.config import get_settings
+
+bearer = HTTPBearer(auto_error=False)
+
+
+async def current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+) -> AuthClaims:
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="authentication required"
+        )
+    settings = get_settings()
+    try:
+        return decode_access_token(
+            credentials.credentials,
+            secret=settings.jwt_secret,
+            issuer=settings.jwt_issuer,
+            audience=settings.jwt_audience,
+        )
+    except TokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid access token"
+        ) from exc
+
+
+async def require_administrator(claims: AuthClaims = Depends(current_user)) -> AuthClaims:
+    if "admin" not in claims.roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="administrator role required"
+        )
+    return claims

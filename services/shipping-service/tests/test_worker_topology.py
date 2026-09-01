@@ -10,3 +10,5 @@ def test_shipping_consumer_is_a_separate_background_entrypoint() -> None:
 
     assert "consume_order_events" not in api_source
     assert "consume_order_events" in worker_source
+    assert "publish_outbox" not in api_source
+    assert "publish_outbox" in worker_source

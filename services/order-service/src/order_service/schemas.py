@@ -87,10 +87,58 @@ class FulfillmentUpdateRequest(BaseModel):
         return self
 
 
+class FulfillmentCommandResponse(BaseModel):
+    order_id: UUID
+    status: FulfillmentStatus
+    carrier: str | None
+    tracking_number: str | None
+    command_id: UUID
+    occurred_at: datetime
+
+
 class RefundRequestResponse(BaseModel):
     order_id: UUID
     refund_request_id: UUID
     status: Literal["REFUND_PENDING"]
+
+
+class FulfillmentAuthorizationRequest(BaseModel):
+    command_id: UUID
+    target_status: FulfillmentStatus
+    expires_at: datetime
+    proof_expires_at: int = Field(ge=1)
+
+
+class FulfillmentAuthorizationResponse(BaseModel):
+    authorization_id: UUID
+    order_id: UUID
+    command_id: UUID
+    target_status: FulfillmentStatus
+    expires_at: datetime
+
+
+class ShippingStatusUpdatedPayload(BaseModel):
+    order_id: UUID
+    authorization_id: UUID
+    command_id: UUID
+    requested_by: UUID
+    status: FulfillmentStatus
+    carrier: str | None
+    tracking_number: str | None
+    occurred_at: datetime
+
+
+class ShippingCommandRecoveryResponse(BaseModel):
+    command_id: UUID
+    state: Literal["NOT_COMMITTED", "COMMITTED"]
+    order_id: UUID | None = None
+    authorization_id: UUID | None = None
+    event_id: UUID | None = None
+    requested_by: UUID | None = None
+    status: FulfillmentStatus | None = None
+    carrier: str | None = None
+    tracking_number: str | None = None
+    occurred_at: datetime | None = None
 
 
 class OrderSummaryResponse(BaseModel):

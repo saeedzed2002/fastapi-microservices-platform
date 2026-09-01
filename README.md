@@ -78,7 +78,7 @@ Core bounded contexts:
 
 Incremental bounded-context extraction:
 
-- `shipping-service` — Phase 18 first slice: a `READY` shipment is created idempotently from `order.confirmed.v1`; operational shipment commands remain deliberately out of scope until the Order-owned transition fence exists. The current `Compose` and `Kind` topologies do not register this worker yet; that rollout follows the fence and its `E2E` evidence.
+- `shipping-service` — Phase 18 source implementation owns a `READY` shipment created idempotently from `order.confirmed.v1`, administrator lifecycle commands, its own transition audit, and its own `Outbox`. Every command obtains an Order-owned short-lived authorization; an expired authorization is reconciled from Shipping before a refund can proceed. The current `Compose` and `Kind` topologies intentionally do not register this service yet; that rollout follows dedicated `E2E` evidence.
 
 See [service boundaries](docs/architecture/service-boundaries.md) for ownership and non-ownership rules.
 

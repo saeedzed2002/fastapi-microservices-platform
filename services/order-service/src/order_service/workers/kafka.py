@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer  # type: ignore[import-untyped]
 from sqlalchemy import or_, select
 
-from order_service.application import process_saga_result
+from order_service.application import process_saga_result, process_shipping_status_update
 from order_service.config import Settings
 from order_service.db import get_session_factory
 from order_service.invoice_application import accept_invoice_request
@@ -192,6 +192,48 @@ async def consume_invoice_events(settings: Settings, stop: asyncio.Event) -> Non
                 record=message,
                 policy=KafkaDlqPolicy(
                     consumer_name="order-service.invoice-dispatcher",
+                    dead_letter_topic=settings.kafka_dead_letter_topic,
+                    max_attempts=settings.kafka_consumer_max_attempts,
+                    retry_backoff_seconds=settings.kafka_consumer_retry_backoff_seconds,
+                ),
+                handler=handle,
+                stop=stop,
+            )
+            if stop.is_set():
+                break
+    finally:
+        await producer.stop()
+        await consumer.stop()
+
+
+async def consume_shipping_events(settings: Settings, stop: asyncio.Event) -> None:
+    consumer = AIOKafkaConsumer(
+        settings.shipping_kafka_topic,
+        bootstrap_servers=settings.kafka_bootstrap_servers,
+        group_id="order-service.shipping",
+        enable_auto_commit=False,
+        auto_offset_reset="earliest",
+    )
+    producer = AIOKafkaProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers, enable_idempotence=True
+    )
+    await consumer.start()
+    await producer.start()
+    try:
+        async for message in consumer:
+
+            async def handle(current_message: Any = message) -> None:
+                envelope = json.loads(current_message.value)
+                if envelope.get("event_type") == "shipping.status_updated.v1":
+                    async with get_session_factory()() as db:
+                        await process_shipping_status_update(db, envelope)
+
+            await process_record_with_dead_letter(
+                consumer=consumer,
+                producer=producer,
+                record=message,
+                policy=KafkaDlqPolicy(
+                    consumer_name="order-service.shipping",
                     dead_letter_topic=settings.kafka_dead_letter_topic,
                     max_attempts=settings.kafka_consumer_max_attempts,
                     retry_backoff_seconds=settings.kafka_consumer_retry_backoff_seconds,

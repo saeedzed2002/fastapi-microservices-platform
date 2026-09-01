@@ -1,0 +1,22 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "Shipping Administration API", "version": "v1", "description": "Shipping owns shipment state. Every mutation requires an administrator JWT and an Idempotency-Key. A retry with the same key returns the prior committed transition; an uncertain Order authorization returns 503 and must be retried with the same key."},
+  "paths": {
+    "/api/v1/shipping/admin/orders/{order_id}/status": {
+      "put": {
+        "summary": "Commit one authorized shipment transition",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"name": "order_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}, {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 128}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ShipmentStatusUpdate"}}}},
+        "responses": {"200": {"description": "Shipment transition committed or a matching idempotent replay", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ShipmentStatus"}}}}, "401": {"description": "Authentication required or invalid"}, "403": {"description": "Administrator role required"}, "404": {"description": "No READY shipment has been created for the confirmed order"}, "409": {"description": "Order authorization denied, command conflicts, authorization expired, or transition is invalid"}, "422": {"description": "Shipment tracking is incomplete"}, "503": {"description": "Order authorization result is unknown; retry with the same Idempotency-Key"}}
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}},
+    "schemas": {
+      "ShipmentStatusUpdate": {"type": "object", "additionalProperties": false, "required": ["status"], "properties": {"status": {"enum": ["PROCESSING", "SHIPPED", "DELIVERED"]}, "carrier": {"type": "string", "minLength": 1, "maxLength": 120}, "tracking_number": {"type": "string", "minLength": 1, "maxLength": 160}}},
+      "ShipmentStatus": {"type": "object", "additionalProperties": false, "required": ["order_id", "status", "carrier", "tracking_number", "command_id", "occurred_at"], "properties": {"order_id": {"type": "string", "format": "uuid"}, "status": {"enum": ["PROCESSING", "SHIPPED", "DELIVERED"]}, "carrier": {"type": ["string", "null"]}, "tracking_number": {"type": ["string", "null"]}, "command_id": {"type": "string", "format": "uuid"}, "occurred_at": {"type": "string", "format": "date-time"}}}
+    }
+  }
+}

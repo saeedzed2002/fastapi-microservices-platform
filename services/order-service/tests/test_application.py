@@ -15,6 +15,7 @@ from order_service.application import (
     decode_order_cursor,
     encode_order_cursor,
     process_saga_result,
+    process_shipping_status_update,
     request_order_refund,
     required_customer_email,
     transition_order,
@@ -28,7 +29,10 @@ from order_service.models import (
     OrderRefundRequest,
     OutboxMessage,
 )
-from order_service.schemas import FulfillmentUpdateRequest
+from order_service.schemas import (
+    FulfillmentUpdateRequest,
+    ShippingCommandRecoveryResponse,
+)
 from order_service.workers.invoice_tasks import render_invoice_pdf
 
 
@@ -180,7 +184,7 @@ def test_active_fulfillment_authorization_blocks_refund() -> None:
     asyncio.run(exercise())
 
 
-def test_expired_fulfillment_authorization_does_not_block_refund() -> None:
+def test_expired_fulfillment_authorization_requires_definitive_shipping_recovery() -> None:
     async def exercise() -> None:
         now = datetime.now(UTC)
         order = Order(
@@ -206,8 +210,15 @@ def test_expired_fulfillment_authorization_does_not_block_refund() -> None:
             if isinstance(value, OrderRefundRequest):
                 value.id = uuid4()
 
+        async def recover(_: FulfillmentAuthorization) -> ShippingCommandRecoveryResponse:
+            return ShippingCommandRecoveryResponse(
+                command_id=authorization.command_id, state="NOT_COMMITTED"
+            )
+
         db = SimpleNamespace(
-            scalar=AsyncMock(side_effect=[order, None, authorization, None]),
+            scalar=AsyncMock(
+                side_effect=[order, None, authorization, authorization, order, None, None, None]
+            ),
             add=Mock(side_effect=assign_refund_identifier),
             flush=AsyncMock(),
             commit=AsyncMock(),
@@ -219,12 +230,13 @@ def test_expired_fulfillment_authorization_does_not_block_refund() -> None:
             requested_by=uuid4(),
             idempotency_key="refund-after-expired-shipping-command",
             now=now,
+            recover_expired_authorization=recover,
         )
 
         assert response.status == "REFUND_PENDING"
-        assert authorization.status == "EXPIRED"
+        assert authorization.status == "RELEASED"
         assert authorization.resolved_at == now
-        db.commit.assert_awaited_once()
+        assert db.commit.await_count == 3
 
     asyncio.run(exercise())
 
@@ -336,6 +348,58 @@ def test_active_fulfillment_authorization_blocks_legacy_mutation() -> None:
             )
 
         db.add.assert_not_called()
+        db.commit.assert_awaited_once()
+
+    asyncio.run(exercise())
+
+
+def test_shipping_status_fact_advances_only_the_matching_authorization() -> None:
+    async def exercise() -> None:
+        now = datetime.now(UTC)
+        order = Order(
+            status="CONFIRMED",
+            tracking_code="ORD-SHIPPING-EVENT",
+            currency="IRT",
+            total_amount=1,
+        )
+        order.id = uuid4()
+        authorization = FulfillmentAuthorization(
+            order_id=order.id,
+            command_id=uuid4(),
+            from_status="CONFIRMED",
+            target_status="SHIPPED",
+            requested_by=uuid4(),
+            status="ACTIVE",
+            issued_at=now - timedelta(seconds=1),
+            expires_at=now + timedelta(seconds=10),
+        )
+        authorization.id = uuid4()
+        db = SimpleNamespace(
+            scalar=AsyncMock(side_effect=[None, order, authorization, None]),
+            add=Mock(),
+            commit=AsyncMock(),
+        )
+        accepted = await process_shipping_status_update(
+            db,
+            {
+                "event_id": str(uuid4()),
+                "event_type": "shipping.status_updated.v1",
+                "payload": {
+                    "order_id": str(order.id),
+                    "authorization_id": str(authorization.id),
+                    "command_id": str(authorization.command_id),
+                    "requested_by": str(authorization.requested_by),
+                    "status": "SHIPPED",
+                    "carrier": "Post",
+                    "tracking_number": "TRK-2",
+                    "occurred_at": now.isoformat().replace("+00:00", "Z"),
+                },
+            },
+        )
+
+        assert accepted is True
+        assert order.status == "SHIPPED"
+        assert authorization.status == "CONSUMED"
         db.commit.assert_awaited_once()
 
     asyncio.run(exercise())

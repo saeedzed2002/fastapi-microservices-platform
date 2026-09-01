@@ -9,6 +9,7 @@ KNOWN_LOCAL_DEVELOPMENT_CREDENTIALS: Final = frozenset(
         "local-development-session-metadata-secret-change-me",
         "local-development-chat-media-access-secret-change-me-32-bytes",
         "local-development-catalog-media-access-secret-change-me-32-bytes",
+        "local-development-order-shipping-access-secret-change-me-32-bytes",
         "minio-local-only",
         "amqp://platform:platform-local-only@localhost:5672//",
     }

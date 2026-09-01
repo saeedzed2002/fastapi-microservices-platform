@@ -1,8 +1,8 @@
 import asyncio
 import base64
 import binascii
-from collections.abc import Iterable
-from datetime import UTC, datetime
+from collections.abc import Awaitable, Callable, Iterable
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import cast
 from uuid import UUID, uuid4
@@ -38,6 +38,8 @@ from order_service.schemas import (
     OrderStatus,
     OrderSummaryResponse,
     RefundRequestResponse,
+    ShippingCommandRecoveryResponse,
+    ShippingStatusUpdatedPayload,
 )
 
 _TRANSITIONS = {
@@ -244,6 +246,10 @@ async def request_order_refund(
     requested_by: UUID,
     idempotency_key: str,
     now: datetime | None = None,
+    recover_expired_authorization: Callable[
+        [FulfillmentAuthorization], Awaitable[ShippingCommandRecoveryResponse]
+    ]
+    | None = None,
 ) -> RefundRequestResponse:
     current_time = now or datetime.now(UTC)
     order = await db.scalar(select(Order).where(Order.id == order_id).with_for_update())
@@ -267,6 +273,23 @@ async def request_order_refund(
         db, order_id=order.id, now=current_time
     )
     if active_authorization is not None:
+        if not _authorization_is_active(active_authorization, now=current_time):
+            await db.commit()
+            if recover_expired_authorization is None:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="expired fulfillment authorization requires shipping recovery",
+                )
+            recovery = await recover_expired_authorization(active_authorization)
+            return await _recover_expired_fulfillment_authorization(
+                db,
+                order_id=order_id,
+                requested_by=requested_by,
+                idempotency_key=idempotency_key,
+                authorization_id=active_authorization.id,
+                recovery=recovery,
+                now=current_time,
+            )
         await db.commit()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -335,6 +358,112 @@ async def request_order_refund(
     )
 
 
+async def _recover_expired_fulfillment_authorization(
+    db: AsyncSession,
+    *,
+    order_id: UUID,
+    requested_by: UUID,
+    idempotency_key: str,
+    authorization_id: UUID,
+    recovery: ShippingCommandRecoveryResponse,
+    now: datetime,
+) -> RefundRequestResponse:
+    authorization = await db.scalar(
+        select(FulfillmentAuthorization)
+        .where(FulfillmentAuthorization.id == authorization_id)
+        .with_for_update()
+    )
+    if authorization is None:
+        await db.commit()
+        return await request_order_refund(
+            db,
+            order_id=order_id,
+            requested_by=requested_by,
+            idempotency_key=idempotency_key,
+            now=now,
+            recover_expired_authorization=None,
+        )
+    if authorization.status != _ACTIVE_FULFILLMENT_AUTHORIZATION:
+        await db.commit()
+        return await request_order_refund(
+            db,
+            order_id=order_id,
+            requested_by=requested_by,
+            idempotency_key=idempotency_key,
+            now=now,
+            recover_expired_authorization=None,
+        )
+    if recovery.command_id != authorization.command_id:
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="shipping recovery returned an invalid command result",
+        )
+    if recovery.state == "NOT_COMMITTED":
+        authorization.status = "RELEASED"
+        authorization.resolved_at = now
+        await db.commit()
+        return await request_order_refund(
+            db,
+            order_id=order_id,
+            requested_by=requested_by,
+            idempotency_key=idempotency_key,
+            now=now,
+            recover_expired_authorization=None,
+        )
+    if not _recovery_matches_authorization(authorization=authorization, recovery=recovery):
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="shipping recovery returned an invalid committed result",
+        )
+    assert recovery.event_id is not None
+    assert recovery.order_id is not None
+    assert recovery.authorization_id is not None
+    assert recovery.requested_by is not None
+    assert recovery.status is not None
+    assert recovery.occurred_at is not None
+    await process_shipping_status_update(
+        db,
+        {
+            "event_id": str(recovery.event_id),
+            "event_type": "shipping.status_updated.v1",
+            "payload": {
+                "order_id": str(recovery.order_id),
+                "authorization_id": str(recovery.authorization_id),
+                "command_id": str(recovery.command_id),
+                "requested_by": str(recovery.requested_by),
+                "status": recovery.status,
+                "carrier": recovery.carrier,
+                "tracking_number": recovery.tracking_number,
+                "occurred_at": recovery.occurred_at.astimezone(UTC)
+                .isoformat()
+                .replace("+00:00", "Z"),
+            },
+        },
+    )
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="shipment transition completed before refund authorization",
+    )
+
+
+def _recovery_matches_authorization(
+    *, authorization: FulfillmentAuthorization, recovery: ShippingCommandRecoveryResponse
+) -> bool:
+    return (
+        recovery.order_id == authorization.order_id
+        and recovery.authorization_id == authorization.id
+        and recovery.status == authorization.target_status
+        and recovery.requested_by == authorization.requested_by
+        and recovery.occurred_at is not None
+        and recovery.occurred_at.tzinfo is not None
+        and authorization.issued_at
+        <= recovery.occurred_at.astimezone(UTC)
+        <= authorization.expires_at
+    )
+
+
 async def authorize_fulfillment_transition(
     db: AsyncSession,
     *,
@@ -344,12 +473,17 @@ async def authorize_fulfillment_transition(
     target_status: str,
     expires_at: datetime,
     now: datetime | None = None,
+    max_ttl_seconds: int = 30,
 ) -> FulfillmentAuthorization:
     current_time = now or datetime.now(UTC)
-    if expires_at.tzinfo is None or expires_at <= current_time:
+    if (
+        expires_at.tzinfo is None
+        or expires_at <= current_time
+        or expires_at > current_time + timedelta(seconds=max_ttl_seconds)
+    ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="fulfillment authorization expiry must be in the future",
+            detail="fulfillment authorization expiry is outside the permitted window",
         )
     expires_at = expires_at.astimezone(UTC)
     order = await db.scalar(select(Order).where(Order.id == order_id).with_for_update())
@@ -447,10 +581,6 @@ async def _load_active_fulfillment_authorization(
         )
         .with_for_update()
     )
-    if authorization is not None and not _authorization_is_active(authorization, now=now):
-        authorization.status = "EXPIRED"
-        authorization.resolved_at = now
-        return None
     return authorization
 
 
@@ -811,5 +941,72 @@ async def process_saga_result(db: AsyncSession, envelope: dict[str, object]) -> 
             payload={"order_id": str(order.id)},
             causation_id=event_id,
         )
+    await db.commit()
+    return True
+
+
+async def process_shipping_status_update(db: AsyncSession, envelope: dict[str, object]) -> bool:
+    event_id = UUID(str(envelope["event_id"]))
+    if await db.scalar(select(InboxMessage).where(InboxMessage.event_id == event_id)):
+        return False
+    if str(envelope["event_type"]) != "shipping.status_updated.v1":
+        return False
+    payload = ShippingStatusUpdatedPayload.model_validate(envelope["payload"])
+    order = await db.scalar(select(Order).where(Order.id == payload.order_id).with_for_update())
+    authorization = await db.scalar(
+        select(FulfillmentAuthorization)
+        .where(FulfillmentAuthorization.id == payload.authorization_id)
+        .with_for_update()
+    )
+    db.add(InboxMessage(event_id=event_id, event_type="shipping.status_updated.v1"))
+    if (
+        order is None
+        or authorization is None
+        or authorization.order_id != payload.order_id
+        or authorization.command_id != payload.command_id
+        or authorization.target_status != payload.status
+        or authorization.requested_by != payload.requested_by
+        or authorization.status != _ACTIVE_FULFILLMENT_AUTHORIZATION
+        or payload.occurred_at.tzinfo is None
+        or payload.occurred_at.astimezone(UTC) < authorization.issued_at
+        or payload.occurred_at.astimezone(UTC) > authorization.expires_at
+        or order.status != authorization.from_status
+    ):
+        await db.commit()
+        return False
+    fulfillment = await db.scalar(
+        select(OrderFulfillment).where(OrderFulfillment.order_id == order.id).with_for_update()
+    )
+    if fulfillment is None:
+        fulfillment = OrderFulfillment(
+            order_id=order.id,
+            carrier=payload.carrier,
+            tracking_number=payload.tracking_number,
+            updated_by=payload.requested_by,
+        )
+        db.add(fulfillment)
+    else:
+        fulfillment.carrier = payload.carrier
+        fulfillment.tracking_number = payload.tracking_number
+        fulfillment.updated_by = payload.requested_by
+    previous = order.status
+    order.status = payload.status
+    authorization.status = "CONSUMED"
+    authorization.resolved_at = payload.occurred_at.astimezone(UTC)
+    add_transition(
+        db,
+        order=order,
+        previous=previous,
+        target=order.status,
+        event_id=event_id,
+        reason="Shipping status event",
+    )
+    add_outbox(
+        db,
+        event_type="order.fulfillment_updated.v1",
+        order_id=order.id,
+        payload={"order_id": str(order.id), "status": order.status},
+        causation_id=event_id,
+    )
     await db.commit()
     return True

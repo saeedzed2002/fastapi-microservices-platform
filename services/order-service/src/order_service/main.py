@@ -2,6 +2,7 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import cast
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
@@ -11,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from order_service.application import (
     admin_order_response,
+    authorize_fulfillment_transition,
     collect_checkout_snapshot,
     create_order,
     list_administrator_orders,
@@ -20,7 +22,6 @@ from order_service.application import (
     load_owned_order_or_404,
     order_response,
     request_order_refund,
-    update_order_fulfillment,
     validate_checkout_payment,
     wait_for_payment_pending,
 )
@@ -48,10 +49,20 @@ from order_service.schemas import (
     CartCheckoutResponse,
     CheckoutRequest,
     CustomerOrderPage,
+    FulfillmentAuthorizationRequest,
+    FulfillmentAuthorizationResponse,
+    FulfillmentCommandResponse,
+    FulfillmentStatus,
     FulfillmentUpdateRequest,
     OrderResponse,
     OrderStatus,
     RefundRequestResponse,
+)
+from order_service.shipping_access import verify_shipping_authorization_proof
+from order_service.shipping_gateway import (
+    HttpShippingRecoveryGateway,
+    ShippingCommandUnavailable,
+    ShippingRecoveryUnavailable,
 )
 from order_service.workers.kafka import consume_invoice_events, consume_saga_events, publish_outbox
 from order_service.workers.task_dispatcher import run_task_dispatcher
@@ -63,7 +74,7 @@ logger = logging.getLogger(settings.service_name)
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     stop = asyncio.Event()
     tasks: list[asyncio.Task[None]] = []
     if settings.kafka_publisher_enabled:
@@ -74,6 +85,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         tasks.append(asyncio.create_task(consume_invoice_events(settings, stop)))
     if settings.task_dispatcher_enabled:
         tasks.append(asyncio.create_task(run_task_dispatcher(settings, stop)))
+    application.state.shipping_recovery_gateway = HttpShippingRecoveryGateway(settings)
     logger.info("service_started")
     yield
     stop.set()
@@ -81,6 +93,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         task.cancel()
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)
+    await application.state.shipping_recovery_gateway.close()
     await dispose_engine()
     logger.info("service_stopped")
 
@@ -135,20 +148,35 @@ async def get_administrator_order(
     return await admin_order_response(db, await load_order_or_404(db, order_id))
 
 
-@app.patch("/api/v1/orders/admin/{order_id}/fulfillment", response_model=AdminOrderResponse)
+@app.patch(
+    "/api/v1/orders/admin/{order_id}/fulfillment",
+    response_model=FulfillmentCommandResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 async def update_administrator_order_fulfillment(
     order_id: UUID,
     payload: FulfillmentUpdateRequest,
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=1, max_length=128),
     claims: AuthClaims = Depends(require_administrator),
-    db: AsyncSession = Depends(get_session),
-) -> AdminOrderResponse:
-    order = await update_order_fulfillment(
-        db,
-        order_id=order_id,
-        updated_by=claims.subject,
-        payload=payload,
-    )
-    return await admin_order_response(db, order)
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+) -> FulfillmentCommandResponse:
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="authentication required"
+        )
+    gateway: HttpShippingRecoveryGateway = app.state.shipping_recovery_gateway
+    try:
+        return await gateway.forward_fulfillment_command(
+            order_id=order_id,
+            payload=payload,
+            idempotency_key=idempotency_key,
+            access_token=credentials.credentials,
+        )
+    except ShippingCommandUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="shipping command outcome is unavailable; retry with the same idempotency key",
+        ) from exc
 
 
 @app.post(
@@ -162,11 +190,59 @@ async def request_administrator_order_refund(
     claims: AuthClaims = Depends(require_administrator),
     db: AsyncSession = Depends(get_session),
 ) -> RefundRequestResponse:
-    return await request_order_refund(
+    gateway: HttpShippingRecoveryGateway = app.state.shipping_recovery_gateway
+    try:
+        return await request_order_refund(
+            db,
+            order_id=order_id,
+            requested_by=claims.subject,
+            idempotency_key=idempotency_key,
+            recover_expired_authorization=gateway.recover,
+        )
+    except ShippingRecoveryUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="shipping recovery is unavailable; refund outcome is unchanged",
+        ) from exc
+
+
+@app.post(
+    "/api/internal/v1/orders/{order_id}/fulfillment-authorizations",
+    response_model=FulfillmentAuthorizationResponse,
+    include_in_schema=False,
+)
+async def authorize_shipping_fulfillment_transition(
+    order_id: UUID,
+    payload: FulfillmentAuthorizationRequest,
+    shipping_order_proof: str = Header(
+        alias="X-Shipping-Order-Proof", min_length=64, max_length=64
+    ),
+    claims: AuthClaims = Depends(require_administrator),
+    db: AsyncSession = Depends(get_session),
+) -> FulfillmentAuthorizationResponse:
+    verify_shipping_authorization_proof(
+        settings=settings,
+        provided_proof=shipping_order_proof,
+        order_id=order_id,
+        command_id=payload.command_id,
+        target_status=payload.target_status,
+        expires_at=payload.proof_expires_at,
+    )
+    authorization = await authorize_fulfillment_transition(
         db,
         order_id=order_id,
+        command_id=payload.command_id,
         requested_by=claims.subject,
-        idempotency_key=idempotency_key,
+        target_status=payload.target_status,
+        expires_at=payload.expires_at,
+        max_ttl_seconds=settings.fulfillment_authorization_max_ttl_seconds,
+    )
+    return FulfillmentAuthorizationResponse(
+        authorization_id=authorization.id,
+        order_id=authorization.order_id,
+        command_id=authorization.command_id,
+        target_status=cast(FulfillmentStatus, authorization.target_status),
+        expires_at=authorization.expires_at,
     )
 
 

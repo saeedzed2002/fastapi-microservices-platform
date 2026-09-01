@@ -40,11 +40,11 @@
     },
     "/api/v1/orders/admin/{order_id}/fulfillment": {
       "patch": {
-        "summary": "Advance a paid order through fulfillment and record shipment tracking",
+        "summary": "Forward a paid-order fulfillment command to Shipping",
         "security": [{"bearerAuth": []}],
-        "parameters": [{"$ref": "#/components/parameters/OrderId"}],
+        "parameters": [{"$ref": "#/components/parameters/OrderId"}, {"$ref": "#/components/parameters/IdempotencyKey"}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FulfillmentUpdate"}}}},
-        "responses": {"200": {"description": "Updated administrator order", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AdminOrder"}}}}, "403": {"description": "Administrator role required"}, "404": {"description": "Order not found"}, "409": {"description": "Invalid fulfillment transition"}, "422": {"description": "Shipment tracking is incomplete"}}
+        "responses": {"202": {"description": "Shipping committed the command or returned its matching idempotent result; Order's customer projection updates asynchronously", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FulfillmentCommand"}}}}, "403": {"description": "Administrator role required"}, "404": {"description": "Shipment is not ready"}, "409": {"description": "Shipping rejected the command"}, "422": {"description": "Shipment tracking is incomplete"}, "503": {"description": "Shipping command result is unknown; retry with the same Idempotency-Key"}}
       }
     },
     "/api/v1/orders/admin/{order_id}/refund": {
@@ -71,6 +71,7 @@
       "OrderItem": {"type": "object", "required": ["variant_id", "sku", "product_name", "unit_amount", "quantity", "attributes"], "properties": {"variant_id": {"type": "string", "format": "uuid"}, "sku": {"type": "string"}, "product_name": {"type": "string"}, "unit_amount": {"type": "string"}, "quantity": {"type": "integer"}, "attributes": {"type": "object", "additionalProperties": {"type": "string"}}}},
       "Fulfillment": {"type": "object", "required": ["carrier", "tracking_number", "updated_at"], "properties": {"carrier": {"type": ["string", "null"]}, "tracking_number": {"type": ["string", "null"]}, "updated_at": {"type": "string", "format": "date-time"}}},
       "FulfillmentUpdate": {"type": "object", "required": ["status"], "properties": {"status": {"enum": ["PROCESSING", "SHIPPED", "DELIVERED"]}, "carrier": {"type": "string", "minLength": 1, "maxLength": 120}, "tracking_number": {"type": "string", "minLength": 1, "maxLength": 160}}},
+      "FulfillmentCommand": {"type": "object", "required": ["order_id", "status", "carrier", "tracking_number", "command_id", "occurred_at"], "properties": {"order_id": {"type": "string", "format": "uuid"}, "status": {"enum": ["PROCESSING", "SHIPPED", "DELIVERED"]}, "carrier": {"type": ["string", "null"]}, "tracking_number": {"type": ["string", "null"]}, "command_id": {"type": "string", "format": "uuid"}, "occurred_at": {"type": "string", "format": "date-time"}}},
       "Order": {"allOf": [{"$ref": "#/components/schemas/OrderSummary"}, {"type": "object", "required": ["items", "fulfillment"], "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/OrderItem"}}, "fulfillment": {"oneOf": [{"$ref": "#/components/schemas/Fulfillment"}, {"type": "null"}]}}}]},
       "Transition": {"type": "object", "required": ["from_status", "to_status", "reason", "created_at"], "properties": {"from_status": {"oneOf": [{"$ref": "#/components/schemas/OrderStatus"}, {"type": "null"}]}, "to_status": {"$ref": "#/components/schemas/OrderStatus"}, "reason": {"type": "string"}, "created_at": {"type": "string", "format": "date-time"}}},
       "RefundRequest": {"type": "object", "required": ["order_id", "refund_request_id", "status"], "properties": {"order_id": {"type": "string", "format": "uuid"}, "refund_request_id": {"type": "string", "format": "uuid"}, "status": {"const": "REFUND_PENDING"}}},

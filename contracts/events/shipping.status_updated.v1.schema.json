@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fastapi-platform:contracts:events:shipping.status_updated:v1",
+  "title": "Shipping Status Updated v1",
+  "description": "A Shipping-owned, no-PII fact that one authorized shipment transition committed locally.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["order_id", "authorization_id", "command_id", "requested_by", "status", "carrier", "tracking_number", "occurred_at"],
+  "properties": {
+    "order_id": {"type": "string", "format": "uuid"},
+    "authorization_id": {"type": "string", "format": "uuid"},
+    "command_id": {"type": "string", "format": "uuid"},
+    "requested_by": {"type": "string", "format": "uuid"},
+    "status": {"enum": ["PROCESSING", "SHIPPED", "DELIVERED"]},
+    "carrier": {"type": ["string", "null"], "maxLength": 120},
+    "tracking_number": {"type": ["string", "null"], "maxLength": 160},
+    "occurred_at": {"type": "string", "format": "date-time"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "SHIPPED"}}, "required": ["status"]},
+      "then": {"properties": {"carrier": {"type": "string", "minLength": 1, "maxLength": 120}, "tracking_number": {"type": "string", "minLength": 1, "maxLength": 160}}}
+    }
+  ]
+}

@@ -8,6 +8,8 @@ dependencies = [
   "alembic>=1.19.1,<2",
   "asyncpg>=0.31,<0.32",
   "fastapi>=0.141.1,<0.142",
+  "httpx>=0.28.1,<0.29",
+  "platform-auth",
   "platform-messaging",
   "platform-observability",
   "pydantic-settings>=2.15,<3",
@@ -26,5 +28,6 @@ build-backend = "uv_build"
 package = true
 
 [tool.uv.sources]
+platform-auth = { workspace = true }
 platform-messaging = { workspace = true }
 platform-observability = { workspace = true }

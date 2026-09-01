@@ -43,10 +43,20 @@ also records the corresponding Order transition after validating the event
 against the authorization. A delayed or duplicate Shipping fact cannot create
 another shipment or bypass refund eligibility.
 
-The existing Order `v1` fulfillment endpoint remains as a compatibility facade
-during the migration. It forwards a caller-authorized command to Shipping and
-returns a clear unavailable/uncertain result rather than guessing whether a
-timeout committed. It is not removed until the facade, projection, and
+An authorization whose wall-clock expiry has passed remains `ACTIVE` until
+Order obtains a definitive Shipping recovery response for its `command_id`.
+Shipping rejects a local commit at or after that expiry. If recovery reports
+`NOT_COMMITTED`, Order marks the authorization `RELEASED` and may continue the
+refund. If recovery reports the matching committed transition, Order applies
+the same Inbox/projection path before rejecting the refund. An unavailable,
+malformed, or mismatched recovery response returns a temporary failure and
+does not release the financial fence. This avoids the unsafe inference that a
+late event means that Shipping never committed.
+
+The existing Order `v1` fulfillment endpoint is a compatibility facade during
+the migration. It forwards a caller-authorized, idempotent command to Shipping
+and returns a clear unavailable/uncertain result rather than guessing whether
+a timeout committed. It is not removed until the facade, projection, and
 recovery behavior have Compose and `Kind` evidence.
 
 ## Consequences

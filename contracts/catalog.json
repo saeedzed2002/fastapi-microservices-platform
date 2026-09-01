@@ -59,6 +59,22 @@
       "schema": "openapi/order-checkout.v1.openapi.json"
     },
     {
+      "name": "shipping.commands.v1",
+      "kind": "service-openapi",
+      "owner": "shipping-service",
+      "status": "active",
+      "notes": "Administrator shipment commands are idempotent and obtain an Order-owned short-lived authorization before Shipping commits its local transition.",
+      "schema": "openapi/shipping-commands.v1.openapi.json"
+    },
+    {
+      "name": "order.shipping_authorization.v1",
+      "kind": "service-openapi",
+      "owner": "order-service",
+      "status": "active",
+      "notes": "HMAC-authenticated durable coordination boundary: Shipping obtains one short-lived Order authorization and Order later reads the definitive Shipping command state for safe expiry recovery.",
+      "schema": "openapi/order-shipping-authorization.v1.openapi.json"
+    },
+    {
       "name": "payment.zarinpal.v1",
       "kind": "service-openapi",
       "owner": "payment-service",
@@ -247,6 +263,17 @@
       "message_key": "order_id",
       "notes": "Administrator requested a provider-owned reversal while the Order was still confirmed.",
       "schema": "events/order.refund_requested.v1.schema.json"
+    },
+    {
+      "name": "shipping.status_updated.v1",
+      "kind": "domain-event",
+      "owner": "shipping-service",
+      "consumers": ["order-service"],
+      "status": "active",
+      "topic": "fastapi-platform.shipping.events.v1",
+      "message_key": "order_id",
+      "notes": "Shipping committed one authorization-bound shipment transition. It contains no delivery address or carrier-provider credentials; Order consumes it only after matching its local authorization.",
+      "schema": "events/shipping.status_updated.v1.schema.json"
     },
     {
       "name": "order.fulfillment_updated.v1",

@@ -1,0 +1,29 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "Order Shipping Authorization Internal API", "version": "v1", "description": "A short-lived, HMAC-authenticated and administrator-attributed authorization between Shipping and Order. It is an internal coordination boundary, not a public client API."},
+  "paths": {
+    "/api/internal/v1/orders/{order_id}/fulfillment-authorizations": {
+      "post": {
+        "summary": "Authorize one shipment command before Shipping commits locally",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"name": "order_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}, {"name": "X-Shipping-Order-Proof", "in": "header", "required": true, "schema": {"type": "string", "minLength": 64, "maxLength": 64}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AuthorizationRequest"}}}},
+        "responses": {"200": {"description": "Authorization is active or an exact idempotent replay", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Authorization"}}}}, "401": {"description": "Authentication required or invalid"}, "403": {"description": "Invalid internal proof or administrator role required"}, "404": {"description": "Order not found"}, "409": {"description": "Order is not eligible, another command is pending, or the command conflicts"}, "422": {"description": "Authorization expiry is outside the permitted bound"}}
+      }
+    },
+    "/api/internal/v1/shipping/commands/{command_id}": {
+      "get": {
+        "summary": "Recover the definitive commit state of an expired authorization",
+        "parameters": [{"name": "command_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}, {"name": "proof_expires_at", "in": "query", "required": true, "schema": {"type": "integer", "minimum": 1}}, {"name": "X-Order-Shipping-Proof", "in": "header", "required": true, "schema": {"type": "string", "minLength": 64, "maxLength": 64}}],
+        "responses": {"200": {"description": "Definitive durable command state; unavailable results never report NOT_COMMITTED"}, "403": {"description": "Invalid or expired internal proof"}}
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}},
+    "schemas": {
+      "AuthorizationRequest": {"type": "object", "additionalProperties": false, "required": ["command_id", "target_status", "expires_at", "proof_expires_at"], "properties": {"command_id": {"type": "string", "format": "uuid"}, "target_status": {"enum": ["PROCESSING", "SHIPPED", "DELIVERED"]}, "expires_at": {"type": "string", "format": "date-time"}, "proof_expires_at": {"type": "integer", "minimum": 1}}},
+      "Authorization": {"type": "object", "additionalProperties": false, "required": ["authorization_id", "order_id", "command_id", "target_status", "expires_at"], "properties": {"authorization_id": {"type": "string", "format": "uuid"}, "order_id": {"type": "string", "format": "uuid"}, "command_id": {"type": "string", "format": "uuid"}, "target_status": {"enum": ["PROCESSING", "SHIPPED", "DELIVERED"]}, "expires_at": {"type": "string", "format": "date-time"}}}
+    }
+  }
+}

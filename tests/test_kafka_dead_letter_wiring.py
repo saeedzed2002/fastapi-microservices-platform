@@ -3,8 +3,9 @@ CONSUMER_WORKERS = {
     "services/customer-service/src/customer_service/workers/identity_consumer.py": 1,
     "services/inventory-service/src/inventory_service/workers/kafka.py": 1,
     "services/notification-service/src/notification_service/workers/kafka.py": 1,
-    "services/order-service/src/order_service/workers/kafka.py": 2,
+    "services/order-service/src/order_service/workers/kafka.py": 3,
     "services/payment-service/src/payment_service/workers/kafka.py": 1,
+    "services/shipping-service/src/shipping_service/workers/kafka.py": 1,
 }
 CONSUMER_CONFIGS = [
     "services/customer-service/src/customer_service/config.py",
@@ -12,6 +13,7 @@ CONSUMER_CONFIGS = [
     "services/notification-service/src/notification_service/config.py",
     "services/order-service/src/order_service/config.py",
     "services/payment-service/src/payment_service/config.py",
+    "services/shipping-service/src/shipping_service/config.py",
 ]
 
 

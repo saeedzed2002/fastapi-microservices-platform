@@ -115,7 +115,7 @@ Owns a rebuildable, eventually consistent search projection/index. It does not o
 
 Owns shipments, carrier adapters/references, carrier tracking numbers, shipping status, and fulfilment lifecycle. It does not own the platform order tracking code, payment truth, or inventory truth.
 
-Shipping is being extracted incrementally in the approved Phase 18 milestone. Its first slice owns idempotent creation of a `READY` shipment from `order.confirmed.v1`; it does not yet expose shipment transition commands or alter Order's existing fulfillment endpoint. Order will retain a customer-facing projection of Shipping facts after the transition fence and compatibility facade are proven.
+Shipping is being extracted incrementally in the approved Phase 18 milestone. It owns idempotent creation of a `READY` shipment from `order.confirmed.v1`, administrator shipment commands, state-change audit rows, and a no-PII `shipping.status_updated.v1` fact. Before a local transition commits, Shipping obtains an HMAC-authenticated, administrator-attributed, short-lived Order authorization. Order consumes the fact only after matching that authorization and retains `OrderFulfillment` as a customer-facing projection. The legacy Order fulfillment route is a forwarding compatibility facade; it never performs a second local fulfillment mutation. Compose and `Kind` registration remain deliberately pending the dedicated migration and `E2E` evidence.
 
 ## Boundary enforcement
 

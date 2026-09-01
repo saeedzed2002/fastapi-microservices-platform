@@ -44,12 +44,15 @@ becomes the authoritative shipment bounded context.
 2. Completed: add the Order-owned fulfillment-transition authorization record and its
    bounded expiry/recovery path. Refund initiation must return a conflict while
    such an authorization is active.
-3. Add authenticated Shipping status commands. Shipping obtains an Order
-   authorization before its local commit, then writes
-   `shipping.status_updated.v1` in its own outbox transaction.
-4. Add the Order consumer and make `OrderFulfillment` a projection. Preserve
-   the existing endpoint as a facade until migration evidence proves it is
-   safe to deprecate.
+3. Completed in source: add authenticated Shipping status commands. Shipping
+   obtains an Order authorization before its local commit, then writes
+   `shipping.status_updated.v1` in its own outbox transaction. It rejects a
+   commit after authorization expiry.
+4. Completed in source: add the Order consumer and make `OrderFulfillment` a
+   projection. The existing endpoint is a forwarding facade with explicit
+   `Idempotency-Key`; it is not deprecated until topology migration evidence
+   proves it is safe. An expired authorization is released only after a
+   definitive Shipping recovery query; an unavailable result fails closed.
 5. Add Compose, Kind, contract, and failure tests for duplicate facts,
    concurrent refund/shipping commands, expired authorizations, and delayed
    projection delivery.
