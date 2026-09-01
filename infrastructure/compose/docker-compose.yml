@@ -736,7 +736,7 @@ services:
       - observability-tempo-data:/var/tempo
 
   grafana:
-    image: grafana/grafana:13.1.0
+    image: grafana/grafana:13.2.1
     profiles: [observability]
     environment:
       GF_SECURITY_ADMIN_USER: admin
