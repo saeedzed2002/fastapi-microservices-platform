@@ -4,7 +4,11 @@ FastAPI Microservices Platform is a backend-only, production-oriented e-commerce
 
 ## Project status
 
-The repository has completed **Phase 16 — online payment provider routing**.
+The repository has completed **Phase 17 — portfolio evidence and reviewer
+guide**. It is intentionally a portfolio repository, not a deployed public
+environment. Its CI publishes immutable, scanned container images as build
+artifacts and proves the platform in a disposable `Kind` cluster; neither
+operation is a target-environment deployment.
 The local
 `observability` profile collects bounded platform metrics, JSON logs, and
 traces through Prometheus, Loki, Tempo, and Grafana. Resilience, staff account
@@ -18,6 +22,13 @@ API readiness and the checkout-to-invoice-to-email workflow.
 A real target environment still must provide pinned release images, secrets,
 ingress/TLS, external durable services, and environment-specific egress policy
 before public deployment.
+
+## Review this repository
+
+Start with the [portfolio reviewer guide](docs/portfolio/reviewer-guide.md).
+It maps every material claim to its implementation, contract, runbook, or
+executable CI evidence, and distinguishes verified local/CI behavior from
+deliberately out-of-scope production operations.
 
 ## Architecture at a glance
 
@@ -94,6 +105,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Architecture diagrams](docs/diagrams/README.md)
 - [Open architectural questions](docs/architecture/open-questions.md)
 - [Architecture Decision Records](docs/adr/README.md)
+- [Portfolio reviewer guide](docs/portfolio/reviewer-guide.md)
 - [Event contracts](docs/events/README.md)
 - [Coding standards](docs/development/coding-standards.md)
 - [Dependency and version policy](docs/development/dependency-policy.md)
@@ -123,6 +135,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Phase 14 plan](docs/development/phase-14-plan.md)
 - [Phase 15 plan](docs/development/phase-15-plan.md)
 - [Phase 16 plan](docs/development/phase-16-plan.md)
+- [Phase 17 plan](docs/development/phase-17-plan.md)
 
 ## Roadmap
 
@@ -145,6 +158,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 | 14 | Catalog reviews, replies & moderation |
 | 15 | Kubernetes API autoscaling |
 | 16 | Online payment provider routing |
+| 17 | Portfolio evidence and reviewer guide |
 
 ## Local development
 
