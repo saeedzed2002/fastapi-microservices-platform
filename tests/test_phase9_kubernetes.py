@@ -108,3 +108,4 @@ def test_secret_template_is_not_in_the_foundation_apply_set() -> None:
 
     assert "runtime-secrets.example.yaml" not in foundation
     assert "REPLACE" in secret_template
+    assert "ORDER_SHIPPING_INTERNAL_ACCESS_SECRET" in secret_template

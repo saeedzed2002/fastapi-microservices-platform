@@ -26,7 +26,9 @@ spec:
         app.kubernetes.io/part-of: fastapi-microservices-platform
         platform.fastapi.io/workload: migration
     spec:
-      restartPolicy: OnFailure
+      # Run each migration command once per Pod.  A failed attempt gets a
+      # fresh Pod under backoffLimit and remains inspectable for diagnostics.
+      restartPolicy: Never
       serviceAccountName: {{ $.Values.serviceAccount.name }}
       automountServiceAccountToken: false
       {{- include "fastapi-platform.imagePullSecrets" $ | nindent 6 }}

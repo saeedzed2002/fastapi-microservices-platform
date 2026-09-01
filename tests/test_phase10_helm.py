@@ -129,6 +129,7 @@ def test_application_chart_retains_every_workload_and_controlled_migration() -> 
     assert "helm.sh/hook: pre-install,pre-upgrade" in migrations
     assert "helm.sh/hook-delete-policy: before-hook-creation" in migrations
     assert "command: [alembic, -c, /app/alembic.ini, upgrade, head]" in migrations
+    assert "restartPolicy: Never" in migrations
     assert "platform.fastapi.io/workload: migration" in migrations
     assert "payment-expiry-worker" in values
     assert "media-upload-reaper" in values

@@ -141,7 +141,7 @@ wait_for_hpa_metrics() {
 
 dump_namespace_logs() {
   local namespace="$1"
-  local pod
+  local pod restart_counts
 
   kubectl --context "${CONTEXT}" -n "${namespace}" get pods -o name 2>/dev/null |
     while IFS= read -r pod; do
@@ -149,9 +149,27 @@ dump_namespace_logs() {
       echo "--- current logs: ${namespace}/${pod} ---" >&2
       kubectl --context "${CONTEXT}" -n "${namespace}" logs "${pod}" \
         --all-containers=true --prefix --tail=200 || true
-      echo "--- previous logs: ${namespace}/${pod} ---" >&2
-      kubectl --context "${CONTEXT}" -n "${namespace}" logs "${pod}" \
-        --all-containers=true --prefix --previous --tail=200 || true
+      restart_counts="$(kubectl --context "${CONTEXT}" -n "${namespace}" get "${pod}" \
+        --output jsonpath='{range .status.containerStatuses[*]}{.restartCount}{" "}{end}' 2>/dev/null || true)"
+      if [[ "${restart_counts}" =~ [1-9] ]]; then
+        echo "--- previous logs: ${namespace}/${pod} ---" >&2
+        kubectl --context "${CONTEXT}" -n "${namespace}" logs "${pod}" \
+          --all-containers=true --prefix --previous --tail=200 || true
+      fi
+    done || true
+}
+
+dump_migration_diagnostics() {
+  local job
+
+  kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" get jobs \
+    --selector=platform.fastapi.io/workload=migration -o name 2>/dev/null |
+    while IFS= read -r job; do
+      [[ -n "${job}" ]] || continue
+      echo "--- migration diagnostics: ${APP_NAMESPACE}/${job} ---" >&2
+      kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" describe "${job}" || true
+      kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" logs "${job}" \
+        --all-containers=true --prefix --tail=200 || true
     done || true
 }
 
@@ -164,6 +182,7 @@ diagnose() {
       kubectl --context "${CONTEXT}" get events --all-namespaces --sort-by=.lastTimestamp || true
       kubectl --context "${CONTEXT}" -n "${APP_NAMESPACE}" get pods -o wide || true
       kubectl --context "${CONTEXT}" -n "${DEPENDENCY_NAMESPACE}" get pods -o wide || true
+      dump_migration_diagnostics
       dump_namespace_logs "${DEPENDENCY_NAMESPACE}"
       dump_namespace_logs "${APP_NAMESPACE}"
       kind export logs --name "${CLUSTER_NAME}" "${ROOT_DIR}/kind-conformance-logs" || true

@@ -86,6 +86,7 @@ def test_conformance_dependencies_and_secrets_are_isolated_test_inputs() -> None
     assert "provider-disabled" in secrets
     assert "smtp://" not in secrets
     assert "fastapi-platform-dependencies.svc.cluster.local" in secrets
+    assert "ORDER_SHIPPING_INTERNAL_ACCESS_SECRET" in secrets
 
     # These values use YAML flow mappings.  Kafka listener values contain
     # commas and colons, so they must remain quoted or Kubernetes will decode
@@ -134,6 +135,7 @@ def test_kind_cluster_and_ci_script_are_pinned_and_disposable() -> None:
     assert "kind delete cluster" in script
     assert "kind export logs" in script
     assert "dump_namespace_logs" in script
+    assert "dump_migration_diagnostics" in script
     assert "--previous --tail=200" in script
     assert "platform-health-smoke" in script
     assert "platform-checkout-e2e" in script
