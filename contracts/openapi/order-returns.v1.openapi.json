@@ -1,0 +1,62 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Order Returns API",
+    "version": "v1",
+    "description": "A customer requests one full return after delivery. Administrators decide the request and record physical receipt before Payment receives a refund request."
+  },
+  "paths": {
+    "/api/v1/orders/{order_id}/returns": {
+      "post": {
+        "summary": "Create or replay the caller-owned delivered-order return request",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/OrderId"}, {"$ref": "#/components/parameters/IdempotencyKey"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReturnRequestCreate"}}}},
+        "responses": {"202": {"description": "Return request accepted", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReturnRequest"}}}}, "403": {"description": "Customer role required"}, "404": {"description": "Order not found or not owned"}, "409": {"description": "Order is not delivery-eligible or a different request already exists"}}
+      }
+    },
+    "/api/v1/orders/admin/returns": {
+      "get": {
+        "summary": "List return requests for administrator review",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/ReturnStatus"}, {"$ref": "#/components/parameters/Limit"}, {"$ref": "#/components/parameters/Cursor"}],
+        "responses": {"200": {"description": "Return request page", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReturnRequestPage"}}}}, "403": {"description": "Administrator role required"}}
+      }
+    },
+    "/api/v1/orders/admin/returns/{return_request_id}/decision": {
+      "post": {
+        "summary": "Approve or reject one pending return request",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/ReturnRequestId"}, {"$ref": "#/components/parameters/IdempotencyKey"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReturnDecision"}}}},
+        "responses": {"202": {"description": "Decision accepted", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReturnRequest"}}}}, "403": {"description": "Administrator role required"}, "404": {"description": "Return request not found"}, "409": {"description": "Decision is no longer valid"}}
+      }
+    },
+    "/api/v1/orders/admin/returns/{return_request_id}/receipt": {
+      "post": {
+        "summary": "Record physical receipt for an approved full-order return",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/ReturnRequestId"}, {"$ref": "#/components/parameters/IdempotencyKey"}],
+        "responses": {"202": {"description": "Receipt and refund handoffs accepted", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReturnRequest"}}}}, "403": {"description": "Administrator role required"}, "404": {"description": "Return request not found"}, "409": {"description": "Return is not approved or receipt key conflicts"}}
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}},
+    "parameters": {
+      "OrderId": {"name": "order_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+      "ReturnRequestId": {"name": "return_request_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+      "IdempotencyKey": {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 128}},
+      "ReturnStatus": {"name": "status", "in": "query", "schema": {"$ref": "#/components/schemas/ReturnStatus"}},
+      "Limit": {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20}},
+      "Cursor": {"name": "cursor", "in": "query", "schema": {"type": "string", "minLength": 1, "maxLength": 256}}
+    },
+    "schemas": {
+      "ReturnStatus": {"enum": ["REQUESTED", "APPROVED", "REJECTED", "RECEIVED", "REFUND_PENDING", "REFUNDED", "REFUND_FAILED"]},
+      "ReturnRequestCreate": {"type": "object", "additionalProperties": false, "required": ["reason"], "properties": {"reason": {"type": "string", "minLength": 1, "maxLength": 1000}}},
+      "ReturnDecision": {"type": "object", "additionalProperties": false, "required": ["status"], "properties": {"status": {"enum": ["APPROVED", "REJECTED"]}, "note": {"type": "string", "maxLength": 1000}}},
+      "ReturnRequest": {"type": "object", "required": ["id", "order_id", "status", "reason", "requested_at", "decision_at", "received_at"], "properties": {"id": {"type": "string", "format": "uuid"}, "order_id": {"type": "string", "format": "uuid"}, "status": {"$ref": "#/components/schemas/ReturnStatus"}, "reason": {"type": "string"}, "decision_note": {"type": ["string", "null"]}, "requested_at": {"type": "string", "format": "date-time"}, "decision_at": {"type": ["string", "null"], "format": "date-time"}, "received_at": {"type": ["string", "null"], "format": "date-time"}}},
+      "ReturnRequestPage": {"type": "object", "required": ["items", "next_cursor"], "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/ReturnRequest"}}, "next_cursor": {"type": ["string", "null"]}}}
+    }
+  }
+}

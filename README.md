@@ -138,6 +138,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Phase 16 plan](docs/development/phase-16-plan.md)
 - [Phase 17 plan](docs/development/phase-17-plan.md)
 - [Phase 18 plan](docs/development/phase-18-plan.md)
+- [Phase 19 plan](docs/development/phase-19-plan.md)
 
 ## Roadmap
 
@@ -162,6 +163,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 | 16 | Online payment provider routing |
 | 17 | Portfolio evidence and reviewer guide |
 | 18 | Shipping ownership extraction |
+| 19 | In progress: Post-delivery returns and refund lifecycle |
 
 ## Local development
 
