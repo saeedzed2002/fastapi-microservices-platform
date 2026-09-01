@@ -22,6 +22,7 @@ from order_service.models import (
     OrderFulfillment,
     OrderItem,
     OrderRefundRequest,
+    OrderReturnRequest,
     OrderStateTransition,
     OutboxMessage,
 )
@@ -38,6 +39,11 @@ from order_service.schemas import (
     OrderStatus,
     OrderSummaryResponse,
     RefundRequestResponse,
+    ReturnDecisionRequest,
+    ReturnRequestCreate,
+    ReturnRequestPage,
+    ReturnRequestResponse,
+    ReturnStatus,
     ShippingCommandRecoveryResponse,
     ShippingStatusUpdatedPayload,
 )
@@ -91,6 +97,9 @@ async def order_response(db: AsyncSession, order: Order) -> OrderResponse:
     fulfillment = await db.scalar(
         select(OrderFulfillment).where(OrderFulfillment.order_id == order.id)
     )
+    return_request = await db.scalar(
+        select(OrderReturnRequest).where(OrderReturnRequest.order_id == order.id)
+    )
     return OrderResponse(
         id=order.id,
         status=order.status,
@@ -103,6 +112,22 @@ async def order_response(db: AsyncSession, order: Order) -> OrderResponse:
         fulfillment=(
             FulfillmentResponse.model_validate(fulfillment) if fulfillment is not None else None
         ),
+        return_request=(
+            return_request_response(return_request) if return_request is not None else None
+        ),
+    )
+
+
+def return_request_response(return_request: OrderReturnRequest) -> ReturnRequestResponse:
+    return ReturnRequestResponse(
+        id=return_request.id,
+        order_id=return_request.order_id,
+        status=cast(ReturnStatus, return_request.status),
+        reason=return_request.reason,
+        decision_note=return_request.decision_note,
+        requested_at=return_request.created_at,
+        decision_at=return_request.decided_at,
+        received_at=return_request.received_at,
     )
 
 
@@ -239,12 +264,203 @@ async def update_order_fulfillment(
     return order
 
 
+async def request_order_return(
+    db: AsyncSession,
+    *,
+    order_id: UUID,
+    requested_by: UUID,
+    idempotency_key: str,
+    payload: ReturnRequestCreate,
+) -> ReturnRequestResponse:
+    order = await db.scalar(select(Order).where(Order.id == order_id).with_for_update())
+    if order is None or order.customer_id != requested_by:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order not found")
+    existing = await db.scalar(
+        select(OrderReturnRequest).where(OrderReturnRequest.order_id == order.id).with_for_update()
+    )
+    if existing is not None:
+        await db.commit()
+        if existing.idempotency_key != idempotency_key:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="return request already exists"
+            )
+        return return_request_response(existing)
+    key_owner = await db.scalar(
+        select(OrderReturnRequest).where(OrderReturnRequest.idempotency_key == idempotency_key)
+    )
+    if key_owner is not None:
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="idempotency key conflict")
+    if order.status != "DELIVERED":
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="order is not eligible for a return"
+        )
+    return_request = OrderReturnRequest(
+        order_id=order.id,
+        idempotency_key=idempotency_key,
+        requested_by=requested_by,
+        reason=payload.reason,
+        status="REQUESTED",
+    )
+    db.add(return_request)
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        await db.rollback()
+        key_owner = await db.scalar(
+            select(OrderReturnRequest).where(OrderReturnRequest.idempotency_key == idempotency_key)
+        )
+        if key_owner is not None and key_owner.order_id == order_id:
+            return return_request_response(key_owner)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="idempotency key conflict"
+        ) from exc
+    await db.commit()
+    return return_request_response(return_request)
+
+
+async def decide_order_return(
+    db: AsyncSession,
+    *,
+    return_request_id: UUID,
+    decided_by: UUID,
+    idempotency_key: str,
+    payload: ReturnDecisionRequest,
+    now: datetime | None = None,
+) -> ReturnRequestResponse:
+    return_request = await db.scalar(
+        select(OrderReturnRequest)
+        .where(OrderReturnRequest.id == return_request_id)
+        .with_for_update()
+    )
+    if return_request is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="return request not found"
+        )
+    if return_request.decision_idempotency_key is not None:
+        await db.commit()
+        if return_request.decision_idempotency_key != idempotency_key:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="return decision already exists"
+            )
+        return return_request_response(return_request)
+    key_owner = await db.scalar(
+        select(OrderReturnRequest).where(
+            OrderReturnRequest.decision_idempotency_key == idempotency_key
+        )
+    )
+    if key_owner is not None:
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="idempotency key conflict")
+    if return_request.status != "REQUESTED":
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="return decision is no longer valid"
+        )
+    return_request.status = payload.status
+    return_request.decision_idempotency_key = idempotency_key
+    return_request.decided_by = decided_by
+    return_request.decision_note = payload.note
+    return_request.decided_at = now or datetime.now(UTC)
+    await db.commit()
+    return return_request_response(return_request)
+
+
+async def receive_order_return(
+    db: AsyncSession,
+    *,
+    return_request_id: UUID,
+    received_by: UUID,
+    idempotency_key: str,
+    allow_test_refund: bool = False,
+    now: datetime | None = None,
+) -> ReturnRequestResponse:
+    return_request = await db.scalar(
+        select(OrderReturnRequest)
+        .where(OrderReturnRequest.id == return_request_id)
+        .with_for_update()
+    )
+    if return_request is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="return request not found"
+        )
+    if return_request.receipt_idempotency_key is not None:
+        await db.commit()
+        if return_request.receipt_idempotency_key != idempotency_key:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="return receipt already exists"
+            )
+        return return_request_response(return_request)
+    key_owner = await db.scalar(
+        select(OrderReturnRequest).where(
+            OrderReturnRequest.receipt_idempotency_key == idempotency_key
+        )
+    )
+    if key_owner is not None:
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="idempotency key conflict")
+    order = await db.scalar(
+        select(Order).where(Order.id == return_request.order_id).with_for_update()
+    )
+    if (
+        order is None
+        or return_request.status != "APPROVED"
+        or order.status != "DELIVERED"
+        or order.payment_method
+        not in (
+            {"zarinpal", "online", "test_success"} if allow_test_refund else {"zarinpal", "online"}
+        )
+    ):
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="return receipt is not valid"
+        )
+    items = list(
+        await db.scalars(
+            select(OrderItem).where(OrderItem.order_id == order.id).order_by(OrderItem.id)
+        )
+    )
+    if not items:
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="order has no returnable items"
+        )
+    return_request.status = "RECEIVED"
+    return_request.receipt_idempotency_key = idempotency_key
+    return_request.received_by = received_by
+    return_request.received_at = now or datetime.now(UTC)
+    add_outbox(
+        db,
+        event_type="order.return_received.v1",
+        order_id=order.id,
+        payload={
+            "return_request_id": str(return_request.id),
+            "order_id": str(order.id),
+            "received_by": str(received_by),
+            "items": [{"sku": item.sku, "quantity": item.quantity} for item in items],
+        },
+        causation_id=None,
+    )
+    await request_order_refund(
+        db,
+        order_id=order.id,
+        requested_by=received_by,
+        idempotency_key=f"return-refund:{return_request.id}",
+        return_request_id=return_request.id,
+        allow_test_refund=allow_test_refund,
+    )
+    return return_request_response(return_request)
+
+
 async def request_order_refund(
     db: AsyncSession,
     *,
     order_id: UUID,
     requested_by: UUID,
     idempotency_key: str,
+    return_request_id: UUID | None = None,
+    allow_test_refund: bool = False,
     now: datetime | None = None,
     recover_expired_authorization: Callable[
         [FulfillmentAuthorization], Awaitable[ShippingCommandRecoveryResponse]
@@ -260,7 +476,10 @@ async def request_order_refund(
     )
     if refund_request is not None:
         await db.commit()
-        if refund_request.idempotency_key != idempotency_key:
+        if (
+            refund_request.idempotency_key != idempotency_key
+            or refund_request.return_request_id != return_request_id
+        ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT, detail="refund request already exists"
             )
@@ -269,49 +488,77 @@ async def request_order_refund(
             refund_request_id=refund_request.id,
             status="REFUND_PENDING",
         )
-    active_authorization = await _load_active_fulfillment_authorization(
-        db, order_id=order.id, now=current_time
-    )
-    if active_authorization is not None:
-        if not _authorization_is_active(active_authorization, now=current_time):
-            await db.commit()
-            if recover_expired_authorization is None:
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="expired fulfillment authorization requires shipping recovery",
-                )
-            recovery = await recover_expired_authorization(active_authorization)
-            return await _recover_expired_fulfillment_authorization(
-                db,
-                order_id=order_id,
-                requested_by=requested_by,
-                idempotency_key=idempotency_key,
-                authorization_id=active_authorization.id,
-                recovery=recovery,
-                now=current_time,
-            )
-        await db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="fulfillment transition is already in progress",
+    return_request: OrderReturnRequest | None = None
+    if return_request_id is not None:
+        return_request = await db.scalar(
+            select(OrderReturnRequest)
+            .where(OrderReturnRequest.id == return_request_id)
+            .with_for_update()
         )
+        if (
+            return_request is None
+            or return_request.order_id != order.id
+            or return_request.status != "RECEIVED"
+        ):
+            await db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="return is not refundable"
+            )
+    else:
+        active_authorization = await _load_active_fulfillment_authorization(
+            db, order_id=order.id, now=current_time
+        )
+        if active_authorization is not None:
+            if not _authorization_is_active(active_authorization, now=current_time):
+                await db.commit()
+                if recover_expired_authorization is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="expired fulfillment authorization requires shipping recovery",
+                    )
+                recovery = await recover_expired_authorization(active_authorization)
+                return await _recover_expired_fulfillment_authorization(
+                    db,
+                    order_id=order_id,
+                    requested_by=requested_by,
+                    idempotency_key=idempotency_key,
+                    authorization_id=active_authorization.id,
+                    recovery=recovery,
+                    now=current_time,
+                )
+            await db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="fulfillment transition is already in progress",
+            )
     key_owner = await db.scalar(
         select(OrderRefundRequest).where(OrderRefundRequest.idempotency_key == idempotency_key)
     )
     if key_owner is not None:
         await db.commit()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="idempotency key conflict")
-    if order.status != "CONFIRMED" or order.payment_method not in {"zarinpal", "online"}:
+    if (
+        (return_request is None and order.status != "CONFIRMED")
+        or (return_request is not None and order.status != "DELIVERED")
+        or order.payment_method
+        not in (
+            {"zarinpal", "online", "test_success"} if allow_test_refund else {"zarinpal", "online"}
+        )
+    ):
         await db.commit()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="order is not refundable")
     refund_request = OrderRefundRequest(
         order_id=order.id,
         idempotency_key=idempotency_key,
         requested_by=requested_by,
+        return_request_id=return_request_id,
+        pre_refund_status=order.status,
     )
     db.add(refund_request)
     previous = order.status
     order.status = "REFUND_PENDING"
+    if return_request is not None:
+        return_request.status = "REFUND_PENDING"
     add_transition(
         db,
         order=order,
@@ -347,6 +594,11 @@ async def request_order_refund(
             "order_id": str(order.id),
             "refund_request_id": str(refund_request.id),
             "requested_by": str(requested_by),
+            **(
+                {"return_request_id": str(return_request_id)}
+                if return_request_id is not None
+                else {}
+            ),
         },
         causation_id=None,
     )
@@ -627,6 +879,48 @@ async def list_administrator_orders(
     return AdminOrderPage(
         items=[order_summary_response(order) for order in rows[:limit]],
         next_cursor=encode_order_cursor(rows[limit - 1]) if len(rows) > limit else None,
+    )
+
+
+def encode_return_cursor(return_request: OrderReturnRequest) -> str:
+    payload = (
+        f"{return_request.created_at.astimezone(UTC).isoformat()}|{return_request.id}".encode()
+    )
+    return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+
+
+async def list_administrator_returns(
+    *,
+    db: AsyncSession,
+    status_filter: ReturnStatus | None,
+    limit: int,
+    cursor: str | None,
+) -> ReturnRequestPage:
+    conditions: list[ColumnElement[bool]] = []
+    if status_filter is not None:
+        conditions.append(OrderReturnRequest.status == status_filter)
+    if cursor is not None:
+        created_at, return_request_id = decode_order_cursor(cursor)
+        conditions.append(
+            or_(
+                OrderReturnRequest.created_at < created_at,
+                and_(
+                    OrderReturnRequest.created_at == created_at,
+                    OrderReturnRequest.id < return_request_id,
+                ),
+            )
+        )
+    statement = (
+        select(OrderReturnRequest)
+        .order_by(OrderReturnRequest.created_at.desc(), OrderReturnRequest.id.desc())
+        .limit(limit + 1)
+    )
+    if conditions:
+        statement = statement.where(*conditions)
+    rows = list(await db.scalars(statement))
+    return ReturnRequestPage(
+        items=[return_request_response(row) for row in rows[:limit]],
+        next_cursor=encode_return_cursor(rows[limit - 1]) if len(rows) > limit else None,
     )
 
 
@@ -919,12 +1213,37 @@ async def process_saga_result(db: AsyncSession, envelope: dict[str, object]) -> 
     if order is None:
         await db.commit()
         return False
+    event_type = str(envelope["event_type"])
+    refund_request: OrderRefundRequest | None = None
+    return_request: OrderReturnRequest | None = None
+    if event_type in {"payment.refunded.v1", "payment.refund_failed.v1"}:
+        raw_refund_request_id = payload.get("refund_request_id")
+        if raw_refund_request_id is not None:
+            refund_request = await db.scalar(
+                select(OrderRefundRequest)
+                .where(
+                    OrderRefundRequest.id == UUID(str(raw_refund_request_id)),
+                    OrderRefundRequest.order_id == order.id,
+                )
+                .with_for_update()
+            )
+            if refund_request is None:
+                await db.commit()
+                return False
+            if refund_request.return_request_id is not None:
+                return_request = await db.scalar(
+                    select(OrderReturnRequest)
+                    .where(OrderReturnRequest.id == refund_request.return_request_id)
+                    .with_for_update()
+                )
     previous = order.status
-    if not transition_order(
-        order, event_type=str(envelope["event_type"]), event_id=event_id, reason="Kafka Saga event"
-    ):
+    target = _TRANSITIONS.get((order.status, event_type))
+    if target is None:
         await db.commit()
         return False
+    if event_type == "payment.refund_failed.v1" and refund_request is not None:
+        target = refund_request.pre_refund_status or target
+    order.status = target
     add_transition(
         db,
         order=order,
@@ -933,7 +1252,12 @@ async def process_saga_result(db: AsyncSession, envelope: dict[str, object]) -> 
         event_id=event_id,
         reason="Kafka Saga event",
     )
-    if str(envelope["event_type"]) == "payment.succeeded.v1" and order.status == "CONFIRMED":
+    if return_request is not None:
+        if event_type == "payment.refunded.v1":
+            return_request.status = "REFUNDED"
+        elif event_type == "payment.refund_failed.v1":
+            return_request.status = "REFUND_FAILED"
+    if event_type == "payment.succeeded.v1" and order.status == "CONFIRMED":
         add_outbox(
             db,
             event_type="order.confirmed.v1",

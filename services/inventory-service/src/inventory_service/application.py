@@ -159,6 +159,26 @@ async def process_saga_event(db: AsyncSession, envelope: dict[str, object]) -> b
     reservation = await db.scalar(
         select(Reservation).where(Reservation.order_id == order_id).with_for_update()
     )
+    if event_type == "order.return_received.v1":
+        try:
+            return_request_id = UUID(str(payload["return_request_id"]))
+            received_items = cast(list[dict[str, object]], payload["items"])
+        except (KeyError, ValueError, TypeError) as exc:
+            raise RuntimeError("return receipt event is malformed") from exc
+        if reservation is None or reservation.status != "COMMITTED":
+            raise RuntimeError(f"return receipt has no committed reservation for order {order_id}")
+        if _inventory_items(received_items) != _inventory_items(reservation.items):
+            raise RuntimeError(
+                f"return receipt items do not match reservation for order {order_id}"
+            )
+        await _return_received_reservation(
+            db,
+            reservation=reservation,
+            order_id=order_id,
+            return_request_id=return_request_id,
+        )
+        await db.commit()
+        return True
     if event_type == "payment.failed.v1":
         if reservation is not None and reservation.status == "RESERVED":
             await _release_reservation(db, reservation=reservation, order_id=order_id)
@@ -170,6 +190,12 @@ async def process_saga_event(db: AsyncSession, envelope: dict[str, object]) -> b
         await db.commit()
         return True
     if event_type == "payment.refunded.v1":
+        if payload.get("return_request_id") is not None:
+            # A post-delivery return restocks only after the warehouse has
+            # accepted the physical goods.  Its payment result is financial
+            # completion, never a second stock movement.
+            await db.commit()
+            return True
         if reservation is not None:
             if reservation.status == "COMMITTED":
                 await _return_committed_reservation(db, reservation=reservation, order_id=order_id)
@@ -312,6 +338,51 @@ async def _return_committed_reservation(
                 reserved_delta=0,
                 reason=f"payment refunded for order {order_id}",
                 idempotency_key=f"refund-return:{order_id}:{stock.sku}",
+            )
+        )
+    reservation.status = "RETURNED"
+    reservation.returned_at = datetime.now(UTC)
+
+
+def _inventory_items(items: list[dict[str, object]]) -> tuple[tuple[str, int], ...]:
+    try:
+        normalized: list[tuple[str, int]] = []
+        for item in items:
+            quantity = item["quantity"]
+            if not isinstance(quantity, int) or isinstance(quantity, bool):
+                raise ValueError
+            normalized.append((str(item["sku"]).upper(), quantity))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise RuntimeError("return receipt items are malformed") from exc
+    if not normalized or any(quantity < 1 for _, quantity in normalized):
+        raise RuntimeError("return receipt items are malformed")
+    return tuple(sorted(normalized))
+
+
+async def _return_received_reservation(
+    db: AsyncSession,
+    *,
+    reservation: Reservation,
+    order_id: UUID,
+    return_request_id: UUID,
+) -> None:
+    for item in reservation.items:
+        stock = await db.scalar(
+            select(StockItem).where(StockItem.sku == str(item["sku"]).upper()).with_for_update()
+        )
+        if stock is None:
+            raise RuntimeError(f"committed stock item is missing for order {order_id}")
+        quantity = cast(int, item["quantity"])
+        stock.on_hand += quantity
+        stock.version += 1
+        db.add(
+            StockMovement(
+                stock_item_id=stock.id,
+                kind="return_received",
+                quantity_delta=quantity,
+                reserved_delta=0,
+                reason=f"physical return received for order {order_id}",
+                idempotency_key=f"return-received:{return_request_id}:{stock.sku}",
             )
         )
     reservation.status = "RETURNED"

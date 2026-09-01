@@ -40,6 +40,44 @@ class FulfillmentResponse(BaseModel):
     updated_at: datetime
 
 
+ReturnStatus = Literal[
+    "REQUESTED",
+    "APPROVED",
+    "REJECTED",
+    "RECEIVED",
+    "REFUND_PENDING",
+    "REFUNDED",
+    "REFUND_FAILED",
+]
+
+
+class ReturnRequestCreate(BaseModel):
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+class ReturnDecisionRequest(BaseModel):
+    status: Literal["APPROVED", "REJECTED"]
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class ReturnRequestResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    order_id: UUID
+    status: ReturnStatus
+    reason: str
+    decision_note: str | None
+    requested_at: datetime
+    decision_at: datetime | None
+    received_at: datetime | None
+
+
+class ReturnRequestPage(BaseModel):
+    items: list[ReturnRequestResponse]
+    next_cursor: str | None
+
+
 class OrderResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -52,6 +90,7 @@ class OrderResponse(BaseModel):
     updated_at: datetime
     items: list[OrderItemResponse]
     fulfillment: FulfillmentResponse | None
+    return_request: ReturnRequestResponse | None
 
 
 class CartCheckoutResponse(BaseModel):

@@ -16,6 +16,7 @@ from order_service.application import (
     encode_order_cursor,
     process_saga_result,
     process_shipping_status_update,
+    receive_order_return,
     request_order_refund,
     required_customer_email,
     transition_order,
@@ -27,6 +28,7 @@ from order_service.models import (
     Order,
     OrderItem,
     OrderRefundRequest,
+    OrderReturnRequest,
     OutboxMessage,
 )
 from order_service.schemas import (
@@ -108,6 +110,136 @@ def test_refund_failure_does_not_create_a_second_order_confirmation_event() -> N
         assert await process_saga_result(db, envelope)
         assert order.status == "CONFIRMED"
         assert not any(isinstance(call.args[0], OutboxMessage) for call in db.add.call_args_list)
+
+    asyncio.run(exercise())
+
+
+def test_post_delivery_return_receipt_creates_physical_and_financial_handoffs() -> None:
+    async def exercise() -> None:
+        now = datetime.now(UTC)
+        customer_id = uuid4()
+        administrator_id = uuid4()
+        order = Order(
+            customer_id=customer_id,
+            status="DELIVERED",
+            tracking_code="ORD-RETURN",
+            currency="IRT",
+            total_amount=1,
+            payment_method="test_success",
+        )
+        order.id = uuid4()
+        item = OrderItem(
+            order_id=order.id,
+            variant_id=uuid4(),
+            sku="SKU-RETURN",
+            product_name="Returnable item",
+            unit_amount=1,
+            quantity=1,
+            attributes={},
+        )
+        return_request = OrderReturnRequest(
+            order_id=order.id,
+            idempotency_key="return-request-key",
+            requested_by=customer_id,
+            reason="not suitable",
+            status="APPROVED",
+            decision_idempotency_key="return-decision-key",
+            decided_by=administrator_id,
+            decided_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        return_request.id = uuid4()
+        added: list[object] = []
+
+        def add(value: object) -> None:
+            if isinstance(value, OrderRefundRequest):
+                value.id = uuid4()
+            added.append(value)
+
+        db = SimpleNamespace(
+            scalar=AsyncMock(
+                side_effect=[
+                    return_request,
+                    None,
+                    order,
+                    order,
+                    None,
+                    return_request,
+                    None,
+                ]
+            ),
+            scalars=AsyncMock(return_value=[item]),
+            add=Mock(side_effect=add),
+            flush=AsyncMock(),
+            commit=AsyncMock(),
+        )
+
+        response = await receive_order_return(
+            db,
+            return_request_id=return_request.id,
+            received_by=administrator_id,
+            idempotency_key="return-receipt-key",
+            allow_test_refund=True,
+            now=now,
+        )
+
+        assert response.status == "REFUND_PENDING"
+        assert order.status == "REFUND_PENDING"
+        assert return_request.received_at == now
+        assert return_request.receipt_idempotency_key == "return-receipt-key"
+        outbox = [row for row in added if isinstance(row, OutboxMessage)]
+        assert [row.event_type for row in outbox] == [
+            "order.return_received.v1",
+            "order.refund_requested.v1",
+        ]
+        assert outbox[0].payload["items"] == [{"sku": "SKU-RETURN", "quantity": 1}]
+        assert outbox[1].payload["return_request_id"] == str(return_request.id)
+
+    asyncio.run(exercise())
+
+
+def test_return_refund_failure_restores_delivered_status_and_marks_return() -> None:
+    async def exercise() -> None:
+        order = Order(
+            status="REFUND_PENDING", tracking_code="ORD-RETURN-FAIL", currency="IRT", total_amount=1
+        )
+        order.id = uuid4()
+        return_request = OrderReturnRequest(
+            order_id=order.id,
+            idempotency_key="return-request-key",
+            requested_by=uuid4(),
+            reason="not suitable",
+            status="REFUND_PENDING",
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        return_request.id = uuid4()
+        refund_request = OrderRefundRequest(
+            order_id=order.id,
+            idempotency_key="return-refund-key",
+            requested_by=uuid4(),
+            return_request_id=return_request.id,
+            pre_refund_status="DELIVERED",
+        )
+        refund_request.id = uuid4()
+        db = SimpleNamespace(
+            scalar=AsyncMock(side_effect=[None, order, refund_request, return_request]),
+            add=Mock(),
+            commit=AsyncMock(),
+        )
+        envelope = {
+            "event_id": str(uuid4()),
+            "event_type": "payment.refund_failed.v1",
+            "payload": {
+                "order_id": str(order.id),
+                "refund_request_id": str(refund_request.id),
+            },
+        }
+
+        assert await process_saga_result(db, envelope)
+        assert order.status == "DELIVERED"
+        assert return_request.status == "REFUND_FAILED"
 
     asyncio.run(exercise())
 

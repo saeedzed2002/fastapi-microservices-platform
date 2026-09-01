@@ -52,6 +52,7 @@ class PaymentReversal(Base):
     intent_id: Mapped[UUID] = mapped_column(unique=True, index=True)
     attempt_id: Mapped[UUID] = mapped_column(unique=True, index=True)
     refund_request_id: Mapped[UUID] = mapped_column(unique=True, index=True)
+    return_request_id: Mapped[UUID | None] = mapped_column(unique=True, index=True)
     status: Mapped[str] = mapped_column(String(32), index=True)
     idempotency_key: Mapped[str] = mapped_column(String(128), unique=True)
     requested_by: Mapped[UUID] = mapped_column(index=True)

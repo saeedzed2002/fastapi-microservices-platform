@@ -31,16 +31,18 @@ performs the existing provider-owned reversal with an auditable correlation.
 
 ## Sequence
 
-1. Completed: define the ownership decision and proposed canonical return API
-   and receipt event contracts.
-2. Add the Order return aggregate, migration, customer request, administrator
-   decision/receipt commands, and customer/admin projections.
-3. Add additive return correlation to the existing refund workflow and consume
-   provider outcomes without regressing pre-delivery refund behavior.
-4. Add the Inventory receipt consumer and one-return-one-restock movement
-   guard.
-5. Add contract, failure, Compose, and disposable-Kind E2E evidence for
-   duplicate receipt, payment failure, and post-delivery stock safety.
+1. Completed: define the ownership decision and canonical return API and
+   receipt event contracts.
+2. Completed: add the Order return aggregate and migration, customer request,
+   administrator decision/receipt commands, and customer/admin projections.
+3. Completed: add additive return correlation to the established refund
+   workflow and consume provider outcomes without regressing pre-delivery
+   refund behavior.
+4. Completed: add the Inventory receipt consumer and one-return-one-restock
+   movement guard.
+5. In progress: contract and unit failure evidence plus the clean full Compose
+   E2E suite are complete. The same portable return workflow is wired into
+   disposable-Kind conformance; its CI proof remains before release evidence.
 
 ## Acceptance evidence
 

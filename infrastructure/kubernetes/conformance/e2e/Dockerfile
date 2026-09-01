@@ -5,5 +5,6 @@ FROM fastapi-platform/order-service:conformance
 
 COPY tests/e2e/checkout_workflow.py /app/checkout_workflow.py
 COPY tests/e2e/shipping_workflow.py /app/shipping_workflow.py
+COPY tests/e2e/returns_workflow.py /app/returns_workflow.py
 
 CMD ["python", "/app/checkout_workflow.py"]

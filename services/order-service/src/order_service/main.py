@@ -15,13 +15,17 @@ from order_service.application import (
     authorize_fulfillment_transition,
     collect_checkout_snapshot,
     create_order,
+    decide_order_return,
     list_administrator_orders,
+    list_administrator_returns,
     list_customer_orders,
     load_idempotent_order,
     load_order_or_404,
     load_owned_order_or_404,
     order_response,
+    receive_order_return,
     request_order_refund,
+    request_order_return,
     validate_checkout_payment,
     wait_for_payment_pending,
 )
@@ -57,6 +61,11 @@ from order_service.schemas import (
     OrderResponse,
     OrderStatus,
     RefundRequestResponse,
+    ReturnDecisionRequest,
+    ReturnRequestCreate,
+    ReturnRequestPage,
+    ReturnRequestResponse,
+    ReturnStatus,
 )
 from order_service.shipping_access import verify_shipping_authorization_proof
 from order_service.shipping_gateway import (
@@ -71,6 +80,7 @@ from platform_observability import configure_application, metrics_response
 
 settings = get_settings()
 logger = logging.getLogger(settings.service_name)
+allow_test_refund = settings.environment in {"local", "conformance"}
 
 
 @asynccontextmanager
@@ -116,6 +126,68 @@ async def liveness() -> dict[str, str]:
 async def readiness(db: AsyncSession = Depends(get_session)) -> dict[str, str]:
     await db.execute(text("SELECT 1"))
     return {"status": "ok"}
+
+
+@app.get("/api/v1/orders/admin/returns", response_model=ReturnRequestPage)
+async def get_administrator_returns(
+    return_status: ReturnStatus | None = Query(default=None, alias="status"),
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = Query(default=None, min_length=1, max_length=256),
+    _: AuthClaims = Depends(require_administrator),
+    db: AsyncSession = Depends(get_session),
+) -> ReturnRequestPage:
+    try:
+        return await list_administrator_returns(
+            db=db,
+            status_filter=return_status,
+            limit=limit,
+            cursor=cursor,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid cursor"
+        ) from exc
+
+
+@app.post(
+    "/api/v1/orders/admin/returns/{return_request_id}/decision",
+    response_model=ReturnRequestResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def decide_administrator_order_return(
+    return_request_id: UUID,
+    payload: ReturnDecisionRequest,
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=1, max_length=128),
+    claims: AuthClaims = Depends(require_administrator),
+    db: AsyncSession = Depends(get_session),
+) -> ReturnRequestResponse:
+    return await decide_order_return(
+        db,
+        return_request_id=return_request_id,
+        decided_by=claims.subject,
+        idempotency_key=idempotency_key,
+        payload=payload,
+    )
+
+
+@app.post(
+    "/api/v1/orders/admin/returns/{return_request_id}/receipt",
+    response_model=ReturnRequestResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def receive_administrator_order_return(
+    return_request_id: UUID,
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=1, max_length=128),
+    claims: AuthClaims = Depends(require_administrator),
+    db: AsyncSession = Depends(get_session),
+) -> ReturnRequestResponse:
+    return await receive_order_return(
+        db,
+        return_request_id=return_request_id,
+        received_by=claims.subject,
+        idempotency_key=idempotency_key,
+        allow_test_refund=allow_test_refund,
+    )
 
 
 @app.get("/api/v1/orders/admin", response_model=AdminOrderPage)
@@ -197,6 +269,7 @@ async def request_administrator_order_refund(
             order_id=order_id,
             requested_by=claims.subject,
             idempotency_key=idempotency_key,
+            allow_test_refund=allow_test_refund,
             recover_expired_authorization=gateway.recover,
         )
     except ShippingRecoveryUnavailable as exc:
@@ -273,6 +346,27 @@ async def get_order(
     db: AsyncSession = Depends(get_session),
 ) -> OrderResponse:
     return await order_response(db, await load_owned_order_or_404(db, order_id, claims.subject))
+
+
+@app.post(
+    "/api/v1/orders/{order_id}/returns",
+    response_model=ReturnRequestResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def request_customer_order_return(
+    order_id: UUID,
+    payload: ReturnRequestCreate,
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=1, max_length=128),
+    claims: AuthClaims = Depends(require_customer),
+    db: AsyncSession = Depends(get_session),
+) -> ReturnRequestResponse:
+    return await request_order_return(
+        db,
+        order_id=order_id,
+        requested_by=claims.subject,
+        idempotency_key=idempotency_key,
+        payload=payload,
+    )
 
 
 @app.post("/api/v1/orders", response_model=OrderResponse, status_code=status.HTTP_202_ACCEPTED)

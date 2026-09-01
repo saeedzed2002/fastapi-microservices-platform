@@ -95,7 +95,42 @@ class OrderRefundRequest(Base):
     )
     idempotency_key: Mapped[str] = mapped_column(String(128), unique=True)
     requested_by: Mapped[UUID] = mapped_column(index=True)
+    return_request_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("order_return_requests.id", ondelete="RESTRICT"), unique=True, index=True
+    )
+    pre_refund_status: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class OrderReturnRequest(Base):
+    __tablename__ = "order_return_requests"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('REQUESTED', 'APPROVED', 'REJECTED', 'RECEIVED', "
+            "'REFUND_PENDING', 'REFUNDED', 'REFUND_FAILED')",
+            name="ck_order_return_requests_status",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    order_id: Mapped[UUID] = mapped_column(
+        ForeignKey("orders.id", ondelete="RESTRICT"), unique=True, index=True
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), unique=True)
+    requested_by: Mapped[UUID] = mapped_column(index=True)
+    reason: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32), default="REQUESTED", index=True)
+    decision_idempotency_key: Mapped[str | None] = mapped_column(String(128), unique=True)
+    decided_by: Mapped[UUID | None] = mapped_column(index=True)
+    decision_note: Mapped[str | None] = mapped_column(Text)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    receipt_idempotency_key: Mapped[str | None] = mapped_column(String(128), unique=True)
+    received_by: Mapped[UUID | None] = mapped_column(index=True)
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
 
 
 class FulfillmentAuthorization(Base):

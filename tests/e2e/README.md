@@ -30,6 +30,13 @@ Shipping consumer to create its local shipment, exercises an idempotent
 administrator transition through the edge, then waits for the Order Kafka
 consumer to update the customer-facing projection.
 
+`test_phase19_returns.py` takes a fresh successful test-payment checkout to
+the Shipping-owned delivered state, creates and approves one customer return,
+records a duplicate-safe physical receipt, and proves that Inventory restores
+stock once while the correlated test-payment refund completes. The disposable
+Kind runner executes this same workflow inside the cluster; it does not claim
+to exercise public ingress or an external payment provider.
+
 `test_phase12_resilience.py` is additionally limited to the disposable Compose
 topology because it controls Docker Compose service lifecycle. It never runs
 inside the Kind E2E Pod or against a remote environment.

@@ -38,6 +38,7 @@ spec:
             - {name: E2E_INVENTORY_BASE_URL, value: http://inventory-service}
             - {name: E2E_ORDER_BASE_URL, value: http://order-service}
             - {name: E2E_SHIPPING_BASE_URL, value: http://shipping-service}
+            - {name: E2E_RUN_RETURNS, value: "1"}
             - {name: E2E_MAILPIT_BASE_URL, value: http://mailpit.fastapi-platform-dependencies.svc.cluster.local:8025}
             - name: E2E_S3_ENDPOINT
               valueFrom: {secretKeyRef: {name: platform-runtime-secrets, key: ORDER_S3_ENDPOINT_URL}}

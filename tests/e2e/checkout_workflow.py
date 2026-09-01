@@ -21,6 +21,7 @@ class CheckoutWorkflowResult:
     order_id: UUID
     customer_id: UUID
     administrator_id: UUID
+    sku: str
     new_mail_messages: int
 
 
@@ -204,6 +205,7 @@ def run_checkout_workflow(
         order_id=UUID(order_id),
         customer_id=UUID(user_id),
         administrator_id=UUID(admin_id),
+        sku=sku,
         new_mail_messages=new_mail_messages,
     )
     print(f"checkout E2E succeeded for order {result.order_id}")
@@ -212,7 +214,11 @@ def run_checkout_workflow(
 
 if __name__ == "__main__":
     checkout = run_checkout_workflow()
-    if os.environ.get("E2E_SHIPPING_BASE_URL"):
+    if os.environ.get("E2E_RUN_RETURNS") == "1":
+        from returns_workflow import run_returns_workflow
+
+        run_returns_workflow(checkout)
+    elif os.environ.get("E2E_SHIPPING_BASE_URL"):
         from shipping_workflow import run_shipping_workflow
 
         run_shipping_workflow(checkout)

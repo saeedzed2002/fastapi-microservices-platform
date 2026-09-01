@@ -158,6 +158,7 @@ async def consume_reservation_events(settings: Settings, stop: asyncio.Event) ->
                                 callback_url=settings.zarinpal_callback_url,
                                 timeout_seconds=settings.zarinpal_request_timeout_seconds,
                             ),
+                            allow_test_refund=settings.environment in {"local", "conformance"},
                         )
 
             await process_record_with_dead_letter(

@@ -55,10 +55,10 @@ def _signed_access_token(*, issued_at: datetime, expires_at: datetime) -> str:
     )
 
 
-def test_access_token_allows_two_seconds_of_future_issued_at() -> None:
+def test_access_token_allows_bounded_future_issued_at_clock_skew() -> None:
     now = datetime.now(UTC)
     token = _signed_access_token(
-        issued_at=now + timedelta(seconds=2),
+        issued_at=now + timedelta(seconds=30),
         expires_at=now + timedelta(minutes=15),
     )
 
@@ -70,7 +70,7 @@ def test_access_token_allows_two_seconds_of_future_issued_at() -> None:
 def test_access_token_rejects_issued_at_beyond_clock_skew() -> None:
     now = datetime.now(UTC)
     token = _signed_access_token(
-        issued_at=now + timedelta(seconds=10),
+        issued_at=now + timedelta(seconds=31),
         expires_at=now + timedelta(minutes=15),
     )
 

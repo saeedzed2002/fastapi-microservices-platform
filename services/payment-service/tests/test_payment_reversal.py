@@ -6,7 +6,11 @@ from uuid import uuid4
 
 import httpx
 
-from payment_service.application import _has_successful_zarinpal_attempt, reverse_zarinpal_payment
+from payment_service.application import (
+    _has_successful_zarinpal_attempt,
+    process_zarinpal_refund_request,
+    reverse_zarinpal_payment,
+)
 from payment_service.models import OutboxMessage, PaymentReversal
 from payment_service.zarinpal import ZarinpalClient
 
@@ -70,6 +74,7 @@ def test_reverse_persists_the_request_before_calling_zarinpal() -> None:
             transport=httpx.MockTransport(handler),
         )
         refund_request_id = uuid4()
+        return_request_id = uuid4()
         requested_by = uuid4()
 
         result = await reverse_zarinpal_payment(
@@ -79,6 +84,7 @@ def test_reverse_persists_the_request_before_calling_zarinpal() -> None:
             idempotency_key=f"refund-request:{refund_request_id}",
             refund_request_id=refund_request_id,
             provider=client,
+            return_request_id=return_request_id,
         )
 
         reversal = next(row for row in added if isinstance(row, PaymentReversal))
@@ -92,6 +98,8 @@ def test_reverse_persists_the_request_before_calling_zarinpal() -> None:
         assert len(events) == 1
         assert events[0].event_type == "payment.refunded.v1"
         assert events[0].payload["refund_request_id"] == str(refund_request_id)
+        assert events[0].payload["return_request_id"] == str(return_request_id)
+        assert reversal.return_request_id == return_request_id
 
     asyncio.run(exercise())
 
@@ -102,5 +110,62 @@ def test_zibal_success_is_not_sent_to_zarinpal_reversal() -> None:
         db = SimpleNamespace(scalar=AsyncMock(side_effect=[intent, None]))
 
         assert not await _has_successful_zarinpal_attempt(db, order_id=intent.order_id)
+
+    asyncio.run(exercise())
+
+
+def test_local_test_payment_refund_preserves_return_correlation() -> None:
+    async def exercise() -> None:
+        intent = SimpleNamespace(
+            id=uuid4(),
+            order_id=uuid4(),
+            method="test_success",
+            status="SUCCEEDED",
+            provider_reference="fake-test-payment",
+        )
+        attempt = SimpleNamespace(id=uuid4(), intent_id=intent.id)
+        refund_request_id = uuid4()
+        return_request_id = uuid4()
+        added: list[object] = []
+
+        def add(row: object) -> None:
+            if isinstance(row, PaymentReversal):
+                row.id = uuid4()
+            added.append(row)
+
+        db = SimpleNamespace(
+            scalar=AsyncMock(side_effect=[None, intent, attempt.id, intent, None, attempt]),
+            add=Mock(side_effect=add),
+            flush=AsyncMock(),
+            commit=AsyncMock(),
+        )
+        client = ZarinpalClient(
+            merchant_id="",
+            sandbox=True,
+            callback_url="https://localhost/api/v1/payments/zarinpal/callback",
+            timeout_seconds=10,
+        )
+
+        assert await process_zarinpal_refund_request(
+            db,
+            {
+                "event_id": str(uuid4()),
+                "event_type": "order.refund_requested.v1",
+                "payload": {
+                    "order_id": str(intent.order_id),
+                    "refund_request_id": str(refund_request_id),
+                    "requested_by": str(uuid4()),
+                    "return_request_id": str(return_request_id),
+                },
+            },
+            provider=client,
+            allow_test_refund=True,
+        )
+
+        assert intent.status == "REFUNDED"
+        events = [row for row in added if isinstance(row, OutboxMessage)]
+        assert len(events) == 1
+        assert events[0].event_type == "payment.refunded.v1"
+        assert events[0].payload["return_request_id"] == str(return_request_id)
 
     asyncio.run(exercise())

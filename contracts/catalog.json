@@ -78,7 +78,7 @@
       "name": "order.returns.v1",
       "kind": "service-openapi",
       "owner": "order-service",
-      "status": "proposed",
+      "status": "active",
       "notes": "Customer full-order returns after delivery, administrator decision and physical receipt. Provider refund and Inventory restoration remain independently owned handoffs.",
       "schema": "openapi/order-returns.v1.openapi.json"
     },
@@ -269,7 +269,7 @@
       "status": "active",
       "topic": "fastapi-platform.order.events.v1",
       "message_key": "order_id",
-      "notes": "Administrator requested a provider-owned reversal while the Order was still confirmed.",
+      "notes": "Order requested a provider-owned reversal. A delivered-order return includes return_request_id after physical receipt; the original administrator path remains supported.",
       "schema": "events/order.refund_requested.v1.schema.json"
     },
     {
@@ -277,7 +277,7 @@
       "kind": "domain-event",
       "owner": "order-service",
       "consumers": ["inventory-service"],
-      "status": "proposed",
+      "status": "active",
       "topic": "fastapi-platform.order.events.v1",
       "message_key": "order_id",
       "notes": "Order recorded receipt of a full delivered-order return. Inventory restores the no-PII SKU/quantity snapshot exactly once for the return identifier.",

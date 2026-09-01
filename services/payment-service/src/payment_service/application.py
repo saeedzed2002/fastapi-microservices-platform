@@ -950,6 +950,7 @@ async def reverse_zarinpal_payment(
     idempotency_key: str,
     refund_request_id: UUID,
     provider: ZarinpalClient,
+    return_request_id: UUID | None = None,
 ) -> ZarinpalReverse:
     """Persist a reversal intent before contacting Zarinpal.
 
@@ -964,6 +965,7 @@ async def reverse_zarinpal_payment(
         requested_by=requested_by,
         idempotency_key=idempotency_key,
         refund_request_id=refund_request_id,
+        return_request_id=return_request_id,
     )
     if isinstance(prepared, ZarinpalReverse):
         return prepared
@@ -990,6 +992,7 @@ async def _prepare_zarinpal_reversal(
     requested_by: UUID,
     idempotency_key: str,
     refund_request_id: UUID,
+    return_request_id: UUID | None,
 ) -> tuple[PaymentIntent, PaymentAttempt, PaymentReversal] | ZarinpalReverse:
     intent = cast(
         PaymentIntent | None,
@@ -1006,6 +1009,9 @@ async def _prepare_zarinpal_reversal(
         .execution_options(populate_existing=True)
     )
     if reversal is not None:
+        if reversal.return_request_id != return_request_id:
+            await db.commit()
+            raise PaymentReversalRejected
         if reversal.idempotency_key != idempotency_key:
             await db.commit()
             if reversal.status == "SUCCEEDED":
@@ -1050,6 +1056,7 @@ async def _prepare_zarinpal_reversal(
         intent_id=intent.id,
         attempt_id=attempt.id,
         refund_request_id=refund_request_id,
+        return_request_id=return_request_id,
         status="REQUESTING",
         idempotency_key=idempotency_key,
         requested_by=requested_by,
@@ -1077,6 +1084,11 @@ async def _record_zarinpal_reversal_rejection(
                 "provider_reference": intent.provider_reference,
                 "refund_request_id": str(reversal.refund_request_id),
                 "failure_code": code,
+                **(
+                    {"return_request_id": str(reversal.return_request_id)}
+                    if reversal.return_request_id is not None
+                    else {}
+                ),
             },
             causation_id=None,
             trace_id=uuid4().hex,
@@ -1118,6 +1130,11 @@ async def _record_zarinpal_reversal(
             "provider_reference": intent.provider_reference,
             "reversal_id": str(reversal.id),
             "refund_request_id": str(reversal.refund_request_id),
+            **(
+                {"return_request_id": str(reversal.return_request_id)}
+                if reversal.return_request_id is not None
+                else {}
+            ),
         },
         causation_id=None,
         trace_id=uuid4().hex,
@@ -1136,6 +1153,7 @@ async def process_zarinpal_refund_request(
     envelope: dict[str, object],
     *,
     provider: ZarinpalClient,
+    allow_test_refund: bool = False,
 ) -> bool:
     """Handle the durable Order refund command without a cross-service transaction."""
     event_id = UUID(str(envelope["event_id"]))
@@ -1147,11 +1165,24 @@ async def process_zarinpal_refund_request(
     order_id = UUID(str(payload["order_id"]))
     refund_request_id = UUID(str(payload["refund_request_id"]))
     requested_by = UUID(str(payload["requested_by"]))
-    if not await _has_successful_zarinpal_attempt(db, order_id=order_id):
+    raw_return_request_id = payload.get("return_request_id")
+    return_request_id = (
+        UUID(str(raw_return_request_id)) if raw_return_request_id is not None else None
+    )
+    if allow_test_refund and await _has_successful_test_attempt(db, order_id=order_id):
+        await _record_test_refund(
+            db,
+            order_id=order_id,
+            refund_request_id=refund_request_id,
+            return_request_id=return_request_id,
+            requested_by=requested_by,
+        )
+    elif not await _has_successful_zarinpal_attempt(db, order_id=order_id):
         await _record_refund_not_ready(
             db,
             order_id=order_id,
             refund_request_id=refund_request_id,
+            return_request_id=return_request_id,
         )
     else:
         try:
@@ -1162,12 +1193,14 @@ async def process_zarinpal_refund_request(
                 idempotency_key=f"refund-request:{refund_request_id}",
                 refund_request_id=refund_request_id,
                 provider=provider,
+                return_request_id=return_request_id,
             )
         except PaymentNotReady:
             await _record_refund_not_ready(
                 db,
                 order_id=order_id,
                 refund_request_id=refund_request_id,
+                return_request_id=return_request_id,
             )
         except PaymentReversalRejected:
             # The rejection and compensating domain event are already durable.
@@ -1199,11 +1232,104 @@ async def _has_successful_zarinpal_attempt(db: AsyncSession, *, order_id: UUID) 
     return attempt is not None
 
 
+async def _has_successful_test_attempt(db: AsyncSession, *, order_id: UUID) -> bool:
+    intent = await db.scalar(select(PaymentIntent).where(PaymentIntent.order_id == order_id))
+    if intent is None:
+        raise PaymentIntentNotFound
+    if intent.method != "test_success" or intent.status != "SUCCEEDED":
+        return False
+    attempt = await db.scalar(
+        select(PaymentAttempt.id)
+        .where(
+            PaymentAttempt.intent_id == intent.id,
+            PaymentAttempt.provider == "fake",
+            PaymentAttempt.status == "SUCCEEDED",
+        )
+        .limit(1)
+    )
+    return attempt is not None
+
+
+async def _record_test_refund(
+    db: AsyncSession,
+    *,
+    order_id: UUID,
+    refund_request_id: UUID,
+    return_request_id: UUID | None,
+    requested_by: UUID,
+) -> None:
+    intent = cast(
+        PaymentIntent | None,
+        await db.scalar(
+            select(PaymentIntent).where(PaymentIntent.order_id == order_id).with_for_update()
+        ),
+    )
+    if intent is None:
+        raise PaymentIntentNotFound
+    reversal = await db.scalar(
+        select(PaymentReversal)
+        .where(PaymentReversal.refund_request_id == refund_request_id)
+        .with_for_update()
+    )
+    if reversal is not None:
+        if reversal.return_request_id != return_request_id:
+            await db.commit()
+            raise PaymentReversalRejected
+        await db.commit()
+        return
+    attempt = await db.scalar(
+        select(PaymentAttempt)
+        .where(
+            PaymentAttempt.intent_id == intent.id,
+            PaymentAttempt.provider == "fake",
+            PaymentAttempt.status == "SUCCEEDED",
+        )
+        .with_for_update()
+        .limit(1)
+    )
+    if intent.method != "test_success" or intent.status != "SUCCEEDED" or attempt is None:
+        await db.commit()
+        raise PaymentNotReady
+    reversal = PaymentReversal(
+        intent_id=intent.id,
+        attempt_id=attempt.id,
+        refund_request_id=refund_request_id,
+        return_request_id=return_request_id,
+        status="SUCCEEDED",
+        idempotency_key=f"refund-request:{refund_request_id}",
+        requested_by=requested_by,
+        provider_code="test",
+    )
+    db.add(reversal)
+    await db.flush()
+    intent.status = "REFUNDED"
+    _add_outbox(
+        db,
+        intent=intent,
+        event_type="payment.refunded.v1",
+        payload={
+            "order_id": str(order_id),
+            "provider_reference": intent.provider_reference,
+            "reversal_id": str(reversal.id),
+            "refund_request_id": str(refund_request_id),
+            **(
+                {"return_request_id": str(return_request_id)}
+                if return_request_id is not None
+                else {}
+            ),
+        },
+        causation_id=None,
+        trace_id=uuid4().hex,
+    )
+    await db.commit()
+
+
 async def _record_refund_not_ready(
     db: AsyncSession,
     *,
     order_id: UUID,
     refund_request_id: UUID,
+    return_request_id: UUID | None,
 ) -> None:
     intent = await db.scalar(
         select(PaymentIntent).where(PaymentIntent.order_id == order_id).with_for_update()
@@ -1219,6 +1345,11 @@ async def _record_refund_not_ready(
             "provider_reference": intent.provider_reference,
             "refund_request_id": str(refund_request_id),
             "failure_code": "payment_not_reversible",
+            **(
+                {"return_request_id": str(return_request_id)}
+                if return_request_id is not None
+                else {}
+            ),
         },
         causation_id=None,
         trace_id=uuid4().hex,

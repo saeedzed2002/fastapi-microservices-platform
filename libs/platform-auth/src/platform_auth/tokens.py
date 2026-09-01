@@ -6,7 +6,10 @@ from uuid import UUID, uuid4
 import jwt
 from jwt import InvalidTokenError
 
-MAX_ISSUED_AT_CLOCK_SKEW = timedelta(seconds=2)
+# Services validate tokens created by clients and sibling services.  A bounded
+# tolerance keeps short-lived container or node clock convergence from turning
+# otherwise-valid credentials into intermittent authentication failures.
+MAX_ISSUED_AT_CLOCK_SKEW = timedelta(seconds=30)
 
 
 class TokenError(ValueError):

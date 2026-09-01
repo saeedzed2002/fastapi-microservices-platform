@@ -122,3 +122,38 @@ def run_shipping_workflow(checkout: CheckoutWorkflowResult) -> None:
         _wait_for(order_projection_is_shipped, timeout_seconds=timeout_seconds)
 
     print(f"shipping E2E succeeded for order {checkout.order_id}")
+
+
+def run_delivered_shipping_workflow(checkout: CheckoutWorkflowResult) -> None:
+    """Reach delivered state before exercising a post-delivery workflow."""
+    run_shipping_workflow(checkout)
+    shipping_base_url = _service_base_url("shipping")
+    order_base_url = _service_base_url("order")
+    timeout_seconds = float(os.environ.get("E2E_WAIT_TIMEOUT_SECONDS", "45"))
+    user_headers = {
+        "Authorization": f"Bearer {_token(subject=checkout.customer_id, roles=('customer',))}"
+    }
+    administrator_headers = {
+        "Authorization": f"Bearer {_token(subject=checkout.administrator_id, roles=('admin',))}"
+    }
+    with httpx.Client(timeout=10.0, verify=False) as client:
+        delivered = client.put(
+            f"{shipping_base_url}/api/v1/shipping/admin/orders/{checkout.order_id}/status",
+            headers={
+                **administrator_headers,
+                "Idempotency-Key": f"phase19-delivered-{uuid4().hex}",
+            },
+            json={"status": "DELIVERED"},
+        )
+        delivered.raise_for_status()
+        assert delivered.json()["status"] == "DELIVERED"
+
+        def order_projection_is_delivered() -> bool:
+            response = client.get(
+                f"{order_base_url}/api/v1/orders/{checkout.order_id}", headers=user_headers
+            )
+            response.raise_for_status()
+            return response.json()["status"] == "DELIVERED"
+
+        _wait_for(order_projection_is_delivered, timeout_seconds=timeout_seconds)
+    print(f"delivery E2E succeeded for order {checkout.order_id}")
