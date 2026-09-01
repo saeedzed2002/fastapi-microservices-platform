@@ -136,6 +136,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Phase 15 plan](docs/development/phase-15-plan.md)
 - [Phase 16 plan](docs/development/phase-16-plan.md)
 - [Phase 17 plan](docs/development/phase-17-plan.md)
+- [Phase 18 plan](docs/development/phase-18-plan.md)
 
 ## Roadmap
 
@@ -159,6 +160,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 | 15 | Kubernetes API autoscaling |
 | 16 | Online payment provider routing |
 | 17 | Portfolio evidence and reviewer guide |
+| 18 | Proposed: Shipping ownership extraction |
 
 ## Local development
 
