@@ -122,7 +122,11 @@ Before relying on delivery, protect `main`: require pull requests, require the
 `kubernetes-conformance` checks, require up-to-date branches, restrict direct
 pushes, and prohibit required-check bypass. Configure Actions with read-only
 defaults and grant `GITHUB_TOKEN` package writes only to the publish job.
-Enable Dependency Graph, Dependabot alerts,
-Dependabot security updates, and Dependabot version updates; the committed
-configuration checks `uv`, GitHub Actions, Docker Compose, and service
-Dockerfiles weekly.
+Enable Dependency Graph, Dependabot alerts, and Dependabot security updates.
+Routine Dependabot version updates are deliberately disabled with
+`open-pull-requests-limit: 0`: this portfolio repository keeps routine changes
+on `main` through explicitly reviewed maintenance commits rather than bot
+branches. A real security update may still create a dedicated remediation PR;
+that exception is intentional and must be reviewed promptly. The committed
+configuration covers `uv`, GitHub Actions, Docker Compose, and service
+Dockerfiles.
