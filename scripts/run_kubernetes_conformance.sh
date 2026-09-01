@@ -14,6 +14,8 @@ readonly METRICS_SERVER_RELEASE_URL="https://github.com/kubernetes-sigs/metrics-
 readonly METRICS_SERVER_MANIFEST_SHA256="1cec29a5267809306a2c6ec74a3e449abbb705b4a8beed0c8a1963910f72c79b"
 readonly METRICS_SERVER_SOURCE_IMAGE="registry.k8s.io/metrics-server/metrics-server@sha256:d9862115e7c7881280d3d75ca26bda8ffc0fc213315979575bf23ce9826205c0"
 readonly METRICS_SERVER_LOCAL_IMAGE="fastapi-platform/conformance-metrics-server:local"
+readonly DOCKER_OPERATION_MAX_ATTEMPTS=3
+readonly DOCKER_OPERATION_RETRY_DELAY_SECONDS=5
 readonly SERVICE_IMAGES=(
   reference-service
   identity-service
@@ -85,6 +87,25 @@ readonly DEPENDENCY_LOCAL_IMAGES=(
 )
 
 cluster_created=false
+
+retry_docker_operation() {
+  local attempt=1
+
+  while true; do
+    if "$@"; then
+      return 0
+    fi
+
+    if [[ "${attempt}" -ge "${DOCKER_OPERATION_MAX_ATTEMPTS}" ]]; then
+      echo "Docker operation failed after ${attempt} attempts: $*" >&2
+      return 1
+    fi
+
+    echo "Docker operation failed (attempt ${attempt}/${DOCKER_OPERATION_MAX_ATTEMPTS}); retrying: $*" >&2
+    sleep "$((attempt * DOCKER_OPERATION_RETRY_DELAY_SECONDS))"
+    attempt=$((attempt + 1))
+  done
+}
 
 install_metrics_server() {
   local manifest
@@ -240,11 +261,14 @@ echo "Pulling pinned disposable dependency images."
 for index in "${!DEPENDENCY_SOURCE_IMAGES[@]}"; do
   source_image="${DEPENDENCY_SOURCE_IMAGES[${index}]}"
   local_image="${DEPENDENCY_LOCAL_IMAGES[${index}]}"
-  docker pull "${source_image}"
-  docker tag "${source_image}" "${local_image}"
+  # These exact digests are external runner inputs. Retry a transient Docker
+  # daemon or registry error, but fail the conformance proof after a bounded
+  # number of attempts rather than silently substituting another image.
+  retry_docker_operation docker pull "${source_image}"
+  retry_docker_operation docker tag "${source_image}" "${local_image}"
 done
-docker pull "${METRICS_SERVER_SOURCE_IMAGE}"
-docker tag "${METRICS_SERVER_SOURCE_IMAGE}" "${METRICS_SERVER_LOCAL_IMAGE}"
+retry_docker_operation docker pull "${METRICS_SERVER_SOURCE_IMAGE}"
+retry_docker_operation docker tag "${METRICS_SERVER_SOURCE_IMAGE}" "${METRICS_SERVER_LOCAL_IMAGE}"
 
 kind create cluster \
   --name "${CLUSTER_NAME}" \

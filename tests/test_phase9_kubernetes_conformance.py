@@ -147,7 +147,15 @@ def test_kind_cluster_and_ci_script_are_pinned_and_disposable() -> None:
     assert script.count("--provenance=false") == 3
     assert "DEPENDENCY_SOURCE_IMAGES" in script
     assert "DEPENDENCY_LOCAL_IMAGES" in script
-    assert 'docker tag "${source_image}" "${local_image}"' in script
+    assert "retry_docker_operation" in script
+    assert "DOCKER_OPERATION_MAX_ATTEMPTS=3" in script
+    assert 'retry_docker_operation docker pull "${source_image}"' in script
+    assert 'retry_docker_operation docker tag "${source_image}" "${local_image}"' in script
+    assert 'retry_docker_operation docker pull "${METRICS_SERVER_SOURCE_IMAGE}"' in script
+    assert (
+        'retry_docker_operation docker tag "${METRICS_SERVER_SOURCE_IMAGE}" '
+        '"${METRICS_SERVER_LOCAL_IMAGE}"' in script
+    )
     assert (
         'for image in "${DEPENDENCY_LOCAL_IMAGES[@]}" '
         '"${METRICS_SERVER_LOCAL_IMAGE}" '
