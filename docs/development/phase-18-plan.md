@@ -53,9 +53,9 @@ becomes the authoritative shipment bounded context.
    `Idempotency-Key`; it is not deprecated until topology migration evidence
    proves it is safe. An expired authorization is released only after a
    definitive Shipping recovery query; an unavailable result fails closed.
-5. Add Compose, Kind, contract, and failure tests for duplicate facts,
-   concurrent refund/shipping commands, expired authorizations, and delayed
-   projection delivery.
+5. Completed: add Compose, Kind, contract, and failure tests for duplicate
+   facts, concurrent refund/shipping commands, expired authorizations, and
+   delayed projection delivery.
 
 ## Acceptance evidence
 

@@ -19,7 +19,10 @@ Use the following path for a focused review:
    and the [online provider routing runbook](../runbooks/online-payment-provider-routing.md).
 4. Inspect [realtime Chat](../diagrams/realtime-chat.md) and the accepted
    [support-queue assignment](../adr/ADR-019-chat-support-queue-assignment.md).
-5. Inspect the [Kubernetes conformance ADR](../adr/ADR-028-kubernetes-conformance-ci.md)
+5. Trace the [Shipping ownership ADR](../adr/ADR-039-shipping-ownership-extraction.md)
+   through the [Shipping command contract](../../contracts/openapi/shipping-commands.v1.openapi.json)
+   and [Shipping E2E workflow](../../tests/e2e/test_phase18_shipping.py).
+6. Inspect the [Kubernetes conformance ADR](../adr/ADR-028-kubernetes-conformance-ci.md)
    and the [platform workflow](../../.github/workflows/platform-ci.yml).
 
 ## Evidence map
@@ -31,6 +34,7 @@ Use the following path for a focused review:
 | Payment routing avoids unsafe provider failover | [Payment provider ADR](../adr/ADR-034-online-payment-provider-routing.md), [online routing plan](../development/phase-16-plan.md), and [Payment tests](../../services/payment-service/tests) | Zibal fallback occurs only after a persisted definitive Zarinpal rejection, never after an unknown outcome. |
 | Customers can open support requests without exposing history to every agent | [Support assignment ADR](../adr/ADR-019-chat-support-queue-assignment.md), [Chat support contract](../../contracts/openapi/chat-support.v1.openapi.json), and [support runbook](../runbooks/chat-support-queue.md) | One eligible agent claims a durable Chat-owned request atomically; queue readers see metadata only. |
 | Product feedback is bounded and moderated | [Catalog review ADR](../adr/ADR-032-catalog-product-review-moderation.md), [review contract](../../contracts/openapi/catalog-reviews.v1.openapi.json), and [moderation runbook](../runbooks/catalog-review-moderation.md) | Reviews have a one-level reply limit and explicit administrator moderation. |
+| Shipment lifecycle is independently owned without opening a refund race | [Shipping ownership ADR](../adr/ADR-039-shipping-ownership-extraction.md), [Shipping command contract](../../contracts/openapi/shipping-commands.v1.openapi.json), and [Shipping E2E](../../tests/e2e/test_phase18_shipping.py) | Shipping commits an authorization-bound transition and emits a no-PII fact; Order applies the customer-facing projection only after its local fence matches. |
 | Kubernetes resources are executable rather than documentation-only | [Kubernetes conformance ADR](../adr/ADR-028-kubernetes-conformance-ci.md), [conformance script](../../scripts/run_kubernetes_conformance.sh), and [workflow](../../.github/workflows/platform-ci.yml) | CI creates a disposable `Kind` cluster, applies the release path, and proves API and checkout workflow behavior in-cluster. |
 | Published images pass the same security gate | [single-job publication ADR](../adr/ADR-038-single-job-ghcr-publication.md), [delivery scan-gate test](../../tests/test_ci_delivery_scan_gate.py), and [runtime image hardening test](../../tests/test_runtime_image_hardening.py) | Every exact image is built and scanned for `HIGH`/`CRITICAL` findings before one registry login or push. |
 
@@ -62,7 +66,9 @@ one sequential `GHCR` job only after every scan succeeds.
   access policy, and a promotion/rollback process.
 - The Zarinpal and Zibal integrations use local/test configuration only; no
   claim is made that a real merchant transaction has run.
-- Shipping remains a planned bounded context, not an implemented service.
+- Shipping owns the implemented shipment lifecycle, but carrier labels,
+  webhooks, rate shopping, delivery estimates, address validation, returns,
+  and third-party carrier integration remain out of scope.
 - License selection is intentionally left to the repository owner because it
   is a legal/product decision.
 

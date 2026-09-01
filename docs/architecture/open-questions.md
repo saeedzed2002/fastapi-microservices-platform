@@ -91,7 +91,11 @@ open before additional channels ship.
 
 ### Order and Shipping status
 
-Shipping should own carrier/fulfilment truth; Order should maintain only a customer-facing projection. Shipping currently has no Phase 0–12 implementation milestone and remains post-roadmap unless explicitly scheduled.
+Shipping owns carrier/fulfilment truth from the completed Phase 18 extraction;
+Order retains only a customer-facing projection and the financial eligibility
+fence. External carrier integrations remain deliberately unscheduled because
+the current scope does not claim label purchase, rate shopping, delivery
+estimates, address validation, return logistics, or carrier webhooks.
 
 ### Topic and event version migration
 

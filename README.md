@@ -4,21 +4,22 @@ FastAPI Microservices Platform is a backend-only, production-oriented e-commerce
 
 ## Project status
 
-The repository has completed **Phase 17 — portfolio evidence and reviewer
-guide**. It is intentionally a portfolio repository, not a deployed public
-environment. Its CI publishes immutable, scanned container images as build
-artifacts and proves the platform in a disposable `Kind` cluster; neither
-operation is a target-environment deployment.
+The repository has completed **Phase 18 — Shipping ownership extraction**. It
+is intentionally a portfolio repository, not a deployed public environment.
+Its CI publishes immutable, scanned container images as build artifacts and
+proves the platform in a disposable `Kind` cluster; neither operation is a
+target-environment deployment.
 The local
 `observability` profile collects bounded platform metrics, JSON logs, and
 traces through Prometheus, Loki, Tempo, and Grafana. Resilience, staff account
-recovery/device sessions, moderated catalog reviews, and bounded Kubernetes
-autoscaling have durable contracts, tests, and runbooks. Raw `Kustomize`
-resources remain the reviewable workload baseline, while two Helm charts
-package the controlled foundation and application-release sequence. The
-`main`-branch/manual CI workflow installs those charts in a disposable `Kind`
-cluster, waits for controlled migrations and workloads, then proves in-cluster
-API readiness and the checkout-to-invoice-to-email workflow.
+recovery/device sessions, moderated catalog reviews, bounded Kubernetes
+autoscaling, and Shipping-owned fulfilment transitions have durable contracts,
+tests, and runbooks. Raw `Kustomize` resources remain the reviewable workload
+baseline, while two Helm charts package the controlled foundation and
+application-release sequence. The `main`-branch/manual CI workflow installs
+those charts in a disposable `Kind` cluster, waits for controlled migrations
+and workloads, then proves in-cluster API readiness and the
+checkout-to-invoice-to-email and Shipping-to-Order projection workflows.
 A real target environment still must provide pinned release images, secrets,
 ingress/TLS, external durable services, and environment-specific egress policy
 before public deployment.
@@ -78,7 +79,7 @@ Core bounded contexts:
 
 Incremental bounded-context extraction:
 
-- `shipping-service` — Phase 18 source implementation owns a `READY` shipment created idempotently from `order.confirmed.v1`, administrator lifecycle commands, its own transition audit, and its own `Outbox`. Every command obtains an Order-owned short-lived authorization; an expired authorization is reconciled from Shipping before a refund can proceed. The current `Compose` and `Kind` topologies intentionally do not register this service yet; that rollout follows dedicated `E2E` evidence.
+- `shipping-service` — owns a `READY` shipment created idempotently from `order.confirmed.v1`, administrator lifecycle commands, its own transition audit, and its own `Outbox`. Every command obtains an Order-owned short-lived authorization; an expired authorization is reconciled from Shipping before a refund can proceed. `Compose` and `Kind` register its API, migration, and dedicated event worker; the shared checkout-to-Shipping workflow proves the asynchronous Order projection.
 
 See [service boundaries](docs/architecture/service-boundaries.md) for ownership and non-ownership rules.
 
@@ -160,7 +161,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 | 15 | Kubernetes API autoscaling |
 | 16 | Online payment provider routing |
 | 17 | Portfolio evidence and reviewer guide |
-| 18 | In progress: Shipping ownership extraction |
+| 18 | Shipping ownership extraction |
 
 ## Local development
 
