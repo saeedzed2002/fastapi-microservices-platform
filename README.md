@@ -132,6 +132,7 @@ The complete intended layout is documented in [repository structure](docs/archit
 - [Phase 0 plan](docs/development/phase-0-plan.md)
 - [Phase 1 plan](docs/development/phase-1-plan.md)
 - [Phase 2 plan](docs/development/phase-2-plan.md)
+- [Phase 3 plan](docs/development/phase-3-plan.md)
 - [Phase 4 plan](docs/development/phase-4-plan.md)
 - [Phase 5 plan](docs/development/phase-5-plan.md)
 - [Phase 6 plan](docs/development/phase-6-plan.md)
