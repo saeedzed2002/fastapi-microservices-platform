@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import ssl
 import subprocess
 import time
 from collections.abc import Callable
@@ -219,6 +220,34 @@ def test_cart_uses_postgresql_during_redis_outage() -> None:
             lambda: client.get(f"{base_url}/api/v1/carts/me", headers=headers).status_code == 200,
             description="Cart recovery after Redis restart",
         )
+
+
+def test_chat_websocket_recovers_after_redis_outage() -> None:
+    _require_compose_e2e()
+    base_url = os.environ.get("E2E_BASE_URL", "https://localhost")
+    access_token = _token(subject=uuid4(), roles=("customer",))
+
+    async def authenticate() -> None:
+        from websockets.asyncio.client import connect
+
+        websocket_ssl = ssl.create_default_context()
+        websocket_ssl.check_hostname = False
+        websocket_ssl.verify_mode = ssl.CERT_NONE
+        websocket_url = f"{base_url.replace('https', 'wss', 1)}/api/v1/chat/ws"
+        async with connect(websocket_url, ssl=websocket_ssl) as socket:
+            await socket.send(
+                json.dumps(
+                    {
+                        "type": "chat.authenticate.v1",
+                        "request_id": str(uuid4()),
+                        "access_token": access_token,
+                    }
+                )
+            )
+            authenticated = json.loads(await socket.recv())
+            assert authenticated["type"] == "chat.authenticated.v1"
+
+    asyncio.run(authenticate())
 
 
 def test_order_task_intent_recovers_after_rabbitmq_outage() -> None:

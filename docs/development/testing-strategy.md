@@ -37,6 +37,12 @@ Testcontainers is the preferred candidate when its current stable toolchain is v
 
 Checkout eventually covers registration, product creation, stock, cart, order snapshot, reservation, payment, confirmation, invoice generation, object upload, and notification completion.
 
+The Phase 4 Compose workflow proves customer-profile creation, address ownership,
+single-default-address replacement, Cart item accumulation caps, optimistic Cart
+version fencing, partial consumption, and durable Cart clearing through the
+public edge. It uses unique customer and variant identifiers and makes no
+assumption about existing platform data.
+
 Chat covers two authenticated users, membership, database commit before ACK, realtime delivery, reconnect catch-up, deduplication, attachments, and later multi-pod fan-out. Customer support coverage also proves metadata-only queue visibility, atomic single-agent claim, loss of access after release, and denial of unclaimed agents. Edge coverage proves HTTPS routing, redirect, headers, basic rate limits, blocked internal paths, no direct API host port, and Chat WebSocket upgrades.
 
 Asynchronous tests use bounded polling of observable state. Fixed sleeps are avoided. Tests isolate identifiers, clean data, control time where possible, and report which stage failed.
@@ -62,5 +68,8 @@ Phase 12 adds bounded dependency outage, disruption, and recovery testing to
 the feature-level suite already accumulated. Its first implementation runs
 only inside the isolated Compose integration topology, uses explicit service
 allow-lists and `finally` recovery, and proves durable outbox/task-intent and
-database fallback behavior. Kubernetes disruption is deferred until a reviewed
-cluster recovery controller and target operational boundary exist.
+database fallback behavior. It also verifies that a Chat WebSocket can
+authenticate after the Redis outage has recovered, so an interrupted Redis
+subscription cannot leave the connection limiter permanently unavailable.
+Kubernetes disruption is deferred until a reviewed cluster recovery controller
+and target operational boundary exist.

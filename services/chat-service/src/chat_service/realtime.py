@@ -104,11 +104,9 @@ class ChatRealtime:
     def __init__(self, settings: Settings, hub: ConnectionHub) -> None:
         self._settings = settings
         self._hub = hub
-        self._client: Redis | None = (
-            Redis.from_url(settings.redis_url, decode_responses=True, health_check_interval=30)
-            if settings.redis_enabled
-            else None
-        )
+        self._command_client = self._create_redis_client()
+        self._subscriber_client = self._create_redis_client()
+        self._command_client_recovery_lock = asyncio.Lock()
         self._stop = asyncio.Event()
         self._subscriber_task: asyncio.Task[None] | None = None
         self._pubsub: Any | None = None
@@ -120,7 +118,7 @@ class ChatRealtime:
         self._websocket_request_errors = 0
 
     async def start(self) -> None:
-        if self._client is not None and self._subscriber_task is None:
+        if self._subscriber_client is not None and self._subscriber_task is None:
             self._subscriber_task = asyncio.create_task(self._run_subscriber())
 
     async def stop(self) -> None:
@@ -131,20 +129,18 @@ class ChatRealtime:
             self._subscriber_task.cancel()
             await asyncio.gather(self._subscriber_task, return_exceptions=True)
             self._subscriber_task = None
-        if self._client is not None:
-            await self._client.aclose()
+        if self._command_client is not None:
+            await self._command_client.aclose()
+        if self._subscriber_client is not None:
+            await self._subscriber_client.aclose()
 
     async def allow_connection(self, *, remote_ip: str) -> bool:
-        if self._client is None:
+        if self._command_client is None:
             self._connection_rate_limit_rejections += 1
             return False
         key = f"fastapi-platform:chat:ws-rate:v1:{remote_ip}"
         try:
-            count = await self._client.incr(key)
-            if count == 1:
-                await self._client.expire(
-                    key, self._settings.websocket_connection_rate_window_seconds
-                )
+            count = await self._increment_connection_count(key=key)
             allowed = count <= self._settings.websocket_connection_rate_limit
             if not allowed:
                 self._connection_rate_limit_rejections += 1
@@ -167,27 +163,27 @@ class ChatRealtime:
         await self._refresh_presence(subject_id=subject_id, connection_id=connection_id)
 
     async def _refresh_presence(self, *, subject_id: UUID, connection_id: UUID) -> None:
-        if self._client is None:
+        if self._command_client is None:
             return
         key = self._presence_key(subject_id)
         try:
-            await self._client.zadd(
+            await self._command_client.zadd(
                 key,
                 {
                     f"{self._settings.redis_instance_id}:{connection_id}": time.time()
                     + self._settings.presence_ttl_seconds
                 },
             )
-            await self._client.expire(key, self._settings.presence_ttl_seconds * 2)
+            await self._command_client.expire(key, self._settings.presence_ttl_seconds * 2)
         except RedisError:
             self._presence_failures += 1
             logger.warning("chat_presence_unavailable")
 
     async def leave_presence(self, *, subject_id: UUID, connection_id: UUID) -> None:
-        if self._client is None:
+        if self._command_client is None:
             return
         try:
-            await self._client.zrem(
+            await self._command_client.zrem(
                 self._presence_key(subject_id),
                 f"{self._settings.redis_instance_id}:{connection_id}",
             )
@@ -196,12 +192,12 @@ class ChatRealtime:
             logger.warning("chat_presence_unavailable")
 
     async def presence_status(self, *, subject_id: UUID) -> Literal["online", "offline", "unknown"]:
-        if self._client is None:
+        if self._command_client is None:
             return "unknown"
         key = self._presence_key(subject_id)
         try:
-            await self._client.zremrangebyscore(key, 0, time.time())
-            return "online" if await self._client.zcard(key) > 0 else "offline"
+            await self._command_client.zremrangebyscore(key, 0, time.time())
+            return "online" if await self._command_client.zcard(key) > 0 else "offline"
         except RedisError:
             self._presence_failures += 1
             logger.warning("chat_presence_unavailable")
@@ -212,7 +208,7 @@ class ChatRealtime:
             participant_ids=sent_message.participant_ids,
             message=sent_message.message,
         )
-        if self._client is None or sent_message.duplicate:
+        if self._command_client is None or sent_message.duplicate:
             return
         notification = FanoutNotification(
             origin_instance_id=self._settings.redis_instance_id,
@@ -220,7 +216,9 @@ class ChatRealtime:
             message=sent_message.message,
         )
         try:
-            await self._client.publish(self._settings.redis_channel, notification.model_dump_json())
+            await self._command_client.publish(
+                self._settings.redis_channel, notification.model_dump_json()
+            )
         except RedisError:
             self._redis_fanout_publish_failures += 1
             logger.warning("chat_fanout_publish_failed")
@@ -268,6 +266,45 @@ class ChatRealtime:
     def _presence_key(self, subject_id: UUID) -> str:
         return f"fastapi-platform:chat:presence:v1:{subject_id}"
 
+    def _create_redis_client(self) -> Redis | None:
+        if not self._settings.redis_enabled:
+            return None
+        return Redis.from_url(
+            self._settings.redis_url,
+            decode_responses=True,
+            health_check_interval=30,
+        )
+
+    async def _increment_connection_count(self, *, key: str) -> int:
+        client = self._command_client
+        if client is None:
+            raise RedisError("Redis is disabled")
+        try:
+            return await self._increment_connection_count_with_client(client=client, key=key)
+        except RedisError:
+            recovered_client = await self._replace_failed_command_client(failed_client=client)
+            if recovered_client is None:
+                raise
+            return await self._increment_connection_count_with_client(
+                client=recovered_client, key=key
+            )
+
+    async def _increment_connection_count_with_client(self, *, client: Redis, key: str) -> int:
+        count = await client.incr(key)
+        if count == 1:
+            await client.expire(key, self._settings.websocket_connection_rate_window_seconds)
+        return count
+
+    async def _replace_failed_command_client(self, *, failed_client: Redis) -> Redis | None:
+        async with self._command_client_recovery_lock:
+            current_client = self._command_client
+            if current_client is not failed_client:
+                return current_client
+            replacement_client = self._create_redis_client()
+            self._command_client = replacement_client
+            await failed_client.aclose()
+            return replacement_client
+
     async def _run_subscriber(self) -> None:
         delay = self._settings.redis_subscriber_retry_seconds
         while not self._stop.is_set():
@@ -285,9 +322,9 @@ class ChatRealtime:
                     delay = min(delay * 2, self._settings.redis_subscriber_max_retry_seconds)
 
     async def _listen_once(self) -> None:
-        if self._client is None:
+        if self._subscriber_client is None:
             return
-        pubsub = self._client.pubsub()
+        pubsub = self._subscriber_client.pubsub()
         self._pubsub = pubsub
         try:
             await pubsub.subscribe(self._settings.redis_channel)

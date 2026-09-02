@@ -1,7 +1,13 @@
 import asyncio
 
+import pytest
+from redis.exceptions import RedisError
 from search_service.config import Settings
-from search_service.rate_limit import PublicSearchRateLimited, PublicSearchRateLimiter
+from search_service.rate_limit import (
+    PublicSearchRateLimited,
+    PublicSearchRateLimiter,
+    PublicSearchRateLimitUnavailable,
+)
 
 
 class FakeRedis:
@@ -35,5 +41,19 @@ def test_public_search_limit_uses_hashed_source_ip() -> None:
         else:
             raise AssertionError("second request was not rate limited")
         assert all("203.0.113.8" not in key for key in fake.values)
+
+    asyncio.run(scenario())
+
+
+def test_public_search_fails_closed_when_redis_is_unavailable() -> None:
+    class UnavailableRedis:
+        async def incr(self, _: str) -> int:
+            raise RedisError("unavailable")
+
+    async def scenario() -> None:
+        limiter = PublicSearchRateLimiter(Settings())
+        limiter._client = UnavailableRedis()  # type: ignore[assignment]
+        with pytest.raises(PublicSearchRateLimitUnavailable):
+            await limiter.check("203.0.113.8")
 
     asyncio.run(scenario())
