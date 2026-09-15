@@ -77,9 +77,6 @@ one sequential `GHCR` job only after every scan succeeds.
   carrier-managed reverse logistics, and third-party carrier integration remain
   out of scope. Order owns the implemented full-order return request and
   physical-receipt workflow.
-- License selection is intentionally left to the repository owner because it
-  is a legal/product decision.
-
 ## Review principle
 
 Treat the architecture documents and canonical artifacts under `contracts/`

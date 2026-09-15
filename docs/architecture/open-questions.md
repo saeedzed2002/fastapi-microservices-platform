@@ -32,12 +32,6 @@ Resolved by ADR-026: Catalog uses a synchronous, short-lived HMAC-authenticated 
 
 Specify fail-open, fail-closed, or durable fallback behavior before each feature first depends on Redis: security state in Phase 2, Cart cache in Phase 4, and Chat fan-out/presence in Phase 7.
 
-## Owner decision not blocking technical Phase 1 work
-
-### License
-
-The repository license is a legal/product decision. No license file is created until the owner selects one.
-
 ## Decisions required before Phase 5
 
 ### Authoritative checkout composition

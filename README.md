@@ -227,4 +227,4 @@ containers. `scripts/platform.ps1` remains available as an optional task runner.
 
 ## License
 
-No license has been selected yet. License selection is a legal/product decision and will not be inferred from the technical architecture.
+This repository is licensed under the [MIT License](LICENSE).
