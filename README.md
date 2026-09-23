@@ -1,6 +1,6 @@
 # FastAPI Microservices Platform
 
-FastAPI Microservices Platform is a backend-only, production-oriented e-commerce platform built as independently deployable, event-driven microservices. The e-commerce domain is used to exercise distributed consistency, failure recovery, observability, security, and delivery practices; endpoint count is not the project goal.
+FastAPI Microservices Platform is a backend-only, portfolio-oriented e-commerce platform built as independently deployable, event-driven microservices. The e-commerce domain is used to exercise distributed consistency, failure recovery, observability, security, and delivery practices; endpoint count is not the project goal.
 
 ## Project status
 
