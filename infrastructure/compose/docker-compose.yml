@@ -703,7 +703,7 @@ services:
         condition: service_started
 
   prometheus:
-    image: prom/prometheus:v3.14.0
+    image: prom/prometheus:v3.15.0
     profiles: [observability]
     command:
       - --config.file=/etc/prometheus/prometheus.yml
